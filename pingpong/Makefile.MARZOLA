@@ -1,5 +1,5 @@
-MPI_HOME  = ??
-CUDA_HOME = ??
+CUDA_HOME=/usr/local/cuda-12.1
+MPI_HOME=/opt/shares/openmpi-4.1.5
 
 # CC=${MPI_HOME}/bin/mpicc
 CC=nvcc
