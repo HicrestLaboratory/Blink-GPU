@@ -5,14 +5,14 @@ NCCL_HOME=/home/root/opt/nvhpc/Linux_x86_64/23.1/comm_libs/11.8/nccl
 # CC=${MPI_HOME}/bin/mpicc
 CC=nvcc
 CFLAGS=-O3 -std=c++14
-LIBS=-L$(MPI_HOME)/lib -L$(CUDA_HOME)/lib64 -L$(CUDA_HOME)/compact -L$(NCCL_HOME)/lib
-INCL=-I$(MPI_HOME)/include -I$(CUDA_HOME)/include -I$(NCCL_HOME)/include
-LIBFLAGS=-lmpi -lcudart -lcuda -lnccl
+LIBS=-L$(MPI_HOME)/lib -L$(CUDA_HOME)/lib64 -L$(CUDA_HOME)/compact
+INCL=-I$(MPI_HOME)/include -I$(CUDA_HOME)/include
+LIBFLAGS=-lmpi -lcudart -lcuda
 DBGFLAGS=-g -G
 
-pingpong: pingpong.cu
+topology-finder: topology-finder.cu
 	$(CC) $(CFLAGS) -o $@ $< $(INCL) $(LIBS) $(LIBFLAGS) -lstdc++ -lm -Wno-deprecated-gpu-targets $(DBGFLAGS)
 
 clean:
-	rm pingpong
+	rm topology-finder
 

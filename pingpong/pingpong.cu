@@ -19,19 +19,44 @@
 #include <string.h>
 #include <sys/time.h>
 
+#define CUDA
+#define NCCL
+// #define GPUDIRECT
+
+#ifdef CUDA
 #include "../include/helper_cuda.h"
 #include "../include/experiment_utils.h"
-// #include <../lib/llvm-13/lib/clang/13.0.1/include/stddef.h>
+#include <cuda.h>
 #include <cuda_runtime.h>
 #include <cuda_runtime_api.h>
 #include <cuda_device_runtime_api.h>
-#include <nccl.h>
+#endif
 
-// #define DEBUG 1
-#define NCCL
+#ifdef NCCL
+#include <nccl.h>
+#endif
+
+#ifdef GPUDIRECT
+#ifdef __cplusplus
+extern "C" {
+#endif
+#include <nv-p2p.h>
+#ifdef __cplusplus
+}
+#endif
+#include <builtin_types.h>
+
+// for boundary alignment requirement
+#define GPU_BOUND_SHIFT   16
+#define GPU_BOUND_SIZE    ((uint64_t)1 << GPU_BOUND_SHIFT)
+#define GPU_BOUND_OFFSET  (GPU_BOUND_SIZE-1)
+#define GPU_BOUND_MASK    (~GPU_BOUND_OFFSET)
+
+#endif
+
+#define DEBUG 2
 #include "../include/debug_utils.h"
 
-#define CUDA
 #define BLK_SIZE 256
 #define GRD_SIZE 4
 
@@ -109,7 +134,7 @@ unsigned long long int check_result(int n, int myid, char* dev_recvBuffer, int r
   checkCudaErrors( cudaDeviceSynchronize() );
 
   for (int i=0; i<n; i++)
-    error += (unsigned long long int)(recvid*i - checkBuffer[i]);
+    error += (unsigned long long int)((recvid+1)*i - checkBuffer[i]);
 
   free(checkBuffer);
 
@@ -213,7 +238,7 @@ int main(int argc, char* argv[]) {
   dim3 block_size(BLK_SIZE, 1, 1);
   dim3 grid_size(GRD_SIZE, 1, 1);
   printf("block_size = %d, grid_size = %d, elements per thread = %f\n", block_size.x, grid_size.x, (float)msgSize/(block_size.x*grid_size.x));
-  init_kernel<<<grid_size, block_size>>>(msgSize, dev_sendBuffer, me);
+  init_kernel<<<grid_size, block_size>>>(msgSize, dev_sendBuffer, me+1);
   checkCudaErrors( cudaDeviceSynchronize() );
 #else
   for (int i = 0; i < msgSize; ++i)
@@ -314,7 +339,7 @@ int main(int argc, char* argv[]) {
   timeTaken = 0.0;
   checkCudaErrors( cudaMemset(dev_sendBuffer, 0, msgSize*sizeof(char)) );
   checkCudaErrors( cudaMemset(dev_recvBuffer, 0, msgSize*sizeof(char)) );
-  init_kernel<<<grid_size, block_size>>>(msgSize, dev_sendBuffer, me);
+  init_kernel<<<grid_size, block_size>>>(msgSize, dev_sendBuffer, me+1);
   checkCudaErrors( cudaDeviceSynchronize() );
   DBG_CHECK(1)
 
@@ -351,6 +376,54 @@ int main(int argc, char* argv[]) {
     ADD_TIME_EXPERIMENT(1, timeTaken);
   }
   DBG_CHECK(1)
+#else
+  if (0 == me) printf("# the NCCL macro is disabled\n");
+#endif
+
+  if (0 == me) printf("# ---------------- GPU Direct ----------------\n");
+  SET_EXPERIMENT(2, "GPUDirect")
+  MPI_Barrier(MPI_COMM_WORLD);
+  DBG_CHECK(1)
+
+#ifdef GPUDIRECT
+
+  interror = 0ULL;
+  timeTaken = 0.0;
+  CUdeviceptr devptrSend, devptrRecv;
+  checkCudaResult( cuMemAlloc ( &devptrSend, msgSize*sizeof(char) ) );
+  checkCudaResult( cuMemAlloc ( &devptrRecv, msgSize*sizeof(char) ) );
+
+  checkCudaErrors( cudaFree(dev_sendBuffer) );
+  checkCudaErrors( cudaFree(dev_recvBuffer) );
+  dev_sendBuffer = (char*) devptrSend;
+  dev_recvBuffer = (char*) devptrRecv;
+
+  init_kernel<<<grid_size, block_size>>>(msgSize, dev_sendBuffer, me+1);
+  checkCudaErrors( cudaDeviceSynchronize() );
+  DBG_CHECK(2)
+
+
+  unsigned int flag = 1;
+  checkCudaResult( cuPointerSetAttribute(&flag, CU_POINTER_ATTRIBUTE_SYNC_MEMOPS, devptrSend) );
+  DBG_CHECK(2)
+
+  nvidia_p2p_page_table *page_table;
+  // do proper alignment, as required by NVIDIA kernel driver
+  uint64_t virt_start = devptrSend & GPU_BOUND_MASK;
+  size_t pin_size = devptrSend + msgSize*sizeof(char) - virt_start;
+  if (msgSize == 0)
+      return -EINVAL;
+  int ret = nvidia_p2p_get_pages(0, 0, virt_start, pin_size, &page_table, NULL, dev_sendBuffer);
+  if (ret == 0) {
+      printf("Succesfully pinned, page_table can be accessed");
+  } else {
+      fprintf(stderr, "Pinning failed");
+      exit(42);
+  }
+  DBG_CHECK(2)
+
+#else
+  if (0 == me) printf("# the GPUDIRECT macro is disabled\n");
 #endif
 
   MPI_Barrier(MPI_COMM_WORLD);

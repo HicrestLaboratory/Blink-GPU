@@ -50,24 +50,28 @@
 
 #define MPI_ALL_PRINT(X) \
   {\
+    int inmacro_myid, inmacro_ntask;  \
+    MPI_Comm_rank(MPI_COMM_WORLD, &inmacro_myid);  \
+	MPI_Comm_size(MPI_COMM_WORLD, &inmacro_ntask);  \
+	\
     FILE *fp;\
     char s[50], s1[50];\
-    sprintf(s, "temp_%d.txt", myid);\
+    sprintf(s, "temp_%d.txt", inmacro_myid);\
     fp = fopen ( s, "w" );\
     fclose(fp);\
     fp = fopen ( s, "a+" );\
-    fprintf(fp, "\t------------------------- Proc %d File %s Line %d -------------------------\n\n", myid, __FILE__, __LINE__);\
+    fprintf(fp, "\t------------------------- Proc %d File %s Line %d -------------------------\n\n", inmacro_myid, __FILE__, __LINE__);\
     X;\
-    if (myid==ntask-1) \
+    if (inmacro_myid==inmacro_ntask-1) \
         fprintf(fp, "\t--------------------------------------------------------------------------\n\n");\
     fclose(fp);\
-    for (int i=0; i<ntask; i++) {\
-        if (myid == i) {\
+    for (int i=0; i<inmacro_ntask; i++) {\
+        if (inmacro_myid == i) {\
             int error; \
-            sprintf(s1, "cat temp_%d.txt", myid);\
+            sprintf(s1, "cat temp_%d.txt", inmacro_myid);\
             error = system(s1);\
             if (error == -1) fprintf(stderr, "Error at line %d of file %s", __LINE__, __FILE__); \
-            sprintf(s1, "rm temp_%d.txt", myid);\
+            sprintf(s1, "rm temp_%d.txt", inmacro_myid);\
             error = system(s1);\
             if (error == -1) fprintf(stderr, "Error at line %d of file %s", __LINE__, __FILE__); \
         }\
@@ -204,6 +208,22 @@
         fprintf((FP), "%3d ", CL[i_macro]);           \
     fprintf((FP), "\n\n");                            \
 }
+
+#ifdef CUDA
+// This will output the proper CUDA error strings
+// in the event that a CUDA host call returns an error
+#define checkCudaResult(err)  __checkCudaResult (err, __FILE__, __LINE__)
+
+inline void __checkCudaResult( CUresult err, const char *file, const int line )
+{
+    if( CUDA_SUCCESS != err) {
+        fprintf(stderr,
+                "CUDA Driver API error = %04d from file <%s>, line %i.\n",
+                err, file, line );
+        exit(-1);
+    }
+}
+#endif
 
 #ifdef NCCL
 
