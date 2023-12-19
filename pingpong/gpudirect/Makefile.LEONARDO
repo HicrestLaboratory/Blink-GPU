@@ -10,11 +10,12 @@ INCL=-I$(MPI_HOME)/include -I$(CUDA_HOME)/include -I$(NCCL_HOME)/include -I/leon
 LIBFLAGS=-lmpi -lcudart -lcuda -lnccl
 DBGFLAGS=-g -G
 
+BINFOLDER=../bin
 
 
-pingpong: old_pingpong.cu
+$(BINFOLDER)/pingpong_gpudirect: pingpong_gpudirect.cu
 	$(CC) $(CFLAGS) -o $@ $< $(INCL) $(LIBS) $(LIBFLAGS) -lstdc++ -lm -Wno-deprecated-gpu-targets $(DBGFLAGS)
 
 clean:
-	rm pingpong
+	rm -r $(BINFOLDER)/pingpong_gpudirect
 
