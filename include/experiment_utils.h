@@ -5,7 +5,7 @@
 #define TIMER_STOP(n)	 gettimeofday(&temp_2_##n, (struct timezone*)0)
 #define TIMER_ELAPSED(n) ((temp_2_##n.tv_sec-temp_1_##n.tv_sec)+(temp_2_##n.tv_usec-temp_1_##n.tv_usec)*1.0e-6)
 
-#define NEXP 4
+#define NEXP 8
 #define MAX_EXPLABLE_SIZE 10
 
 typedef struct experiments_statistics {

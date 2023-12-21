@@ -1,0 +1,18 @@
+CUDA_HOME=/leonardo/prod/opt/compilers/cuda/11.8/none
+MPI_HOME=/leonardo/prod/spack/03/install/0.19/linux-rhel8-icelake/nvhpc-23.1/openmpi-4.1.4-6ek2oqarjw755glr5papxirjmamqwvgd
+NCCL_HOME=/home/root/opt/nvhpc/Linux_x86_64/23.1/comm_libs/11.8/nccl
+
+# CC=${MPI_HOME}/bin/mpicc
+CC=nvcc
+CFLAGS=-O3 -std=c++14
+LIBS=-L$(MPI_HOME)/lib -L$(CUDA_HOME)/lib64 -L$(CUDA_HOME)/compact -L$(NCCL_HOME)/lib
+INCL=-I$(MPI_HOME)/include -I$(CUDA_HOME)/include -I$(NCCL_HOME)/include -I/leonardo/prod/build/compilers/cuda/11.8/none/BA_WORK/var/cuda-repo-rhel8-11-8-local/usr/src/nvidia-520.61.05/nvidia
+LIBFLAGS=-lmpi -lcudart -lcuda -lnccl
+DBGFLAGS=-g -G
+
+nccl_test: nccl_test.cu
+	$(CC) $(CFLAGS) -o $@ $< $(INCL) $(LIBS) $(LIBFLAGS) -lstdc++ -lm -Wno-deprecated-gpu-targets $(DBGFLAGS)
+
+clean:
+	rm nccl_test
+

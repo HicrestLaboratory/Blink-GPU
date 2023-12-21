@@ -36,27 +36,6 @@
 #include <nccl.h>
 #endif
 
-#ifdef GPUDIRECT
-
-#ifdef __cplusplus
-extern "C" {
-#endif
-
-#include <nv-p2p.h>
-
-  #ifdef __cplusplus
-}
-#endif
-
-#include <builtin_types.h>
-// for boundary alignment requirement
-#define GPU_BOUND_SHIFT   16
-#define GPU_BOUND_SIZE    ((uint64_t)1 << GPU_BOUND_SHIFT)
-#define GPU_BOUND_OFFSET  (GPU_BOUND_SIZE-1)
-#define GPU_BOUND_MASK    (~GPU_BOUND_OFFSET)
-
-#endif
-
 // #define DEBUG 3
 #include "../../include/debug_utils.h"
 

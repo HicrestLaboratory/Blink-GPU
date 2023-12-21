@@ -1,0 +1,19 @@
+CUDA_HOME=/cm/shared/apps/nvidia/hpc_sdk/Linux_aarch64/23.11/cuda
+MPI_HOME=/cm/shared/apps/nvidia/hpc_sdk/Linux_aarch64/23.11/comm_libs/12.3/hpcx/hpcx-2.16/ompi
+
+CC=nvcc
+CFLAGS=-O3 -std=c++14
+LIBS=-L$(MPI_HOME)/lib -L$(CUDA_HOME)/lib64 -L$(CUDA_HOME)/compact
+INCL=-I$(MPI_HOME)/include -I$(CUDA_HOME)/include -I/leonardo/prod/build/compilers/cuda/11.8/none/BA_WORK/var/cuda-repo-rhel8-11-8-local/usr/src/nvidia-520.61.05/nvidia
+LIBFLAGS=-lmpi -lcudart -lcuda
+DBGFLAGS=-g -G
+
+BINFOLDER=../bin
+
+
+$(BINFOLDER)/pingpong_baseline: pingpong_baseline.cu
+	$(CC) $(CFLAGS) -o $@ $< $(INCL) $(LIBS) $(LIBFLAGS) -lstdc++ -lm -Wno-deprecated-gpu-targets $(DBGFLAGS)
+
+clean:
+	rm -r $(BINFOLDER)/pingpong_baseline
+
