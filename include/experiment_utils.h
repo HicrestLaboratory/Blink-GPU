@@ -9,6 +9,8 @@
 #define MAX_EXPLABLE_SIZE 10
 
 typedef struct experiments_statistics {
+    char* expname[NEXP];
+    char* exptype[NEXP];
     char*  lables[NEXP];
     double  error[NEXP];
     double  times[NEXP];
@@ -24,9 +26,15 @@ ExperimentsStatistics exp_stats;
 
 #define INIT_EXPS {                                                         \
     for (int i=0; i<NEXP; i++) {                                            \
-        char* tmp = (char*)malloc(sizeof(char)*MAX_EXPLABLE_SIZE);          \
-        tmp = (char*) "-----";                                              \
-        exp_stats.lables[i]     = tmp;                                      \
+        char *tmp0 = (char*)malloc(sizeof(char)*MAX_EXPLABLE_SIZE);         \
+        char *tmp1 = (char*)malloc(sizeof(char)*MAX_EXPLABLE_SIZE);         \
+        char *tmp2 = (char*)malloc(sizeof(char)*MAX_EXPLABLE_SIZE);         \
+        strcpy(tmp0, "-----");                                              \
+        strcpy(tmp1, "-----");                                              \
+        strcpy(tmp2, "-----");                                              \
+        exp_stats.lables[i]     = tmp0;                                     \
+        exp_stats.expname[i]    = tmp1;                                     \
+        exp_stats.exptype[i]    = tmp2;                                     \
         exp_stats.error[i]      = 0.0;                                      \
         exp_stats.int_error[i]  = 0ULL;                                     \
         exp_stats.avg_time[i]   = 0.0;                                      \
@@ -40,6 +48,22 @@ ExperimentsStatistics exp_stats;
         exit(42);                                                                                                               \
     }                                                                                                                           \
     exp_stats.lables[I] = (char*) LB ;                                                                                          \
+}
+
+#define SET_EXPERIMENT_NAME(I, LB) {                                                                                            \
+    if ( I >= NEXP) {                                                                                                           \
+        fprintf(stderr, "Invalid experiment number in %s line %d; I was %d when NEXP is %d\n", __FILE__, __LINE__, I, NEXP);    \
+        exit(42);                                                                                                               \
+    }                                                                                                                           \
+    exp_stats.expname[I] = (char*) LB ;                                                                                         \
+}
+
+#define SET_EXPERIMENT_TYPE(I, LB) {                                                                                            \
+    if ( I >= NEXP) {                                                                                                           \
+        fprintf(stderr, "Invalid experiment number in %s line %d; I was %d when NEXP is %d\n", __FILE__, __LINE__, I, NEXP);    \
+        exit(42);                                                                                                               \
+    }                                                                                                                           \
+    exp_stats.exptype[I] = (char*) LB ;                                                                                         \
 }
 
 #define ADD_TIME_EXPERIMENT(I, TM) {                                                                                            \
@@ -67,8 +91,8 @@ ExperimentsStatistics exp_stats;
 }
 
 #define PRINT_EXPARIMENT_STATS {                                                                            \
-    printf("%10s %10s %10s\n", "Experiment", "Time", "IntError");                                           \
+    printf("%10s %10s %10s %10s %10s\n", "Experiment", "Type", "Lable", "Time", "IntError");                                           \
     for (int i=0; i<NEXP; i++) {                                                                            \
-        printf("%10s %10.9lf %10llu\n", exp_stats.lables[i], exp_stats.times[i], exp_stats.int_error[i]);   \
+        printf("%10s %10s %10s %10.9lf %10llu\n", exp_stats.expname[i], exp_stats.exptype[i], exp_stats.lables[i], exp_stats.times[i], exp_stats.int_error[i]);   \
     }                                                                                                       \
 }
