@@ -15,7 +15,7 @@
 #SBATCH --cpus-per-task=8
 #SBATCH --mem=494000MB
 
-mainfolder=/home/lpichett/MPI_GPU_banch/pingpong
+mainfolder=/leonardo/home/userexternal/lpichett/MPI_GPU_banch/pingpong
 binfolder=${mainfolder}/bin
 outfolder=${mainfolder}/out
 

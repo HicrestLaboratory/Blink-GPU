@@ -25,6 +25,8 @@
 #include <cuda_runtime.h>
 #include <cuda_runtime_api.h>
 
+#define NCCL
+
 #include "../../include/experiment_utils.h"
 #include "../../include/debug_utils.h"
 #include "../../include/helper_cuda.h"
@@ -33,6 +35,10 @@
 #define GRD_SIZE 4
 #define dtype float
 #define MPI_dtype MPI_FLOAT
+
+// for nccl
+#include <nccl.h>
+// --------
 
 void get_position(const int rank, const int pex, const int pey, const int pez,
                   int* myX, int* myY, int* myZ) {
@@ -319,19 +325,6 @@ int main(int argc, char* argv[]) {
 
   size_t xSize = ny * nz * vars, ySize = nx * nz * vars, zSize = nx * ny * vars;
 
-  int requestcount = 0;
-  MPI_Status* status;
-  status = (MPI_Status*)malloc(sizeof(MPI_Status) * 4);
-
-  MPI_Request* requests;
-  requests = (MPI_Request*)malloc(sizeof(MPI_Request) * 4);
-
-  dtype* xUpSendBuffer = (dtype*)malloc(sizeof(dtype) * xSize);
-  dtype* xUpRecvBuffer = (dtype*)malloc(sizeof(dtype) * xSize);
-
-  dtype* xDownSendBuffer = (dtype*)malloc(sizeof(dtype) * xSize);
-  dtype* xDownRecvBuffer = (dtype*)malloc(sizeof(dtype) * xSize);
-
   // ---------------------------------------------------------------------------------------
   dtype *dev_xUpSendBuffer, *dev_xUpRecvBuffer, *dev_xDownSendBuffer, *dev_xDownRecvBuffer;
   checkCudaErrors( cudaMalloc(&dev_xUpSendBuffer, sizeof(dtype) * xSize) );
@@ -341,13 +334,6 @@ int main(int argc, char* argv[]) {
   // ---------------------------------------------------------------------------------------
 
   // ---------------------------------------
-//   for (int i = 0; i < xSize; i++) {
-//     xUpSendBuffer[i] = i;
-//     xUpRecvBuffer[i] = i;
-//     xDownSendBuffer[i] = i;
-//     xDownRecvBuffer[i] = i;
-//   }
-  // >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
   checkCudaErrors( cudaMemset(dev_xUpSendBuffer, 0, sizeof(dtype) * xSize) );
   checkCudaErrors( cudaMemset(dev_xUpRecvBuffer, 0, sizeof(dtype) * xSize) );
   checkCudaErrors( cudaMemset(dev_xDownSendBuffer, 0, sizeof(dtype) * xSize) );
@@ -362,12 +348,6 @@ int main(int argc, char* argv[]) {
   }
   // ---------------------------------------
 
-  dtype* yUpSendBuffer = (dtype*)malloc(sizeof(dtype) * ySize);
-  dtype* yUpRecvBuffer = (dtype*)malloc(sizeof(dtype) * ySize);
-
-  dtype* yDownSendBuffer = (dtype*)malloc(sizeof(dtype) * ySize);
-  dtype* yDownRecvBuffer = (dtype*)malloc(sizeof(dtype) * ySize);
-
   // ---------------------------------------------------------------------------------------
   dtype *dev_yUpSendBuffer, *dev_yUpRecvBuffer, *dev_yDownSendBuffer, *dev_yDownRecvBuffer;
   checkCudaErrors( cudaMalloc(&dev_yUpSendBuffer, sizeof(dtype) * ySize) );
@@ -377,13 +357,6 @@ int main(int argc, char* argv[]) {
   // --------------------------------------------------------------------------------------
 
   // ---------------------------------------
-//   for (int i = 0; i < ySize; i++) {
-//     yUpSendBuffer[i] = i;
-//     yUpRecvBuffer[i] = i;
-//     yDownSendBuffer[i] = i;
-//     yDownRecvBuffer[i] = i;
-//   }
-  // >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
   checkCudaErrors( cudaMemset(dev_yUpSendBuffer, 0, sizeof(dtype) * ySize) );
   checkCudaErrors( cudaMemset(dev_yUpRecvBuffer, 0, sizeof(dtype) * ySize) );
   checkCudaErrors( cudaMemset(dev_yDownSendBuffer, 0, sizeof(dtype) * ySize) );
@@ -398,12 +371,6 @@ int main(int argc, char* argv[]) {
   }
   // ---------------------------------------
 
-  dtype* zUpSendBuffer = (dtype*)malloc(sizeof(dtype) * zSize);
-  dtype* zUpRecvBuffer = (dtype*)malloc(sizeof(dtype) * zSize);
-
-  dtype* zDownSendBuffer = (dtype*)malloc(sizeof(dtype) * zSize);
-  dtype* zDownRecvBuffer = (dtype*)malloc(sizeof(dtype) * zSize);
-
   // ---------------------------------------------------------------------------------------
   dtype *dev_zUpSendBuffer, *dev_zUpRecvBuffer, *dev_zDownSendBuffer, *dev_zDownRecvBuffer;
   checkCudaErrors( cudaMalloc(&dev_zUpSendBuffer, sizeof(dtype) * zSize) );
@@ -413,13 +380,6 @@ int main(int argc, char* argv[]) {
   // --------------------------------------------------------------------------------------
 
   // ---------------------------------------
-//   for (int i = 0; i < zSize; i++) {
-//     zUpSendBuffer[i] = i;
-//     zUpRecvBuffer[i] = i;
-//     zDownSendBuffer[i] = i;
-//     zDownRecvBuffer[i] = i;
-//   }
-  // >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
   checkCudaErrors( cudaMemset(dev_zUpSendBuffer, 0, sizeof(dtype) * zSize) );
   checkCudaErrors( cudaMemset(dev_zUpRecvBuffer, 0, sizeof(dtype) * zSize) );
   checkCudaErrors( cudaMemset(dev_zDownSendBuffer, 0, sizeof(dtype) * zSize) );
@@ -434,6 +394,45 @@ int main(int argc, char* argv[]) {
   }
   // ---------------------------------------
 
+  // ---------------------------------------
+  ncclUniqueId Id;
+  ncclComm_t NCCL_COMM_WORLD, NCCL_COMM_NODE;
+
+  ncclGroupStart();
+  if (mynodeid == 0) { NCCLCHECK( ncclGetUniqueId(&Id) ); }
+  MPI_Bcast(&Id, sizeof(ncclUniqueId), MPI_BYTE, 0, nodeComm);
+  NCCLCHECK( ncclCommInitRank(&NCCL_COMM_NODE, mynodesize, Id, mynodeid) );
+  ncclGroupEnd();
+  MPI_Barrier(MPI_COMM_WORLD);
+
+  ncclGroupStart();
+  if (me == 0) { NCCLCHECK( ncclGetUniqueId(&Id) ); }
+  MPI_Bcast(&Id, sizeof(ncclUniqueId), MPI_BYTE, 0, MPI_COMM_WORLD);
+  NCCLCHECK( ncclCommInitRank(&NCCL_COMM_WORLD, world, Id, me) );
+  ncclGroupEnd();
+
+  MPI_ALL_PRINT(
+    int nccl_w_rk;
+    int nccl_w_sz;
+    ncclGroupStart();
+    NCCLCHECK( ncclCommCount(NCCL_COMM_WORLD, &nccl_w_sz)   );
+    NCCLCHECK( ncclCommUserRank(NCCL_COMM_WORLD, &nccl_w_rk) );
+    ncclGroupEnd();
+
+    int nccl_n_rk;
+    int nccl_n_sz;
+    ncclGroupStart();
+    NCCLCHECK( ncclCommCount(NCCL_COMM_NODE, &nccl_n_sz)   );
+    NCCLCHECK( ncclCommUserRank(NCCL_COMM_NODE, &nccl_n_rk) );
+    ncclGroupEnd();
+
+    fprintf(fp, "NCCL_COMM_WORLD: nccl size = %d, nccl rank = %d\n", nccl_w_sz, nccl_w_rk);
+    fprintf(fp, "NCCL_COMM_NODE:  nccl size = %d, nccl rank = %d\n", nccl_n_sz, nccl_n_rk);
+  )
+
+  MPI_Barrier(MPI_COMM_WORLD);
+  // ---------------------------------------
+
   struct timeval start;
   struct timeval end;
 
@@ -446,20 +445,11 @@ int main(int argc, char* argv[]) {
   INIT_EXPS
   TIMER_DEF(0);
   SET_EXPERIMENT_NAME(0, "halo3d")
-  SET_EXPERIMENT_TYPE(0, "baseline")
-  SET_EXPERIMENT(0, "CUDA")
-
-  SET_EXPERIMENT_NAME(1, "halo3d")
-  SET_EXPERIMENT_TYPE(1, "baseline")
-  SET_EXPERIMENT(1, "MPI")
-
-  SET_EXPERIMENT_NAME(2, "halo3d")
-  SET_EXPERIMENT_TYPE(2, "baseline")
-  SET_EXPERIMENT(2, "TOTAL")
+  SET_EXPERIMENT_TYPE(0, "nccl")
+  SET_EXPERIMENT(0, "TOTAL")
   gettimeofday(&start, NULL);
 
   for (int i = 0; i < repeats; ++i) {
-    requestcount = 0;
 
     if (nanosleep(&sleepTS, &remainTS) == EINTR) {
       while (nanosleep(&remainTS, &remainTS) == EINTR)
@@ -468,178 +458,68 @@ int main(int argc, char* argv[]) {
 
     // =================================================================================================================
 
-    // ---------------------------------------
     TIMER_START(0);
     if (xUp > -1) {
-      checkCudaErrors( cudaMemcpy(xUpSendBuffer, dev_xUpSendBuffer, xSize*sizeof(dtype), cudaMemcpyDeviceToHost) );
+      ncclGroupStart();
+      ncclSend(dev_xUpSendBuffer, xSize, ncclChar, xUp, NCCL_COMM_WORLD, NULL);
+      ncclRecv(dev_xUpRecvBuffer, xSize, ncclChar, xUp, NCCL_COMM_WORLD, NULL);
+      ncclGroupEnd();
     }
 
     if (xDown > -1) {
-      checkCudaErrors( cudaMemcpy(xDownSendBuffer, dev_xDownSendBuffer, xSize*sizeof(dtype), cudaMemcpyDeviceToHost) );
+      ncclGroupStart();
+      ncclSend(dev_xDownSendBuffer, xSize, ncclChar, xDown, NCCL_COMM_WORLD, NULL);
+      ncclRecv(dev_xDownRecvBuffer, xSize, ncclChar, xDown, NCCL_COMM_WORLD, NULL);
+      ncclGroupEnd();
     }
-
-    checkCudaErrors( cudaDeviceSynchronize() );
     TIMER_STOP(0);
     timeTakenCUDA += TIMER_ELAPSED(0);
-    // ---------------------------------------
-
-    TIMER_START(0);
-    if (xUp > -1) {
-
-      MPI_Irecv(xUpRecvBuffer, xSize, MPI_dtype, xUp, 1000,
-                MPI_COMM_WORLD, &requests[requestcount++]);
-      MPI_Isend(xUpSendBuffer, xSize, MPI_dtype, xUp, 1000,
-                MPI_COMM_WORLD, &requests[requestcount++]);
-    }
-
-    if (xDown > -1) {
-      MPI_Irecv(xDownRecvBuffer, xSize, MPI_dtype, xDown, 1000,
-                MPI_COMM_WORLD, &requests[requestcount++]);
-      MPI_Isend(xDownSendBuffer, xSize, MPI_dtype, xDown, 1000,
-                MPI_COMM_WORLD, &requests[requestcount++]);
-    }
-
-    MPI_Waitall(requestcount, requests, status);
-    requestcount = 0;
-    TIMER_STOP(0);
-    timeTakenMPI += TIMER_ELAPSED(0);
-
-    // ---------------------------------------
-    TIMER_START(0);
-    if (xUp > -1) {
-      checkCudaErrors( cudaMemcpy(dev_xUpRecvBuffer, xUpRecvBuffer, xSize*sizeof(dtype), cudaMemcpyHostToDevice) );
-    }
-
-    if (xDown > -1) {
-      checkCudaErrors( cudaMemcpy(dev_xDownRecvBuffer, xDownRecvBuffer, xSize*sizeof(dtype), cudaMemcpyHostToDevice) );
-    }
-
-    checkCudaErrors( cudaDeviceSynchronize() );
-    TIMER_STOP(0);
-    timeTakenCUDA += TIMER_ELAPSED(0);
-    // ---------------------------------------
 
     // =================================================================================================================
 
-    // ---------------------------------------
     TIMER_START(0);
     if (yUp > -1) {
-      checkCudaErrors( cudaMemcpy(yUpSendBuffer, dev_yUpSendBuffer, ySize*sizeof(dtype), cudaMemcpyDeviceToHost) );
+      ncclGroupStart();
+      ncclSend(dev_yUpSendBuffer, ySize, ncclChar, yUp, NCCL_COMM_WORLD, NULL);
+      ncclRecv(dev_yUpRecvBuffer, ySize, ncclChar, yUp, NCCL_COMM_WORLD, NULL);
+      ncclGroupEnd();
     }
 
     if (yDown > -1) {
-      checkCudaErrors( cudaMemcpy(yDownSendBuffer, dev_yDownSendBuffer, ySize*sizeof(dtype), cudaMemcpyDeviceToHost) );
+      ncclGroupStart();
+      ncclSend(dev_yDownSendBuffer, ySize, ncclChar, yDown, NCCL_COMM_WORLD, NULL);
+      ncclRecv(dev_yDownRecvBuffer, ySize, ncclChar, yDown, NCCL_COMM_WORLD, NULL);
+      ncclGroupEnd();
     }
-
-    checkCudaErrors( cudaDeviceSynchronize() );
     TIMER_STOP(0);
     timeTakenCUDA += TIMER_ELAPSED(0);
-    // ---------------------------------------
-
-    TIMER_START(0);
-    if (yUp > -1) {
-      MPI_Irecv(yUpRecvBuffer, ySize, MPI_dtype, yUp, 2000,
-                MPI_COMM_WORLD, &requests[requestcount++]);
-      MPI_Isend(yUpSendBuffer, ySize, MPI_dtype, yUp, 2000,
-                MPI_COMM_WORLD, &requests[requestcount++]);
-    }
-
-    if (yDown > -1) {
-      MPI_Irecv(yDownRecvBuffer, ySize, MPI_dtype, yDown, 2000,
-                MPI_COMM_WORLD, &requests[requestcount++]);
-      MPI_Isend(yDownSendBuffer, ySize, MPI_dtype, yDown, 2000,
-                MPI_COMM_WORLD, &requests[requestcount++]);
-    }
-
-    MPI_Waitall(requestcount, requests, status);
-    requestcount = 0;
-    TIMER_STOP(0);
-    timeTakenMPI += TIMER_ELAPSED(0);
-
-    // ---------------------------------------
-    TIMER_START(0);
-    if (yUp > -1) {
-      checkCudaErrors( cudaMemcpy(dev_yUpRecvBuffer, yUpRecvBuffer, ySize*sizeof(dtype), cudaMemcpyHostToDevice) );
-    }
-
-    if (yDown > -1) {
-      checkCudaErrors( cudaMemcpy(dev_yDownRecvBuffer, yDownRecvBuffer, ySize*sizeof(dtype), cudaMemcpyHostToDevice) );
-    }
-
-    checkCudaErrors( cudaDeviceSynchronize() );
-    TIMER_STOP(0);
-    timeTakenCUDA += TIMER_ELAPSED(0);
-    // ---------------------------------------
 
     // =================================================================================================================
 
-    // ---------------------------------------
     TIMER_START(0);
     if (zUp > -1) {
-      checkCudaErrors( cudaMemcpy(zUpSendBuffer, dev_zUpSendBuffer, zSize*sizeof(dtype), cudaMemcpyDeviceToHost) );
+      ncclGroupStart();
+      ncclSend(dev_zUpSendBuffer, zSize, ncclChar, zUp, NCCL_COMM_WORLD, NULL);
+      ncclRecv(dev_zUpRecvBuffer, zSize, ncclChar, zUp, NCCL_COMM_WORLD, NULL);
+      ncclGroupEnd();
     }
 
     if (zDown > -1) {
-      checkCudaErrors( cudaMemcpy(zDownSendBuffer, dev_zDownSendBuffer, zSize*sizeof(dtype), cudaMemcpyDeviceToHost) );
+      ncclGroupStart();
+      ncclSend(dev_zDownSendBuffer, zSize, ncclChar, zDown, NCCL_COMM_WORLD, NULL);
+      ncclRecv(dev_zDownRecvBuffer, zSize, ncclChar, zDown, NCCL_COMM_WORLD, NULL);
+      ncclGroupEnd();
     }
-
-    checkCudaErrors( cudaDeviceSynchronize() );
     TIMER_STOP(0);
     timeTakenCUDA += TIMER_ELAPSED(0);
-    // ---------------------------------------
-
-    TIMER_START(0);
-    if (zUp > -1) {
-      MPI_Irecv(zUpRecvBuffer, zSize, MPI_dtype, zUp, 4000,
-                MPI_COMM_WORLD, &requests[requestcount++]);
-      MPI_Isend(zUpSendBuffer, zSize, MPI_dtype, zUp, 4000,
-                MPI_COMM_WORLD, &requests[requestcount++]);
-    }
-
-    if (zDown > -1) {
-      MPI_Irecv(zDownRecvBuffer, zSize, MPI_dtype, zDown, 4000,
-                MPI_COMM_WORLD, &requests[requestcount++]);
-      MPI_Isend(zDownSendBuffer, zSize, MPI_dtype, zDown, 4000,
-                MPI_COMM_WORLD, &requests[requestcount++]);
-    }
-
-    MPI_Waitall(requestcount, requests, status);
-    requestcount = 0;
-    TIMER_STOP(0);
-    timeTakenMPI += TIMER_ELAPSED(0);
-
-    // ---------------------------------------
-    TIMER_START(0);
-    if (zUp > -1) {
-      checkCudaErrors( cudaMemcpy(dev_zUpRecvBuffer, zUpRecvBuffer, zSize*sizeof(dtype), cudaMemcpyHostToDevice) );
-    }
-
-    if (zDown > -1) {
-      checkCudaErrors( cudaMemcpy(dev_zDownRecvBuffer, zDownRecvBuffer, zSize*sizeof(dtype), cudaMemcpyHostToDevice) );
-    }
-
-    checkCudaErrors( cudaDeviceSynchronize() );
-    TIMER_STOP(0);
-    timeTakenCUDA += TIMER_ELAPSED(0);
-    // ---------------------------------------
 
     // =================================================================================================================
   }
 
   gettimeofday(&end, NULL);
   ADD_TIME_EXPERIMENT(0, timeTakenCUDA)
-  ADD_TIME_EXPERIMENT(1, timeTakenMPI)
-  TotalTimeTaken = timeTakenCUDA + timeTakenMPI;
-  ADD_TIME_EXPERIMENT(2, TotalTimeTaken)
 
   MPI_Barrier(MPI_COMM_WORLD);
-
-  free(xUpRecvBuffer);
-  free(xDownRecvBuffer);
-  free(yUpRecvBuffer);
-  free(yDownRecvBuffer);
-  free(zUpRecvBuffer);
-  free(zDownRecvBuffer);
 
   if (convert_position_to_rank(pex, pey, pez, pex / 2, pey / 2, pez / 2) ==
       me) {

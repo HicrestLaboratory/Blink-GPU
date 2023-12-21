@@ -15,7 +15,7 @@
 #SBATCH --cpus-per-task=8
 #SBATCH --mem=494000MB
 
-mainfolder=/leonardo/home/userexternal/lpichett/MPI_GPU_banch/pingpong
+mainfolder=/leonardo/home/userexternal/lpichett/MPI_GPU_banch/halo3d
 binfolder=${mainfolder}/bin
 outfolder=${mainfolder}/out
 
@@ -23,12 +23,12 @@ echo " ------ PingPong ------ "
 echo "     myfolder: $mainfolder"
 echo "     binfolder: $binfolder"
 
-for binaryPath in ${binfolder}/*
+for binaryPath in "${binfolder}"/*
 do
 	binaryFile=$(echo "$binaryPath" | sed 's|.*/||')
-	echo "binaryFile= --> $binaryFile"
+	echo "binaryFile --> $binaryFile"
 	start_time="$(date -u +%s)"
-	exitcode=$(mpirun -np 2 ${binaryPath} > ${outfolder}/${binaryFile}.out 2> ${outfolder}/${binaryFile}.err)
+	exitcode=$(srun "${binaryPath}" -pex 2 -pey 2 -pez 2 > "${outfolder}/${binaryFile}.out" 2> "${outfolder}/${binaryFile}.err")
 	end_time="$(date -u +%s)"
 
 	echo " exitcode:    $exitcode"
