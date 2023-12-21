@@ -33,6 +33,8 @@
 
 #define BLK_SIZE 256
 #define GRD_SIZE 4
+#define TID_DIGITS 10000
+
 #define dtype float
 #define MPI_dtype MPI_FLOAT
 
@@ -115,15 +117,28 @@ int  assignDeviceToProcess(MPI_Comm *nodeComm, int *nnodes, int *mynodeid)
 }
 
 __global__
-void init_kernel(int n, dtype *input, int scale) {
-
+void init_kernel(int n, dtype *input, int rank) {
   int tid = blockIdx.x*blockDim.x + threadIdx.x;
 
-  for (int i=0; i<n; i++) {
-    int val_coord = tid * scale;
-    if (tid < n)
-        input[tid] = (dtype)val_coord;
+  dtype floattid = tid/(dtype)TID_DIGITS;
+  dtype val_coord = rank + floattid;
+  if (tid < n)
+      input[tid] = (dtype)val_coord;
+
+}
+
+__global__
+void test_kernel(int n, int ninputs, size_t *sizes, dtype **inputs, dtype *output) {
+  int tid = blockIdx.x*blockDim.x + threadIdx.x;
+  dtype tmp = 0.0;
+
+  if (tid < n) {
+    for (int i=0; i<ninputs; i++)
+      if (tid < sizes[i])
+        tmp += inputs[i][tid];
   }
+  output[tid] = tmp;
+
 }
 
 int main(int argc, char* argv[]) {
@@ -324,6 +339,7 @@ int main(int argc, char* argv[]) {
   int zDown = convert_position_to_rank(pex, pey, pez, posX, posY, posZ - 1);
 
   size_t xSize = ny * nz * vars, ySize = nx * nz * vars, zSize = nx * ny * vars;
+  if (me == 0) printf("xSize = %lu, ySize = %lu, zSize = %lu\n", xSize, ySize, zSize);
 
   // ---------------------------------------------------------------------------------------
   dtype *dev_xUpSendBuffer, *dev_xUpRecvBuffer, *dev_xDownSendBuffer, *dev_xDownRecvBuffer;
@@ -331,9 +347,7 @@ int main(int argc, char* argv[]) {
   checkCudaErrors( cudaMalloc(&dev_xUpRecvBuffer, sizeof(dtype) * xSize) );
   checkCudaErrors( cudaMalloc(&dev_xDownSendBuffer, sizeof(dtype) * xSize) );
   checkCudaErrors( cudaMalloc(&dev_xDownRecvBuffer, sizeof(dtype) * xSize) );
-  // ---------------------------------------------------------------------------------------
 
-  // ---------------------------------------
   checkCudaErrors( cudaMemset(dev_xUpSendBuffer, 0, sizeof(dtype) * xSize) );
   checkCudaErrors( cudaMemset(dev_xUpRecvBuffer, 0, sizeof(dtype) * xSize) );
   checkCudaErrors( cudaMemset(dev_xDownSendBuffer, 0, sizeof(dtype) * xSize) );
@@ -342,8 +356,8 @@ int main(int argc, char* argv[]) {
   {
     dim3 block_size(BLK_SIZE, 1, 1);
     dim3 grid_size(GRD_SIZE, 1, 1);
-    init_kernel<<<grid_size, block_size>>>(xSize, dev_xUpSendBuffer, me+1);
-    init_kernel<<<grid_size, block_size>>>(xSize, dev_xDownSendBuffer, me+1);
+    init_kernel<<<grid_size, block_size>>>(xSize, dev_xUpSendBuffer, me);
+    init_kernel<<<grid_size, block_size>>>(xSize, dev_xDownSendBuffer, me);
     checkCudaErrors( cudaDeviceSynchronize() );
   }
   // ---------------------------------------
@@ -354,9 +368,7 @@ int main(int argc, char* argv[]) {
   checkCudaErrors( cudaMalloc(&dev_yUpRecvBuffer, sizeof(dtype) * ySize) );
   checkCudaErrors( cudaMalloc(&dev_yDownSendBuffer, sizeof(dtype) * ySize) );
   checkCudaErrors( cudaMalloc(&dev_yDownRecvBuffer, sizeof(dtype) * ySize) );
-  // --------------------------------------------------------------------------------------
 
-  // ---------------------------------------
   checkCudaErrors( cudaMemset(dev_yUpSendBuffer, 0, sizeof(dtype) * ySize) );
   checkCudaErrors( cudaMemset(dev_yUpRecvBuffer, 0, sizeof(dtype) * ySize) );
   checkCudaErrors( cudaMemset(dev_yDownSendBuffer, 0, sizeof(dtype) * ySize) );
@@ -365,8 +377,8 @@ int main(int argc, char* argv[]) {
   {
     dim3 block_size(BLK_SIZE, 1, 1);
     dim3 grid_size(GRD_SIZE, 1, 1);
-    init_kernel<<<grid_size, block_size>>>(ySize, dev_yUpSendBuffer, me+1);
-    init_kernel<<<grid_size, block_size>>>(ySize, dev_yDownSendBuffer, me+1);
+    init_kernel<<<grid_size, block_size>>>(ySize, dev_yUpSendBuffer, me);
+    init_kernel<<<grid_size, block_size>>>(ySize, dev_yDownSendBuffer, me);
     checkCudaErrors( cudaDeviceSynchronize() );
   }
   // ---------------------------------------
@@ -377,9 +389,7 @@ int main(int argc, char* argv[]) {
   checkCudaErrors( cudaMalloc(&dev_zUpRecvBuffer, sizeof(dtype) * zSize) );
   checkCudaErrors( cudaMalloc(&dev_zDownSendBuffer, sizeof(dtype) * zSize) );
   checkCudaErrors( cudaMalloc(&dev_zDownRecvBuffer, sizeof(dtype) * zSize) );
-  // --------------------------------------------------------------------------------------
 
-  // ---------------------------------------
   checkCudaErrors( cudaMemset(dev_zUpSendBuffer, 0, sizeof(dtype) * zSize) );
   checkCudaErrors( cudaMemset(dev_zUpRecvBuffer, 0, sizeof(dtype) * zSize) );
   checkCudaErrors( cudaMemset(dev_zDownSendBuffer, 0, sizeof(dtype) * zSize) );
@@ -388,10 +398,43 @@ int main(int argc, char* argv[]) {
   {
     dim3 block_size(BLK_SIZE, 1, 1);
     dim3 grid_size(GRD_SIZE, 1, 1);
-    init_kernel<<<grid_size, block_size>>>(zSize, dev_zUpSendBuffer, me+1);
-    init_kernel<<<grid_size, block_size>>>(zSize, dev_zDownSendBuffer, me+1);
+    init_kernel<<<grid_size, block_size>>>(zSize, dev_zUpSendBuffer, me);
+    init_kernel<<<grid_size, block_size>>>(zSize, dev_zDownSendBuffer, me);
     checkCudaErrors( cudaDeviceSynchronize() );
   }
+  // ---------------------------------------
+
+  // ---------------------------------------
+  {
+    float tmp[3][2], *tmp0;
+    srand((unsigned int)time(NULL));
+    int x = rand() % (GRD_SIZE*BLK_SIZE);
+    int size = (xSize > ySize) ? xSize : ySize;
+    if (zSize > size) size = zSize;
+    tmp0 = (dtype*)malloc(sizeof(dtype)*(size));
+    for (int i=0; i<6; i++) tmp[i/2][i%2] = 0.0;
+    checkCudaErrors( cudaMemcpy(tmp0, dev_xUpSendBuffer,   xSize*sizeof(float), cudaMemcpyDeviceToHost) );
+    tmp[0][0] = tmp0[x];
+    checkCudaErrors( cudaMemcpy(tmp0, dev_xDownSendBuffer, xSize*sizeof(float), cudaMemcpyDeviceToHost) );
+    tmp[0][1] = tmp0[x];
+    checkCudaErrors( cudaMemcpy(tmp0, dev_yUpSendBuffer,   ySize*sizeof(float), cudaMemcpyDeviceToHost) );
+    tmp[1][0] = tmp0[x];
+    checkCudaErrors( cudaMemcpy(tmp0, dev_yDownSendBuffer, ySize*sizeof(float), cudaMemcpyDeviceToHost) );
+    tmp[1][1] = tmp0[x];
+    checkCudaErrors( cudaMemcpy(tmp0, dev_zUpSendBuffer,   zSize*sizeof(float), cudaMemcpyDeviceToHost) );
+    tmp[2][0] = tmp0[x];
+    checkCudaErrors( cudaMemcpy(tmp0, dev_zDownSendBuffer, zSize*sizeof(float), cudaMemcpyDeviceToHost) );
+    tmp[2][1] = tmp0[x];
+    checkCudaErrors( cudaDeviceSynchronize() );
+
+    MPI_ALL_PRINT(
+      fprintf(fp, "extracted tid = %d\n", x);
+      fprintf(fp, "xUpSendBuffer = %6.4f, xDownSendBuffer = %6.4f\n", tmp[0][0], tmp[0][1]);
+      fprintf(fp, "yUpSendBuffer = %6.4f, yDownSendBuffer = %6.4f\n", tmp[1][0], tmp[1][1]);
+      fprintf(fp, "zUpSendBuffer = %6.4f, zDownSendBuffer = %6.4f\n", tmp[2][0], tmp[2][1]);
+    )
+  }
+  MPI_Barrier(MPI_COMM_WORLD);
   // ---------------------------------------
 
   // ---------------------------------------
@@ -520,6 +563,56 @@ int main(int argc, char* argv[]) {
   ADD_TIME_EXPERIMENT(0, timeTakenCUDA)
 
   MPI_Barrier(MPI_COMM_WORLD);
+
+  // ---------------------------------------
+  {
+    size_t test_sizes[6], *dev_test_sizes;
+    dtype *test_vector[6], **dev_test_vector;
+    srand((unsigned int)time(NULL));
+    int x = rand() % (GRD_SIZE*BLK_SIZE);
+    int maxSize = (xSize > ySize) ? xSize : ySize;
+    if (zSize > maxSize) maxSize = zSize;
+
+    dtype *dev_checkVector, *checkVector;
+    checkVector = (dtype*) malloc(sizeof(dtype)*maxSize);
+    checkCudaErrors( cudaMalloc(&dev_checkVector,   sizeof(dtype) * maxSize) );
+    checkCudaErrors( cudaMemset(dev_checkVector, 0, sizeof(dtype) * maxSize) );
+
+    test_sizes[0] = xSize;
+    test_sizes[1] = xSize;
+    test_sizes[2] = ySize;
+    test_sizes[3] = ySize;
+    test_sizes[4] = zSize;
+    test_sizes[5] = zSize;
+    test_vector[0] = dev_xUpRecvBuffer;
+    test_vector[1] = dev_xDownRecvBuffer;
+    test_vector[2] = dev_yUpRecvBuffer;
+    test_vector[3] = dev_yDownRecvBuffer;
+    test_vector[4] = dev_zUpRecvBuffer;
+    test_vector[5] = dev_zDownRecvBuffer;
+
+    checkCudaErrors( cudaMalloc(&dev_test_sizes,  sizeof(size_t) * 6) );
+    checkCudaErrors( cudaMalloc(&dev_test_vector, sizeof(dtype*) * 6) );
+    checkCudaErrors( cudaMemcpy(dev_test_sizes,  test_sizes,  sizeof(size_t) * 6, cudaMemcpyHostToDevice) );
+    checkCudaErrors( cudaMemcpy(dev_test_vector, test_vector, sizeof(dtype*) * 6, cudaMemcpyHostToDevice) );
+
+    {
+      dim3 block_size(BLK_SIZE, 1, 1);
+      dim3 grid_size(GRD_SIZE, 1, 1);
+      test_kernel<<<grid_size, block_size>>>(maxSize, 6, dev_test_sizes, dev_test_vector, dev_checkVector);
+      checkCudaErrors( cudaDeviceSynchronize() );
+    }
+    checkCudaErrors( cudaMemcpy(checkVector, dev_checkVector, maxSize*sizeof(dtype), cudaMemcpyDeviceToHost) );
+    checkCudaErrors( cudaDeviceSynchronize() );
+
+    MPI_ALL_PRINT(
+      fprintf(fp, "xUp = %d, xDown = %d, yUp = %d, yDown = %d, zUp = %d, zDown = %d\n", xUp, xDown, yUp, yDown, zUp, zDown);
+      fprintf(fp, "extracted tid = %d\n", x);
+      fprintf(fp, "checkVector = %6.4f\n", checkVector[x]);
+    )
+  }
+  MPI_Barrier(MPI_COMM_WORLD);
+  // ---------------------------------------
 
   if (convert_position_to_rank(pex, pey, pez, pex / 2, pey / 2, pez / 2) ==
       me) {
