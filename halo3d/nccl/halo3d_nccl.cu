@@ -433,6 +433,7 @@ int main(int argc, char* argv[]) {
       fprintf(fp, "yUpSendBuffer = %6.4f, yDownSendBuffer = %6.4f\n", tmp[1][0], tmp[1][1]);
       fprintf(fp, "zUpSendBuffer = %6.4f, zDownSendBuffer = %6.4f\n", tmp[2][0], tmp[2][1]);
     )
+    free(tmp0);
   }
   MPI_Barrier(MPI_COMM_WORLD);
   // ---------------------------------------
@@ -610,6 +611,11 @@ int main(int argc, char* argv[]) {
       fprintf(fp, "extracted tid = %d\n", x);
       fprintf(fp, "checkVector = %6.4f\n", checkVector[x]);
     )
+
+    checkCudaErrors( cudaFree(dev_test_vector) );
+    checkCudaErrors( cudaFree(dev_checkVector) );
+    checkCudaErrors( cudaFree(dev_test_sizes) );
+    free(checkVector);
   }
   MPI_Barrier(MPI_COMM_WORLD);
   // ---------------------------------------

@@ -1,8 +1,8 @@
 #!/bin/bash
 
-#SBATCH --job-name=PingPong
-#SBATCH --output=sout/PingPong_%j.out
-#SBATCH --error=sout/PingPong_%j.err
+#SBATCH --job-name=Halo3D
+#SBATCH --output=sout/Halo3D_%j.out
+#SBATCH --error=sout/Halo3D_%j.err
 
 #SBATCH --partition=boost_usr_prod
 #SBATCH --account=IscrC_SHARP_0
@@ -19,7 +19,7 @@ mainfolder=/leonardo/home/userexternal/lpichett/MPI_GPU_banch/halo3d
 binfolder=${mainfolder}/bin
 outfolder=${mainfolder}/out
 
-echo " ------ PingPong ------ "
+echo " ------ Halo3D ------ "
 echo "     myfolder: $mainfolder"
 echo "     binfolder: $binfolder"
 
