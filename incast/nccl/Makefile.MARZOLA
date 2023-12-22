@@ -1,0 +1,27 @@
+CUDA_HOME=/usr/local/cuda-12.1
+MPI_HOME=/opt/shares/openmpi-4.1.5
+NCCL_HOME=/home/root/opt/nvhpc/Linux_x86_64/23.1/comm_libs/11.8/nccl
+
+CC=nvcc
+CFLAGS=-O3 -std=c++14
+LIBS=-L$(MPI_HOME)/lib -L$(CUDA_HOME)/lib64 -L$(CUDA_HOME)/compact
+INCL=-I$(MPI_HOME)/include -I$(CUDA_HOME)/include -I/leonardo/prod/build/compilers/cuda/11.8/none/BA_WORK/var/cuda-repo-rhel8-11-8-local/usr/src/nvidia-520.61.05/nvidia
+LIBFLAGS=-lmpi -lcudart -lcuda
+DBGFLAGS=-g -G
+
+NCCL=-L$(NCCL_HOME)/lib -I$(NCCL_HOME)/include -lnccl
+
+BINFOLDER=../bin
+OUTFOLDER=../out
+SOUTFOLDER=../sout
+NAME=incast
+TYPE=nccl
+
+
+$(BINFOLDER)/$(NAME)_$(TYPE): $(NAME)_$(TYPE).cu
+	mkdir -p $(BINFOLDER) $(OUTFOLDER) $(SOUTFOLDER)
+	$(CC) $(CFLAGS) -o $@ $< $(INCL) $(LIBS) $(LIBFLAGS) -lstdc++ -lm -Wno-deprecated-gpu-targets $(DBGFLAGS)
+
+clean:
+	rm -r $(BINFOLDER)/$(NAME)_$(TYPE)
+
