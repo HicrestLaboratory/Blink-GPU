@@ -765,6 +765,8 @@ int main(int argc, char* argv[]) {
            (bytesXchng / 1024.0) / timeTaken);
   }
 
+  fflush(stdout);
+  MPI_Barrier(MPI_COMM_WORLD);
   if (me == 0) PRINT_EXPARIMENT_STATS
 
   MPI_Finalize();

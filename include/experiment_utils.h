@@ -90,9 +90,11 @@ ExperimentsStatistics exp_stats;
     exp_stats.int_error[I] += ER ;                                                                                              \
 }
 
-#define PRINT_EXPARIMENT_STATS {                                                                            \
-    printf("%10s %10s %10s %10s %10s\n", "Experiment", "Type", "Lable", "Time", "IntError");                                           \
-    for (int i=0; i<NEXP; i++) {                                                                            \
-        printf("%10s %10s %10s %10.9lf %10llu\n", exp_stats.expname[i], exp_stats.exptype[i], exp_stats.lables[i], exp_stats.times[i], exp_stats.int_error[i]);   \
-    }                                                                                                       \
+#define PRINT_EXPARIMENT_STATS {                                                                \
+    printf("================== EXPERIMENT STATS ==================\n");                         \
+    printf("%10s %10s %10s %10s %10s\n", "Experiment", "Type", "Lable", "Time", "IntError");    \
+    for (int i=0; i<NEXP; i++) {                                                                \
+        printf("%10s %10s %10s %10.9lf %10llu\n", exp_stats.expname[i], exp_stats.exptype[i],   \
+               exp_stats.lables[i], exp_stats.times[i], exp_stats.int_error[i]);                \
+    }                                                                                           \
 }

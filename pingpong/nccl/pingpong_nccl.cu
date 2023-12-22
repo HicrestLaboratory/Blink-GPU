@@ -241,9 +241,6 @@ int main(int argc, char* argv[]) {
   checkCudaErrors( cudaMemset(dev_recvBuffer, 0, msgSize*sizeof(char)) );
 #endif
 
-  TIMER_DEF(0);
-  TIMER_DEF(1);
-
   DBG_CHECK(1)
 
 #ifdef CUDA
@@ -261,9 +258,13 @@ int main(int argc, char* argv[]) {
   DBG_CHECK(1)
 
   INIT_EXPS
+  TIMER_DEF(0);
+  TIMER_DEF(1);
+  SET_EXPERIMENT_NAME(0, "pingpong")
+  SET_EXPERIMENT_TYPE(0, "nccl")
+  SET_EXPERIMENT(0, "MPI+memcpy")
 
   if (0 == me) printf("# ---------------- Start NCCL ----------------\n");
-  SET_EXPERIMENT(1, "NCCL")
   MPI_Barrier(MPI_COMM_WORLD);
   DBG_CHECK(3)
 
@@ -309,15 +310,19 @@ int main(int argc, char* argv[]) {
 
       timeTaken = TIMER_ELAPSED(0);
       interror = check_result( msgSize, mynodeid, dev_recvBuffer, ((mynodeid==0)?1:0) );
-      ADD_INTERROR_EXPERIMENT(1, interror);
-      ADD_TIME_EXPERIMENT(1, timeTaken);
+      ADD_INTERROR_EXPERIMENT(0, interror);
+      ADD_TIME_EXPERIMENT(0, timeTaken);
     }
     DBG_CHECK(3)
   }
 
-  if (0 == me) printf("2node layout...\n");
-  SET_EXPERIMENT(6, "l2NCCL")
   MPI_Barrier(MPI_COMM_WORLD);
+  SET_EXPERIMENT_NAME(1, "pingpong")
+  SET_EXPERIMENT_TYPE(1, "nccl")
+  SET_EXPERIMENT(1, "l2NCCL")
+
+  if (0 == me) printf("2node layout...\n");
+
   interror = 0ULL;
   timeTaken = 0.0;
   timeTakenCUDA = 0.0;
@@ -356,8 +361,8 @@ int main(int argc, char* argv[]) {
 
       timeTaken = TIMER_ELAPSED(0);
       interror = check_result( msgSize, mynodeid, dev_recvBuffer, ((mynodeid==0)?1:0) );
-      ADD_INTERROR_EXPERIMENT(6, interror);
-      ADD_TIME_EXPERIMENT(6, timeTaken);
+      ADD_INTERROR_EXPERIMENT(1, interror);
+      ADD_TIME_EXPERIMENT(1, timeTaken);
     }
     DBG_CHECK(3)
   }

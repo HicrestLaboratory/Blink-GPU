@@ -235,9 +235,6 @@ int main(int argc, char* argv[]) {
   checkCudaErrors( cudaMemset(dev_recvBuffer, 0, msgSize*sizeof(char)) );
 #endif
 
-  TIMER_DEF(0);
-  TIMER_DEF(1);
-
   DBG_CHECK(1)
 
 #ifdef CUDA
@@ -255,12 +252,16 @@ int main(int argc, char* argv[]) {
   DBG_CHECK(1)
 
   INIT_EXPS
+  TIMER_DEF(0);
+  TIMER_DEF(1);
+  SET_EXPERIMENT_NAME(0, "pingpong")
+  SET_EXPERIMENT_TYPE(0, "baseline")
+  SET_EXPERIMENT(0, "MPI+memcpy")
 
   if (0 == me) {
     printf("# Beginning benchmarking...\n");
     printf("# ------------- Start MPI+memcpy -------------\n");
   }
-  SET_EXPERIMENT(0, "MPI+memcpy")
   MPI_Barrier(MPI_COMM_WORLD);
 
   if (me < 2) {
@@ -334,8 +335,11 @@ int main(int argc, char* argv[]) {
   DBG_CHECK(1)
 
   MPI_Barrier(MPI_COMM_WORLD);
-  if (0 == me) printf("2node layout...\n");
+  SET_EXPERIMENT_NAME(1, "pingpong")
+  SET_EXPERIMENT_TYPE(1, "baseline")
   SET_EXPERIMENT(1, "l2MPI+memc")
+
+  if (0 == me) printf("2node layout...\n");
   interror = 0ULL;
   timeTaken = 0.0;
   timeTakenCUDA = 0.0;

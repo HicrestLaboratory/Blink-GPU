@@ -390,6 +390,8 @@ int main(int argc, char* argv[]) {
            dataRecv / timeTaken);
   }
 
+  fflush(stdout);
+  MPI_Barrier(MPI_COMM_WORLD);
   if (me == 0) PRINT_EXPARIMENT_STATS
 
   MPI_Finalize();
