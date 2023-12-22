@@ -1,0 +1,69 @@
+# ----------------- Path -----------------
+CUDA_HOME=/leonardo/prod/opt/compilers/cuda/11.8/none
+MPI_HOME=/leonardo/prod/spack/03/install/0.19/linux-rhel8-icelake/nvhpc-23.1/openmpi-4.1.4-6ek2oqarjw755glr5papxirjmamqwvgd
+NCCL_HOME=/home/root/opt/nvhpc/Linux_x86_64/23.1/comm_libs/11.8/nccl
+# ---------------- Common ----------------
+CC=nvcc
+CFLAGS=-O3 -std=c++14
+LIBS=
+INCL=-I/leonardo/prod/build/compilers/cuda/11.8/none/BA_WORK/var/cuda-repo-rhel8-11-8-local/usr/src/nvidia-520.61.05/nvidia
+LIBFLAGS=
+DBGFLAGS=-g -G
+# ----------- Shared libraries -----------
+MPI=-L$(MPI_HOME)/lib -I$(MPI_HOME)/include -lmpi
+CUDA=-L$(CUDA_HOME)/lib64 -L$(CUDA_HOME)/compact -I$(CUDA_HOME)/include -lcudart -lcuda
+NCCL=-L$(NCCL_HOME)/lib -I$(NCCL_HOME)/include -lnccl
+# ----------------------------------------
+
+
+# =====================================================================================
+
+
+# -------------- Experiment --------------
+NAME=halo3d
+# --------------- Folders ----------------
+BINFOLDER=bin
+OUTFOLDER=out
+SOUTFOLDER=sout
+# ------------ Module loading ------------
+SHELL:=/bin/bash
+NCCL_MODULES=load_nccl_modules.sh
+BASELINE_MODULES=load_baseline_modules.sh
+# ----------------------------------------
+
+
+# =====================================================================================
+
+
+
+all: $(BINFOLDER)/$(NAME)_baseline $(BINFOLDER)/$(NAME)_nccl
+
+
+# --------------- Baseline ---------------
+$(BASELINE_MODULES):
+	@echo "module purge" > $@
+	@echo "module load openmpi" > $@
+	@echo "module load cuda" >> $@
+
+$(BINFOLDER)/$(NAME)_baseline: baseline/$(NAME)_baseline.cu $(BASELINE_MODULES)
+	mkdir -p $(BINFOLDER) $(OUTFOLDER) $(SOUTFOLDER)
+	source $(BASELINE_MODULES) ; $(CC) $(CFLAGS) -o $@ $< $(INCL) $(LIBS) $(LIBFLAGS) $(MPI) $(CUDA) -lstdc++ -lm -Wno-deprecated-gpu-targets $(DBGFLAGS)
+	rm $(BASELINE_MODULES)
+# ----------------------------------------
+
+
+# ----------------- Nccl -----------------
+$(NCCL_MODULES):
+	@echo "module purge" > $@
+	@echo "module load openmpi" > $@
+	@echo "module load cuda" >> $@
+	@echo "module load nccl" >> $@
+
+$(BINFOLDER)/$(NAME)_nccl: nccl/$(NAME)_nccl.cu $(NCCL_MODULES)
+	mkdir -p $(BINFOLDER) $(OUTFOLDER) $(SOUTFOLDER)
+	source $(NCCL_MODULES) ; $(CC) $(CFLAGS) -o $@ $< $(INCL) $(LIBS) $(LIBFLAGS) $(MPI) $(CUDA) $(NCCL) -lstdc++ -lm -Wno-deprecated-gpu-targets $(DBGFLAGS)
+	rm $(NCCL_MODULES)
+# ----------------------------------------
+
+clean:
+	rm -r $(BINFOLDER)/*
