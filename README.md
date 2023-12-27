@@ -19,13 +19,13 @@
 6. **Tested**: the experiment was tested on each considered architecture.
 
 ## Status of development
-**Last update**: 22/12/2023 17:30
+**Last update**: 22/12/2023 20:00
 
 | Benchmark   | Layout       | MPI + CudaMemcpy | NCCL            | GPUDirect       | Low-level NV-link |
 |-------------|--------------|------------------|-----------------|-----------------|-------------------|
-| Ping-pong   | Intra-node   | 🟢               | 🔵             | ❌             | ❌                |
-|             | Inter-nodes  | 🟢               | 🔵             | ❌             | ❌                |
-| Halo3d      | 2x2x2        | 🟢               | 🟢             | ❌             | ❌                |
+| Ping-pong   | Intra-node   | 🟢               | 🟢             | ❌             | ❌                |
+|             | Inter-nodes  | 🟢               | 🟢             | ❌             | ❌                |
+| Halo3d      | 2x2x2        | 🟢               | ▶              | ❌             | ❌                |
 |             | ??           | □                 | □              | ❌             | ❌                |
 | Incast      | Inter-nodes  | 🟢               | 🟢             | ❌             | ❌                |
 |             | ??           | □                 | □              | ❌             | ❌                |

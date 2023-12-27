@@ -259,7 +259,10 @@ int main(int argc, char* argv[]) {
     int x = rand() % (GRD_SIZE*BLK_SIZE);
     tmp0 = (dtype*)malloc(sizeof(dtype)*(msgSize));
     for (int i=0; i<(GRD_SIZE*BLK_SIZE); i++) tmp0[i] = 0.0;
-    checkCudaErrors( cudaMemcpy(tmp0, dev_sendBuffer, msgSize*sizeof(dtype), cudaMemcpyDeviceToHost) );
+    if (me != world-1)
+        checkCudaErrors( cudaMemcpy(tmp0, dev_sendBuffer, msgSize*sizeof(dtype), cudaMemcpyDeviceToHost) );
+    else
+        checkCudaErrors( cudaMemcpy(tmp0, dev_recvBuffer, msgSize*sizeof(dtype), cudaMemcpyDeviceToHost) ); // NOTE: dev_recvBuffer is longer then msgsize
     checkCudaErrors( cudaDeviceSynchronize() );
 
     MPI_ALL_PRINT(
@@ -276,12 +279,7 @@ int main(int argc, char* argv[]) {
   TIMER_DEF(1);
   SET_EXPERIMENT_NAME(0, "pingpong")
   SET_EXPERIMENT_TYPE(0, "baseline")
-  if (nnodes > 1) {
-    SET_EXPERIMENT_LAYOUT(0, "interNodes")
-  } else {
-    SET_EXPERIMENT_LAYOUT(0, "intraNode")
-  }
-  SET_EXPERIMENT(0, "Total")
+  SET_EXPERIMENT(0, "MPI+memcpy")
 
   if (0 == me) {
     printf("# Beginning benchmarking...\n");
@@ -289,7 +287,89 @@ int main(int argc, char* argv[]) {
   }
   MPI_Barrier(MPI_COMM_WORLD);
 
-  if (me == 0 || me == world-1) {
+  if (me < 2) {
+
+    for (int i = 0; i < repeats; ++i) {
+
+#ifdef CUDA
+      TIMER_START(1);
+      checkCudaErrors( cudaMemcpy(sendBuffer, dev_sendBuffer, msgSize*sizeof(dtype), cudaMemcpyDeviceToHost) );
+      checkCudaErrors( cudaDeviceSynchronize() );
+      TIMER_STOP(1);
+
+      timeTakenCUDA += TIMER_ELAPSED(1);
+#endif
+
+      TIMER_START(0);
+      if (0 == me) {
+        MPI_Send(sendBuffer, msgSize, MPI_dtype, 1, 0, MPI_COMM_WORLD);
+        MPI_Recv(recvBuffer, msgSize, MPI_dtype, 1, 1, MPI_COMM_WORLD, &status);
+      } else {
+        MPI_Recv(recvBuffer, msgSize, MPI_dtype, 0, 0, MPI_COMM_WORLD, &status);
+        MPI_Send(sendBuffer, msgSize, MPI_dtype, 0, 1, MPI_COMM_WORLD);
+      }
+      TIMER_STOP(0);
+
+      timeTaken += TIMER_ELAPSED(0);
+
+#ifdef CUDA
+      TIMER_START(1);
+      checkCudaErrors( cudaMemcpy(dev_recvBuffer, recvBuffer, msgSize*sizeof(dtype), cudaMemcpyHostToDevice) );
+      checkCudaErrors( cudaDeviceSynchronize() );
+      TIMER_STOP(1);
+
+      timeTakenCUDA += TIMER_ELAPSED(1);
+
+
+//       interror = check_result( msgSize, me, dev_recvBuffer, ((me==0)?1:0) );
+//       ADD_INTERROR_EXPERIMENT(0, interror);
+//
+//       checkCudaErrors( cudaMemset(dev_recvBuffer, 0, msgSize*sizeof(dtype)) );
+#endif
+
+    }
+
+    DBG_CHECK(1)
+
+    if (0 == me) {
+      printf("# Statistics:\n");
+
+      const double bytesXchng = ((double)msgSize) * 2.0 * ((double)repeats);
+      const double MbytesXchng = bytesXchng / (1024.0 * 1024.0);
+      const double msgsXchng = ((double)repeats) * 2.0;
+      const double KMsgsXchng = msgsXchng / 1000.0;
+
+      printf("#%10s %9s %11s %17s %14s %16s %14s\n", "Type", "MsgSize", "Time", "KMsgs",
+             "MB", "KMsg/S", "MB/S");
+      printf("%10s  %9.0f %11.4f %17.5f %14.4f %16.4f %14.4f\n", "MPI", (double)msgSize,
+             timeTaken, KMsgsXchng, MbytesXchng, KMsgsXchng / timeTaken,
+             MbytesXchng / timeTaken);
+#ifdef CUDA
+      printf("%10s  %9.0f %11.4f %17.5f %14.4f %16.4f %14.4f\n", "memcpy", (double)msgSize,
+             timeTakenCUDA, KMsgsXchng, MbytesXchng, KMsgsXchng / timeTakenCUDA,
+             MbytesXchng / timeTakenCUDA);
+      TotalTimeTaken = timeTaken + timeTakenCUDA;
+      printf("%10s  %9.0f %11.4f %17.5f %14.4f %16.4f %14.4f\n", "MPI+memcpy", (double)msgSize,
+             TotalTimeTaken, KMsgsXchng, MbytesXchng, KMsgsXchng / TotalTimeTaken,
+             MbytesXchng / TotalTimeTaken);
+#endif
+      ADD_TIME_EXPERIMENT(0, TotalTimeTaken)
+    }
+  }
+
+  DBG_CHECK(1)
+
+  MPI_Barrier(MPI_COMM_WORLD);
+  SET_EXPERIMENT_NAME(1, "pingpong")
+  SET_EXPERIMENT_TYPE(1, "baseline")
+  SET_EXPERIMENT(1, "l2MPI+memc")
+
+  if (0 == me) printf("2node layout...\n");
+  interror = 0ULL;
+  timeTaken = 0.0;
+  timeTakenCUDA = 0.0;
+
+  if (nnodes > 1 && mynode < 2 && mynodeid == 0) {
     DBG_CHECK(1)
     printf("[%d] myid = %d\n", __LINE__, me);
     fflush(stdout);
@@ -307,8 +387,8 @@ int main(int argc, char* argv[]) {
 
       TIMER_START(0);
       if (0 == me) {
-        MPI_Send(sendBuffer, msgSize, MPI_dtype, world-1, 0, MPI_COMM_WORLD);
-        MPI_Recv(recvBuffer, msgSize, MPI_dtype, world-1, 1, MPI_COMM_WORLD, &status);
+        MPI_Send(sendBuffer, msgSize, MPI_dtype, mynodesize, 0, MPI_COMM_WORLD);
+        MPI_Recv(recvBuffer, msgSize, MPI_dtype, mynodesize, 1, MPI_COMM_WORLD, &status);
       } else {
         MPI_Recv(recvBuffer, msgSize, MPI_dtype, 0, 0, MPI_COMM_WORLD, &status);
         MPI_Send(sendBuffer, msgSize, MPI_dtype, 0, 1, MPI_COMM_WORLD);
@@ -358,7 +438,7 @@ int main(int argc, char* argv[]) {
              TotalTimeTaken, KMsgsXchng, MbytesXchng, KMsgsXchng / TotalTimeTaken,
              MbytesXchng / TotalTimeTaken);
 #endif
-      ADD_TIME_EXPERIMENT(0, TotalTimeTaken)
+      ADD_TIME_EXPERIMENT(1, TotalTimeTaken)
     }
   }
   // ---------------------------------------
@@ -407,9 +487,8 @@ int main(int argc, char* argv[]) {
   free(recvBuffer);
   DBG_CHECK(1)
 
-  if (0 == me) printf("# --------------------------------------------\n");
-  fflush(stdout);
   MPI_Barrier(MPI_COMM_WORLD);
+  if (0 == me) printf("# --------------------------------------------\n");
   if (me == 0) PRINT_EXPARIMENT_STATS
 
   MPI_Finalize();

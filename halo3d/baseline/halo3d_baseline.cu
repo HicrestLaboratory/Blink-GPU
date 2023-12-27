@@ -505,6 +505,16 @@ int main(int argc, char* argv[]) {
   SET_EXPERIMENT_NAME(2, "halo3d")
   SET_EXPERIMENT_TYPE(2, "baseline")
   SET_EXPERIMENT(2, "TOTAL")
+
+  if (nnodes > 1) {
+    SET_EXPERIMENT_LAYOUT(0, "interNodes")
+    SET_EXPERIMENT_LAYOUT(1, "interNodes")
+    SET_EXPERIMENT_LAYOUT(2, "interNodes")
+  } else {
+    SET_EXPERIMENT_LAYOUT(0, "intraNode")
+    SET_EXPERIMENT_LAYOUT(1, "intraNode")
+    SET_EXPERIMENT_LAYOUT(2, "intraNode")
+  }
   gettimeofday(&start, NULL);
 
   for (int i = 0; i < repeats; ++i) {

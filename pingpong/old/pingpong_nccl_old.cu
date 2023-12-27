@@ -41,10 +41,6 @@
 
 #define BLK_SIZE 256
 #define GRD_SIZE 4
-#define TID_DIGITS 10000
-
-#define dtype float
-#define NCCL_dtype ncclFloat
 
 #define PINGPONG_REPEATS 1000
 #define PINGPONG_MSG_SIZE 1024
@@ -123,28 +119,31 @@ int  assignDeviceToProcess(MPI_Comm *nodeComm, int *nnodes, int *mynodeid)
 }
 
 __global__
-void init_kernel(int n, dtype *input, int rank) {
+void init_kernel(int n, char *input, int scale) {
+
   int tid = blockIdx.x*blockDim.x + threadIdx.x;
 
-  dtype floattid = tid/(dtype)TID_DIGITS;
-  dtype val_coord = rank + floattid;
-  if (tid < n)
-      input[tid] = (dtype)val_coord;
-
+  for (int i=0; i<n; i++) {
+    int val_coord = tid * scale;
+    if (tid < n)
+        input[tid] = (char)val_coord;
+  }
 }
 
-__global__
-void test_kernel(int n, int ninputs, size_t *sizes, dtype **inputs, dtype *output) {
-  int tid = blockIdx.x*blockDim.x + threadIdx.x;
-  dtype tmp = 0.0;
+unsigned long long int check_result(int n, int myid, char* dev_recvBuffer, int recvid) {
 
-  if (tid < n) {
-    for (int i=0; i<ninputs; i++)
-      if (tid < sizes[i])
-        tmp += inputs[i][tid];
-  }
-  output[tid] = tmp;
+  unsigned long long int error = 0ULL;
+  char* checkBuffer = (char*)malloc(sizeof(char*) * n);
 
+  checkCudaErrors( cudaMemcpy(checkBuffer, dev_recvBuffer, n*sizeof(char), cudaMemcpyDeviceToHost) );
+  checkCudaErrors( cudaDeviceSynchronize() );
+
+  for (int i=0; i<n; i++)
+    error += (unsigned long long int)((recvid+1)*i - checkBuffer[i]);
+
+  free(checkBuffer);
+
+  return(error);
 }
 
 #endif
@@ -222,8 +221,8 @@ int main(int argc, char* argv[]) {
   MPI_Barrier(MPI_COMM_WORLD);
 #endif
 
-  dtype* sendBuffer   = (dtype*)malloc(sizeof(dtype*) * msgSize);
-  dtype* recvBuffer   = (dtype*)malloc(sizeof(dtype*) * msgSize);
+  char* sendBuffer   = (char*)malloc(sizeof(char*) * msgSize);
+  char* recvBuffer   = (char*)malloc(sizeof(char*) * msgSize);
 
   for (int i = 0; i < msgSize; ++i) {
     sendBuffer[i]  = 0;
@@ -235,11 +234,11 @@ int main(int argc, char* argv[]) {
   DBG_CHECK(1)
 
 #ifdef CUDA
-  dtype *dev_sendBuffer, *dev_recvBuffer;
-  checkCudaErrors( cudaMalloc(&dev_sendBuffer, msgSize*sizeof(dtype)) );
-  checkCudaErrors( cudaMalloc(&dev_recvBuffer, msgSize*sizeof(dtype)) );
-  checkCudaErrors( cudaMemset(dev_sendBuffer, 0, msgSize*sizeof(dtype)) );
-  checkCudaErrors( cudaMemset(dev_recvBuffer, 0, msgSize*sizeof(dtype)) );
+  char *dev_sendBuffer, *dev_recvBuffer;
+  checkCudaErrors( cudaMalloc(&dev_sendBuffer, msgSize*sizeof(char)) );
+  checkCudaErrors( cudaMalloc(&dev_recvBuffer, msgSize*sizeof(char)) );
+  checkCudaErrors( cudaMemset(dev_sendBuffer, 0, msgSize*sizeof(char)) );
+  checkCudaErrors( cudaMemset(dev_recvBuffer, 0, msgSize*sizeof(char)) );
 #endif
 
   DBG_CHECK(1)
@@ -248,53 +247,28 @@ int main(int argc, char* argv[]) {
   dim3 block_size(BLK_SIZE, 1, 1);
   dim3 grid_size(GRD_SIZE, 1, 1);
   printf("block_size = %d, grid_size = %d, elements per thread = %f\n", block_size.x, grid_size.x, (float)msgSize/(block_size.x*grid_size.x));
-  init_kernel<<<grid_size, block_size>>>(msgSize, dev_sendBuffer, me);
+  init_kernel<<<grid_size, block_size>>>(msgSize, dev_sendBuffer, me+1);
   checkCudaErrors( cudaDeviceSynchronize() );
 #else
   for (int i = 0; i < msgSize; ++i)
     sendBuffer[i]  = i;
 #endif
 
+
   DBG_CHECK(1)
-
-  // ---------------------------------------
-  {
-    float *tmp0;
-    srand((unsigned int)time(NULL));
-    int x = rand() % (GRD_SIZE*BLK_SIZE);
-    tmp0 = (dtype*)malloc(sizeof(dtype)*(msgSize));
-    for (int i=0; i<(GRD_SIZE*BLK_SIZE); i++) tmp0[i] = 0.0;
-    checkCudaErrors( cudaMemcpy(tmp0, dev_sendBuffer, msgSize*sizeof(dtype), cudaMemcpyDeviceToHost) );
-    checkCudaErrors( cudaDeviceSynchronize() );
-
-    MPI_ALL_PRINT(
-      fprintf(fp, "extracted tid = %d\n", x);
-      fprintf(fp, "dev_sendBuffer = %6.4f\n", tmp0[x]);
-    )
-    free(tmp0);
-  }
-  MPI_Barrier(MPI_COMM_WORLD);
-  // ---------------------------------------
 
   INIT_EXPS
   TIMER_DEF(0);
   TIMER_DEF(1);
   SET_EXPERIMENT_NAME(0, "pingpong")
   SET_EXPERIMENT_TYPE(0, "nccl")
-  if (nnodes > 1) {
-    SET_EXPERIMENT_LAYOUT(0, "interNodes")
-  } else {
-    SET_EXPERIMENT_LAYOUT(0, "intraNode")
-  }
-  SET_EXPERIMENT(0, "Total")
+  SET_EXPERIMENT(0, "MPI+memcpy")
 
   if (0 == me) printf("# ---------------- Start NCCL ----------------\n");
   MPI_Barrier(MPI_COMM_WORLD);
   DBG_CHECK(3)
 
 #ifdef NCCL
-
-  // ---------------------------------------
   ncclUniqueId Id;
   ncclComm_t NCCL_COMM_WORLD, NCCL_COMM_NODE;
 
@@ -303,55 +277,39 @@ int main(int argc, char* argv[]) {
   MPI_Bcast(&Id, sizeof(ncclUniqueId), MPI_BYTE, 0, nodeComm);
   NCCLCHECK( ncclCommInitRank(&NCCL_COMM_NODE, mynodesize, Id, mynodeid) );
   ncclGroupEnd();
+  DBG_CHECK(3)
   MPI_Barrier(MPI_COMM_WORLD);
 
-  ncclGroupStart();
-  if (me == 0) { NCCLCHECK( ncclGetUniqueId(&Id) ); }
-  MPI_Bcast(&Id, sizeof(ncclUniqueId), MPI_BYTE, 0, MPI_COMM_WORLD);
-  NCCLCHECK( ncclCommInitRank(&NCCL_COMM_WORLD, world, Id, me) );
-  ncclGroupEnd();
-
-  MPI_ALL_PRINT(
-    int nccl_w_rk;
-    int nccl_w_sz;
+  {
+    int check_rk, check_size;
     ncclGroupStart();
-    NCCLCHECK( ncclCommCount(NCCL_COMM_WORLD, &nccl_w_sz)   );
-    NCCLCHECK( ncclCommUserRank(NCCL_COMM_WORLD, &nccl_w_rk) );
+    NCCLCHECK( ncclCommCount(NCCL_COMM_NODE, &check_size)   );
+    NCCLCHECK( ncclCommUserRank(NCCL_COMM_NODE, &check_rk) );
     ncclGroupEnd();
-
-    int nccl_n_rk;
-    int nccl_n_sz;
-    ncclGroupStart();
-    NCCLCHECK( ncclCommCount(NCCL_COMM_NODE, &nccl_n_sz)   );
-    NCCLCHECK( ncclCommUserRank(NCCL_COMM_NODE, &nccl_n_rk) );
-    ncclGroupEnd();
-
-    fprintf(fp, "NCCL_COMM_WORLD: nccl size = %d, nccl rank = %d\n", nccl_w_sz, nccl_w_rk);
-    fprintf(fp, "NCCL_COMM_NODE:  nccl size = %d, nccl rank = %d\n", nccl_n_sz, nccl_n_rk);
-  )
-
+    printf("[%d] NCCL_COMM_NODE: nccl size = %d, nccl rank = %d\n", me, check_size, check_rk);
+  }
+  DBG_CHECK(3)
   MPI_Barrier(MPI_COMM_WORLD);
-  // ---------------------------------------
 
 //   NCCLCHECK( ncclCommSplit(NCCL_COMM_WORLD, mynode, (me % mynodesize), &NCCL_COMM_NODE, NULL) );
 //   DBG_STOP(1)
 
-  if (me == 0 || me == world-1) {
+  if (mynodeid == 0 || mynodeid == 1) {
     for (int i = 0; i < repeats; i++) {
       TIMER_START(0);
       ncclGroupStart();
-      if (me == 0) {
-        ncclSend(dev_sendBuffer, msgSize, NCCL_dtype, world-1, NCCL_COMM_WORLD, NULL);
-        ncclRecv(dev_recvBuffer, msgSize, NCCL_dtype, world-1, NCCL_COMM_WORLD, NULL);
-      } else {
-        ncclSend(dev_sendBuffer, msgSize, NCCL_dtype, 0, NCCL_COMM_WORLD, NULL);
-        ncclRecv(dev_recvBuffer, msgSize, NCCL_dtype, 0, NCCL_COMM_WORLD, NULL);
+      if (mynodeid == 0) {
+        ncclSend(dev_sendBuffer, msgSize, ncclChar, 1, NCCL_COMM_NODE, NULL);
+        ncclRecv(dev_recvBuffer, msgSize, ncclChar, 1, NCCL_COMM_NODE, NULL);
+      } else if (mynodeid == 1) {
+        ncclSend(dev_sendBuffer, msgSize, ncclChar, 0, NCCL_COMM_NODE, NULL);
+        ncclRecv(dev_recvBuffer, msgSize, ncclChar, 0, NCCL_COMM_NODE, NULL);
       }
       ncclGroupEnd();
       TIMER_STOP(0);
 
       timeTaken = TIMER_ELAPSED(0);
-//       interror = check_result( msgSize, mynodeid, dev_recvBuffer, ((mynodeid==0)?1:0) );
+      interror = check_result( msgSize, mynodeid, dev_recvBuffer, ((mynodeid==0)?1:0) );
       ADD_INTERROR_EXPERIMENT(0, interror);
       ADD_TIME_EXPERIMENT(0, timeTaken);
     }
@@ -359,54 +317,60 @@ int main(int argc, char* argv[]) {
   }
 
   MPI_Barrier(MPI_COMM_WORLD);
+  SET_EXPERIMENT_NAME(1, "pingpong")
+  SET_EXPERIMENT_TYPE(1, "nccl")
+  SET_EXPERIMENT(1, "l2NCCL")
+
+  if (0 == me) printf("2node layout...\n");
+
+  interror = 0ULL;
+  timeTaken = 0.0;
+  timeTakenCUDA = 0.0;
+
+  ncclGroupStart();
+  if (me == 0) { NCCLCHECK( ncclGetUniqueId(&Id) ); }
+  MPI_Bcast(&Id, sizeof(ncclUniqueId), MPI_BYTE, 0, MPI_COMM_WORLD);
+  NCCLCHECK( ncclCommInitRank(&NCCL_COMM_WORLD, world, Id, me) );
+  ncclGroupEnd();
+  DBG_CHECK(3)
+
+  {
+    int check_rk, check_size;
+    ncclGroupStart();
+    NCCLCHECK( ncclCommCount(NCCL_COMM_WORLD, &check_size)   );
+    NCCLCHECK( ncclCommUserRank(NCCL_COMM_WORLD, &check_rk) );
+    ncclGroupEnd();
+    printf("[%d] NCCL_COMM_WORLD: nccl size = %d, nccl rank = %d\n", me, check_size, check_rk);
+  }
+  DBG_CHECK(3)
+  MPI_Barrier(MPI_COMM_WORLD);
+
+  if (me == 0 || me == 4) {
+    for (int i = 0; i < repeats; i++) {
+      TIMER_START(0);
+      ncclGroupStart();
+      if (me == 0) {
+        ncclSend(dev_sendBuffer, msgSize, ncclChar, 4, NCCL_COMM_WORLD, NULL);
+        ncclRecv(dev_recvBuffer, msgSize, ncclChar, 4, NCCL_COMM_WORLD, NULL);
+      } else if (me == 4) {
+        ncclSend(dev_sendBuffer, msgSize, ncclChar, 0, NCCL_COMM_WORLD, NULL);
+        ncclRecv(dev_recvBuffer, msgSize, ncclChar, 0, NCCL_COMM_WORLD, NULL);
+      }
+      ncclGroupEnd();
+      TIMER_STOP(0);
+
+      timeTaken = TIMER_ELAPSED(0);
+      interror = check_result( msgSize, mynodeid, dev_recvBuffer, ((mynodeid==0)?1:0) );
+      ADD_INTERROR_EXPERIMENT(1, interror);
+      ADD_TIME_EXPERIMENT(1, timeTaken);
+    }
+    DBG_CHECK(3)
+  }
+  MPI_Barrier(MPI_COMM_WORLD);
 
 #endif
 
-  // ---------------------------------------
-  {
-    size_t test_sizes[1], *dev_test_sizes;
-    dtype *test_vector[1], **dev_test_vector;
-    srand((unsigned int)time(NULL));
-    int x = rand() % (GRD_SIZE*BLK_SIZE);
-
-    dtype *dev_checkVector, *checkVector;
-    checkVector = (dtype*) malloc(sizeof(dtype)*msgSize);
-    checkCudaErrors( cudaMalloc(&dev_checkVector,   sizeof(dtype) * msgSize) );
-    checkCudaErrors( cudaMemset(dev_checkVector, 0, sizeof(dtype) * msgSize) );
-
-    test_sizes[0] = msgSize;
-    test_vector[0] = dev_recvBuffer;
-
-    checkCudaErrors( cudaMalloc(&dev_test_sizes,  sizeof(size_t)) );
-    checkCudaErrors( cudaMalloc(&dev_test_vector, sizeof(dtype*)) );
-    checkCudaErrors( cudaMemcpy(dev_test_sizes,  test_sizes,  sizeof(size_t), cudaMemcpyHostToDevice) );
-    checkCudaErrors( cudaMemcpy(dev_test_vector, test_vector, sizeof(dtype*), cudaMemcpyHostToDevice) );
-
-    {
-      dim3 block_size(BLK_SIZE, 1, 1);
-      dim3 grid_size(GRD_SIZE, 1, 1);
-      test_kernel<<<grid_size, block_size>>>(msgSize, 1, dev_test_sizes, dev_test_vector, dev_checkVector);
-      checkCudaErrors( cudaDeviceSynchronize() );
-    }
-    checkCudaErrors( cudaMemcpy(checkVector, dev_checkVector, msgSize*sizeof(dtype), cudaMemcpyDeviceToHost) );
-    checkCudaErrors( cudaDeviceSynchronize() );
-
-    MPI_ALL_PRINT(
-      fprintf(fp, "extracted tid = %d\n", x);
-      fprintf(fp, "checkVector = %6.4f\n", checkVector[x]);
-    )
-
-    checkCudaErrors( cudaFree(dev_test_vector) );
-    checkCudaErrors( cudaFree(dev_checkVector) );
-    checkCudaErrors( cudaFree(dev_test_sizes) );
-    free(checkVector);
-  }
-  MPI_Barrier(MPI_COMM_WORLD);
-  // ---------------------------------------
-
   if (0 == me) printf("# --------------------------------------------\n");
-  fflush(stdout);
-  MPI_Barrier(MPI_COMM_WORLD);
   if (me == 0) PRINT_EXPARIMENT_STATS
 
   MPI_Finalize();

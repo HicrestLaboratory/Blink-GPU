@@ -296,6 +296,11 @@ int main(int argc, char* argv[]) {
   TIMER_DEF(0);
   SET_EXPERIMENT_NAME(0, "incast")
   SET_EXPERIMENT_TYPE(0, "nccl")
+  if (nnodes > 1) {
+    SET_EXPERIMENT_LAYOUT(0, "interNodes")
+  } else {
+    SET_EXPERIMENT_LAYOUT(0, "intraNode")
+  }
   SET_EXPERIMENT(0, "TOTAL")
 
   MPI_Barrier(MPI_COMM_WORLD);
