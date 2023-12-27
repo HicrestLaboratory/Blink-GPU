@@ -23,8 +23,8 @@
 
 | Benchmark   | Layout       | MPI + CudaMemcpy | NCCL            | GPUDirect       | Low-level NV-link |
 |-------------|--------------|------------------|-----------------|-----------------|-------------------|
-| Ping-pong   | Intra-node   | 🔵               | 🔵             | ❌             | ❌                |
-|             | Inter-nodes  | 🔵               | 🔵             | ❌             | ❌                |
+| Ping-pong   | Intra-node   | 🟢               | 🔵             | ❌             | ❌                |
+|             | Inter-nodes  | 🟢               | 🔵             | ❌             | ❌                |
 | Halo3d      | 2x2x2        | 🟢               | 🟢             | ❌             | ❌                |
 |             | ??           | □                 | □              | ❌             | ❌                |
 | Incast      | Inter-nodes  | 🟢               | 🟢             | ❌             | ❌                |

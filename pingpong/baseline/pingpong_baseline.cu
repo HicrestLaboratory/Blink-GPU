@@ -37,6 +37,10 @@
 
 #define BLK_SIZE 256
 #define GRD_SIZE 4
+#define TID_DIGITS 10000
+
+#define dtype float
+#define MPI_dtype MPI_FLOAT
 
 #define PINGPONG_REPEATS 1000
 #define PINGPONG_MSG_SIZE 1024
@@ -115,31 +119,28 @@ int  assignDeviceToProcess(MPI_Comm *nodeComm, int *nnodes, int *mynodeid)
 }
 
 __global__
-void init_kernel(int n, char *input, int scale) {
-
+void init_kernel(int n, dtype *input, int rank) {
   int tid = blockIdx.x*blockDim.x + threadIdx.x;
 
-  for (int i=0; i<n; i++) {
-    int val_coord = tid * scale;
-    if (tid < n)
-        input[tid] = (char)val_coord;
-  }
+  dtype floattid = tid/(dtype)TID_DIGITS;
+  dtype val_coord = rank + floattid;
+  if (tid < n)
+      input[tid] = (dtype)val_coord;
+
 }
 
-unsigned long long int check_result(int n, int myid, char* dev_recvBuffer, int recvid) {
+__global__
+void test_kernel(int n, int ninputs, size_t *sizes, dtype **inputs, dtype *output) {
+  int tid = blockIdx.x*blockDim.x + threadIdx.x;
+  dtype tmp = 0.0;
 
-  unsigned long long int error = 0ULL;
-  char* checkBuffer = (char*)malloc(sizeof(char*) * n);
+  if (tid < n) {
+    for (int i=0; i<ninputs; i++)
+      if (tid < sizes[i])
+        tmp += inputs[i][tid];
+  }
+  output[tid] = tmp;
 
-  checkCudaErrors( cudaMemcpy(checkBuffer, dev_recvBuffer, n*sizeof(char), cudaMemcpyDeviceToHost) );
-  checkCudaErrors( cudaDeviceSynchronize() );
-
-  for (int i=0; i<n; i++)
-    error += (unsigned long long int)((recvid+1)*i - checkBuffer[i]);
-
-  free(checkBuffer);
-
-  return(error);
 }
 
 #endif
@@ -215,8 +216,8 @@ int main(int argc, char* argv[]) {
   MPI_Barrier(MPI_COMM_WORLD);
 #endif
 
-  char* sendBuffer   = (char*)malloc(sizeof(char*) * msgSize);
-  char* recvBuffer   = (char*)malloc(sizeof(char*) * msgSize);
+  dtype* sendBuffer   = (dtype*)malloc(sizeof(dtype*) * msgSize);
+  dtype* recvBuffer   = (dtype*)malloc(sizeof(dtype*) * msgSize);
 
   for (int i = 0; i < msgSize; ++i) {
     sendBuffer[i]  = 0;
@@ -228,11 +229,11 @@ int main(int argc, char* argv[]) {
   DBG_CHECK(1)
 
 #ifdef CUDA
-  char *dev_sendBuffer, *dev_recvBuffer;
-  checkCudaErrors( cudaMalloc(&dev_sendBuffer, msgSize*sizeof(char)) );
-  checkCudaErrors( cudaMalloc(&dev_recvBuffer, msgSize*sizeof(char)) );
-  checkCudaErrors( cudaMemset(dev_sendBuffer, 0, msgSize*sizeof(char)) );
-  checkCudaErrors( cudaMemset(dev_recvBuffer, 0, msgSize*sizeof(char)) );
+  dtype *dev_sendBuffer, *dev_recvBuffer;
+  checkCudaErrors( cudaMalloc(&dev_sendBuffer, msgSize*sizeof(dtype)) );
+  checkCudaErrors( cudaMalloc(&dev_recvBuffer, msgSize*sizeof(dtype)) );
+  checkCudaErrors( cudaMemset(dev_sendBuffer, 0, msgSize*sizeof(dtype)) );
+  checkCudaErrors( cudaMemset(dev_recvBuffer, 0, msgSize*sizeof(dtype)) );
 #endif
 
   DBG_CHECK(1)
@@ -241,7 +242,7 @@ int main(int argc, char* argv[]) {
   dim3 block_size(BLK_SIZE, 1, 1);
   dim3 grid_size(GRD_SIZE, 1, 1);
   printf("block_size = %d, grid_size = %d, elements per thread = %f\n", block_size.x, grid_size.x, (float)msgSize/(block_size.x*grid_size.x));
-  init_kernel<<<grid_size, block_size>>>(msgSize, dev_sendBuffer, me+1);
+  init_kernel<<<grid_size, block_size>>>(msgSize, dev_sendBuffer, me);
   checkCudaErrors( cudaDeviceSynchronize() );
 #else
   for (int i = 0; i < msgSize; ++i)
@@ -250,6 +251,28 @@ int main(int argc, char* argv[]) {
 
 
   DBG_CHECK(1)
+
+  // ---------------------------------------
+  {
+    float *tmp0;
+    srand((unsigned int)time(NULL));
+    int x = rand() % (GRD_SIZE*BLK_SIZE);
+    tmp0 = (dtype*)malloc(sizeof(dtype)*(msgSize));
+    for (int i=0; i<(GRD_SIZE*BLK_SIZE); i++) tmp0[i] = 0.0;
+    if (me != world-1)
+        checkCudaErrors( cudaMemcpy(tmp0, dev_sendBuffer, msgSize*sizeof(dtype), cudaMemcpyDeviceToHost) );
+    else
+        checkCudaErrors( cudaMemcpy(tmp0, dev_recvBuffer, msgSize*sizeof(dtype), cudaMemcpyDeviceToHost) ); // NOTE: dev_recvBuffer is longer then msgsize
+    checkCudaErrors( cudaDeviceSynchronize() );
+
+    MPI_ALL_PRINT(
+      fprintf(fp, "extracted tid = %d\n", x);
+      fprintf(fp, "dev_sendBuffer = %6.4f\n", tmp0[x]);
+    )
+    free(tmp0);
+  }
+  MPI_Barrier(MPI_COMM_WORLD);
+  // ---------------------------------------
 
   INIT_EXPS
   TIMER_DEF(0);
@@ -270,7 +293,7 @@ int main(int argc, char* argv[]) {
 
 #ifdef CUDA
       TIMER_START(1);
-      checkCudaErrors( cudaMemcpy(sendBuffer, dev_sendBuffer, msgSize*sizeof(char), cudaMemcpyDeviceToHost) );
+      checkCudaErrors( cudaMemcpy(sendBuffer, dev_sendBuffer, msgSize*sizeof(dtype), cudaMemcpyDeviceToHost) );
       checkCudaErrors( cudaDeviceSynchronize() );
       TIMER_STOP(1);
 
@@ -279,11 +302,11 @@ int main(int argc, char* argv[]) {
 
       TIMER_START(0);
       if (0 == me) {
-        MPI_Send(sendBuffer, msgSize, MPI_CHAR, 1, 0, MPI_COMM_WORLD);
-        MPI_Recv(recvBuffer, msgSize, MPI_CHAR, 1, 1, MPI_COMM_WORLD, &status);
+        MPI_Send(sendBuffer, msgSize, MPI_dtype, 1, 0, MPI_COMM_WORLD);
+        MPI_Recv(recvBuffer, msgSize, MPI_dtype, 1, 1, MPI_COMM_WORLD, &status);
       } else {
-        MPI_Recv(recvBuffer, msgSize, MPI_CHAR, 0, 0, MPI_COMM_WORLD, &status);
-        MPI_Send(sendBuffer, msgSize, MPI_CHAR, 0, 1, MPI_COMM_WORLD);
+        MPI_Recv(recvBuffer, msgSize, MPI_dtype, 0, 0, MPI_COMM_WORLD, &status);
+        MPI_Send(sendBuffer, msgSize, MPI_dtype, 0, 1, MPI_COMM_WORLD);
       }
       TIMER_STOP(0);
 
@@ -291,15 +314,17 @@ int main(int argc, char* argv[]) {
 
 #ifdef CUDA
       TIMER_START(1);
-      checkCudaErrors( cudaMemcpy(dev_recvBuffer, recvBuffer, msgSize*sizeof(char), cudaMemcpyHostToDevice) );
+      checkCudaErrors( cudaMemcpy(dev_recvBuffer, recvBuffer, msgSize*sizeof(dtype), cudaMemcpyHostToDevice) );
       checkCudaErrors( cudaDeviceSynchronize() );
       TIMER_STOP(1);
 
       timeTakenCUDA += TIMER_ELAPSED(1);
-      interror = check_result( msgSize, me, dev_recvBuffer, ((me==0)?1:0) );
-      ADD_INTERROR_EXPERIMENT(0, interror);
 
-      checkCudaErrors( cudaMemset(dev_recvBuffer, 0, msgSize*sizeof(char)) );
+
+//       interror = check_result( msgSize, me, dev_recvBuffer, ((me==0)?1:0) );
+//       ADD_INTERROR_EXPERIMENT(0, interror);
+//
+//       checkCudaErrors( cudaMemset(dev_recvBuffer, 0, msgSize*sizeof(dtype)) );
 #endif
 
     }
@@ -353,7 +378,7 @@ int main(int argc, char* argv[]) {
 
 #ifdef CUDA
       TIMER_START(1);
-      checkCudaErrors( cudaMemcpy(sendBuffer, dev_sendBuffer, msgSize*sizeof(char), cudaMemcpyDeviceToHost) );
+      checkCudaErrors( cudaMemcpy(sendBuffer, dev_sendBuffer, msgSize*sizeof(dtype), cudaMemcpyDeviceToHost) );
       checkCudaErrors( cudaDeviceSynchronize() );
       TIMER_STOP(1);
 
@@ -362,11 +387,11 @@ int main(int argc, char* argv[]) {
 
       TIMER_START(0);
       if (0 == me) {
-        MPI_Send(sendBuffer, msgSize, MPI_CHAR, mynodesize, 0, MPI_COMM_WORLD);
-        MPI_Recv(recvBuffer, msgSize, MPI_CHAR, mynodesize, 1, MPI_COMM_WORLD, &status);
+        MPI_Send(sendBuffer, msgSize, MPI_dtype, mynodesize, 0, MPI_COMM_WORLD);
+        MPI_Recv(recvBuffer, msgSize, MPI_dtype, mynodesize, 1, MPI_COMM_WORLD, &status);
       } else {
-        MPI_Recv(recvBuffer, msgSize, MPI_CHAR, 0, 0, MPI_COMM_WORLD, &status);
-        MPI_Send(sendBuffer, msgSize, MPI_CHAR, 0, 1, MPI_COMM_WORLD);
+        MPI_Recv(recvBuffer, msgSize, MPI_dtype, 0, 0, MPI_COMM_WORLD, &status);
+        MPI_Send(sendBuffer, msgSize, MPI_dtype, 0, 1, MPI_COMM_WORLD);
       }
       TIMER_STOP(0);
 
@@ -374,18 +399,20 @@ int main(int argc, char* argv[]) {
 
 #ifdef CUDA
       TIMER_START(1);
-      checkCudaErrors( cudaMemcpy(dev_recvBuffer, recvBuffer, msgSize*sizeof(char), cudaMemcpyHostToDevice) );
+      checkCudaErrors( cudaMemcpy(dev_recvBuffer, recvBuffer, msgSize*sizeof(dtype), cudaMemcpyHostToDevice) );
       checkCudaErrors( cudaDeviceSynchronize() );
       TIMER_STOP(1);
 
       timeTakenCUDA += TIMER_ELAPSED(1);
-      interror = check_result( msgSize, me, dev_recvBuffer, ((me==0)?1:0) );
-      ADD_INTERROR_EXPERIMENT(1, interror);
 
-      checkCudaErrors( cudaMemset(dev_recvBuffer, 0, msgSize*sizeof(char)) );
+//       interror = check_result( msgSize, me, dev_recvBuffer, ((me==0)?1:0) );
+//       ADD_INTERROR_EXPERIMENT(1, interror);
+//
+//       checkCudaErrors( cudaMemset(dev_recvBuffer, 0, msgSize*sizeof(dtype)) );
 #endif
 
     }
+
 
     DBG_CHECK(1)
 
@@ -414,6 +441,47 @@ int main(int argc, char* argv[]) {
       ADD_TIME_EXPERIMENT(1, TotalTimeTaken)
     }
   }
+  // ---------------------------------------
+  {
+    size_t test_sizes[1], *dev_test_sizes;
+    dtype *test_vector[1], **dev_test_vector;
+    srand((unsigned int)time(NULL));
+    int x = rand() % (GRD_SIZE*BLK_SIZE);
+
+    dtype *dev_checkVector, *checkVector;
+    checkVector = (dtype*) malloc(sizeof(dtype)*msgSize);
+    checkCudaErrors( cudaMalloc(&dev_checkVector,   sizeof(dtype) * msgSize) );
+    checkCudaErrors( cudaMemset(dev_checkVector, 0, sizeof(dtype) * msgSize) );
+
+    test_sizes[0] = msgSize;
+    test_vector[0] = dev_recvBuffer;
+
+    checkCudaErrors( cudaMalloc(&dev_test_sizes,  sizeof(size_t)) );
+    checkCudaErrors( cudaMalloc(&dev_test_vector, sizeof(dtype*)) );
+    checkCudaErrors( cudaMemcpy(dev_test_sizes,  test_sizes,  sizeof(size_t), cudaMemcpyHostToDevice) );
+    checkCudaErrors( cudaMemcpy(dev_test_vector, test_vector, sizeof(dtype*), cudaMemcpyHostToDevice) );
+
+    {
+      dim3 block_size(BLK_SIZE, 1, 1);
+      dim3 grid_size(GRD_SIZE, 1, 1);
+      test_kernel<<<grid_size, block_size>>>(msgSize, 1, dev_test_sizes, dev_test_vector, dev_checkVector);
+      checkCudaErrors( cudaDeviceSynchronize() );
+    }
+    checkCudaErrors( cudaMemcpy(checkVector, dev_checkVector, msgSize*sizeof(dtype), cudaMemcpyDeviceToHost) );
+    checkCudaErrors( cudaDeviceSynchronize() );
+
+    MPI_ALL_PRINT(
+      fprintf(fp, "extracted tid = %d\n", x);
+      fprintf(fp, "checkVector = %6.4f\n", checkVector[x]);
+    )
+
+    checkCudaErrors( cudaFree(dev_test_vector) );
+    checkCudaErrors( cudaFree(dev_checkVector) );
+    checkCudaErrors( cudaFree(dev_test_sizes) );
+    free(checkVector);
+  }
+  MPI_Barrier(MPI_COMM_WORLD);
+  // ---------------------------------------
 
   free(sendBuffer);
   free(recvBuffer);

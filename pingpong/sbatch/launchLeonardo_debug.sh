@@ -23,12 +23,12 @@ echo " ------ PingPong ------ "
 echo "     myfolder: $mainfolder"
 echo "     binfolder: $binfolder"
 
-for binaryPath in ${binfolder}/*
+for binaryPath in "${binfolder}"/*
 do
 	binaryFile=$(echo "$binaryPath" | sed 's|.*/||')
-	echo "binaryFile= --> $binaryFile"
+	echo "binaryFile --> $binaryFile"
 	start_time="$(date -u +%s)"
-	exitcode=$(mpirun -np 2 ${binaryPath} > ${outfolder}/${binaryFile}.out 2> ${outfolder}/${binaryFile}.err)
+	exitcode=$(srun "${binaryPath}" > "${outfolder}/${binaryFile}.out" 2> "${outfolder}/${binaryFile}.err")
 	end_time="$(date -u +%s)"
 
 	echo " exitcode:    $exitcode"
