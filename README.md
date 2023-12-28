@@ -19,20 +19,20 @@
 6. **Tested**: the experiment was tested on each considered architecture.
 
 ## Status of development
-**Last update**: 22/12/2023 20:00
+**Last update**: 28/12/2023 11:00
 
-| Benchmark   | Layout       | MPI + CudaMemcpy | NCCL            | GPUDirect       | Low-level NV-link |
-|-------------|--------------|------------------|-----------------|-----------------|-------------------|
-| Ping-pong   | Intra-node   | 🟢               | 🟢             | ❌             | ❌                |
-|             | Inter-nodes  | 🟢               | 🟢             | ❌             | ❌                |
-| Halo3d      | 2x2x2        | 🟢               | ▶              | ❌             | ❌                |
-|             | ??           | □                 | □              | ❌             | ❌                |
-| Incast      | Inter-nodes  | 🟢               | 🟢             | ❌             | ❌                |
-|             | ??           | □                 | □              | ❌             | ❌                |
-| Sweep       | ??           | □                 | □              | ❌             | ❌                |
-|             | ??           | □                 | □              | ❌             | ❌                |
-| Others (?)  | ??           | ❌               | ❌             | ❌             | ❌                |
-|             | ??           | ❌               | ❌             | ❌             | ❌                |
+| Benchmark   | Layout              | MPI + CudaMemcpy | NCCL            | GPUDirect       | Low-level NV-link |
+|-------------|---------------------|------------------|-----------------|-----------------|-------------------|
+| Ping-pong   | IntraNode           | 🟢               | 🟢               | ❌              | ❌                |
+|             | InterNodes          | 🟢               | 🟢               | ❌              | ❌                |
+| Halo3d      | IntraNode  (2x2x1)  | 🟢               | 🟢               | ❌              | ❌                |
+|             | InterNodes (2x2x2)  | 🟢               | 🟢               | ❌              | ❌                |
+| Incast      | IntraNode           | 🟢               | 🟢               | ❌              | ❌                |
+|             | InterNodes          | 🟢               | 🟢               | ❌              | ❌                |
+| Sweep       | ??                  | □                | □               | ❌              | ❌                |
+|             | ??                  | □                | □               | ❌              | ❌                |
+| Others (?)  | ??                  | ❌               | ❌               | ❌              | ❌                |
+|             | ??                  | ❌               | ❌               | ❌              | ❌                |
 
 ### Testing status
 

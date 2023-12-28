@@ -1,8 +1,8 @@
 #!/bin/bash
 
-#SBATCH --job-name=Halo3D
-#SBATCH --output=sout/Halo3D_%j.out
-#SBATCH --error=sout/Halo3D_%j.err
+#SBATCH --job-name=PingPongInterNodes
+#SBATCH --output=sout/PingPongInterNodes_%j.out
+#SBATCH --error=sout/PingPongInterNodes_%j.err
 
 #SBATCH --partition=boost_usr_prod
 #SBATCH --account=IscrC_SHARP_0
@@ -15,20 +15,23 @@
 #SBATCH --cpus-per-task=8
 #SBATCH --mem=494000MB
 
-mainfolder=/leonardo/home/userexternal/lpichett/MPI_GPU_banch/halo3d
+mainfolder=/leonardo/home/userexternal/lpichett/MPI_GPU_banch/pingpong
 binfolder=${mainfolder}/bin
 outfolder=${mainfolder}/out
+explayout="interNodes"
 
-echo " ------ Halo3D ------ "
+echo " ------ PingPong ------ "
 echo "     myfolder: $mainfolder"
 echo "     binfolder: $binfolder"
+echo "     outfolder: $outfolder"
+echo "     explayout: $explayout"
 
 for binaryPath in "${binfolder}"/*
 do
 	binaryFile=$(echo "$binaryPath" | sed 's|.*/||')
 	echo "binaryFile --> $binaryFile"
 	start_time="$(date -u +%s)"
-	exitcode=$(srun "${binaryPath}" -pex 2 -pey 2 -pez 2 -nx 16 -ny 16 -nz 16 -vars 4 > "${outfolder}/${binaryFile}.out" 2> "${outfolder}/${binaryFile}.err")
+	exitcode=$(srun "${binaryPath}" > "${outfolder}/${binaryFile}_${explayout}.out" 2> "${outfolder}/${binaryFile}_${explayout}.err")
 	end_time="$(date -u +%s)"
 
 	echo " exitcode:    $exitcode"

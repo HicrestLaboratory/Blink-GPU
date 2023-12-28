@@ -36,7 +36,7 @@
 #define TID_DIGITS 10000
 
 #define dtype float
-#define MPI_dtype MPI_FLOAT
+#define NCCL_dtype ncclFloat
 
 // for nccl
 #include <nccl.h>
@@ -406,24 +406,24 @@ int main(int argc, char* argv[]) {
 
   // ---------------------------------------
   {
-    float tmp[3][2], *tmp0;
+    dtype tmp[3][2], *tmp0;
     srand((unsigned int)time(NULL));
     int x = rand() % (GRD_SIZE*BLK_SIZE);
     int size = (xSize > ySize) ? xSize : ySize;
     if (zSize > size) size = zSize;
     tmp0 = (dtype*)malloc(sizeof(dtype)*(size));
     for (int i=0; i<6; i++) tmp[i/2][i%2] = 0.0;
-    checkCudaErrors( cudaMemcpy(tmp0, dev_xUpSendBuffer,   xSize*sizeof(float), cudaMemcpyDeviceToHost) );
+    checkCudaErrors( cudaMemcpy(tmp0, dev_xUpSendBuffer,   xSize*sizeof(dtype), cudaMemcpyDeviceToHost) );
     tmp[0][0] = tmp0[x];
-    checkCudaErrors( cudaMemcpy(tmp0, dev_xDownSendBuffer, xSize*sizeof(float), cudaMemcpyDeviceToHost) );
+    checkCudaErrors( cudaMemcpy(tmp0, dev_xDownSendBuffer, xSize*sizeof(dtype), cudaMemcpyDeviceToHost) );
     tmp[0][1] = tmp0[x];
-    checkCudaErrors( cudaMemcpy(tmp0, dev_yUpSendBuffer,   ySize*sizeof(float), cudaMemcpyDeviceToHost) );
+    checkCudaErrors( cudaMemcpy(tmp0, dev_yUpSendBuffer,   ySize*sizeof(dtype), cudaMemcpyDeviceToHost) );
     tmp[1][0] = tmp0[x];
-    checkCudaErrors( cudaMemcpy(tmp0, dev_yDownSendBuffer, ySize*sizeof(float), cudaMemcpyDeviceToHost) );
+    checkCudaErrors( cudaMemcpy(tmp0, dev_yDownSendBuffer, ySize*sizeof(dtype), cudaMemcpyDeviceToHost) );
     tmp[1][1] = tmp0[x];
-    checkCudaErrors( cudaMemcpy(tmp0, dev_zUpSendBuffer,   zSize*sizeof(float), cudaMemcpyDeviceToHost) );
+    checkCudaErrors( cudaMemcpy(tmp0, dev_zUpSendBuffer,   zSize*sizeof(dtype), cudaMemcpyDeviceToHost) );
     tmp[2][0] = tmp0[x];
-    checkCudaErrors( cudaMemcpy(tmp0, dev_zDownSendBuffer, zSize*sizeof(float), cudaMemcpyDeviceToHost) );
+    checkCudaErrors( cudaMemcpy(tmp0, dev_zDownSendBuffer, zSize*sizeof(dtype), cudaMemcpyDeviceToHost) );
     tmp[2][1] = tmp0[x];
     checkCudaErrors( cudaDeviceSynchronize() );
 
@@ -510,15 +510,15 @@ int main(int argc, char* argv[]) {
     TIMER_START(0);
     if (xUp > -1) {
       ncclGroupStart();
-      ncclSend(dev_xUpSendBuffer, xSize, ncclChar, xUp, NCCL_COMM_WORLD, NULL);
-      ncclRecv(dev_xUpRecvBuffer, xSize, ncclChar, xUp, NCCL_COMM_WORLD, NULL);
+      ncclSend(dev_xUpSendBuffer, xSize, NCCL_dtype, xUp, NCCL_COMM_WORLD, NULL);
+      ncclRecv(dev_xUpRecvBuffer, xSize, NCCL_dtype, xUp, NCCL_COMM_WORLD, NULL);
       ncclGroupEnd();
     }
 
     if (xDown > -1) {
       ncclGroupStart();
-      ncclSend(dev_xDownSendBuffer, xSize, ncclChar, xDown, NCCL_COMM_WORLD, NULL);
-      ncclRecv(dev_xDownRecvBuffer, xSize, ncclChar, xDown, NCCL_COMM_WORLD, NULL);
+      ncclSend(dev_xDownSendBuffer, xSize, NCCL_dtype, xDown, NCCL_COMM_WORLD, NULL);
+      ncclRecv(dev_xDownRecvBuffer, xSize, NCCL_dtype, xDown, NCCL_COMM_WORLD, NULL);
       ncclGroupEnd();
     }
     TIMER_STOP(0);
@@ -529,15 +529,15 @@ int main(int argc, char* argv[]) {
     TIMER_START(0);
     if (yUp > -1) {
       ncclGroupStart();
-      ncclSend(dev_yUpSendBuffer, ySize, ncclChar, yUp, NCCL_COMM_WORLD, NULL);
-      ncclRecv(dev_yUpRecvBuffer, ySize, ncclChar, yUp, NCCL_COMM_WORLD, NULL);
+      ncclSend(dev_yUpSendBuffer, ySize, NCCL_dtype, yUp, NCCL_COMM_WORLD, NULL);
+      ncclRecv(dev_yUpRecvBuffer, ySize, NCCL_dtype, yUp, NCCL_COMM_WORLD, NULL);
       ncclGroupEnd();
     }
 
     if (yDown > -1) {
       ncclGroupStart();
-      ncclSend(dev_yDownSendBuffer, ySize, ncclChar, yDown, NCCL_COMM_WORLD, NULL);
-      ncclRecv(dev_yDownRecvBuffer, ySize, ncclChar, yDown, NCCL_COMM_WORLD, NULL);
+      ncclSend(dev_yDownSendBuffer, ySize, NCCL_dtype, yDown, NCCL_COMM_WORLD, NULL);
+      ncclRecv(dev_yDownRecvBuffer, ySize, NCCL_dtype, yDown, NCCL_COMM_WORLD, NULL);
       ncclGroupEnd();
     }
     TIMER_STOP(0);
@@ -548,15 +548,15 @@ int main(int argc, char* argv[]) {
     TIMER_START(0);
     if (zUp > -1) {
       ncclGroupStart();
-      ncclSend(dev_zUpSendBuffer, zSize, ncclChar, zUp, NCCL_COMM_WORLD, NULL);
-      ncclRecv(dev_zUpRecvBuffer, zSize, ncclChar, zUp, NCCL_COMM_WORLD, NULL);
+      ncclSend(dev_zUpSendBuffer, zSize, NCCL_dtype, zUp, NCCL_COMM_WORLD, NULL);
+      ncclRecv(dev_zUpRecvBuffer, zSize, NCCL_dtype, zUp, NCCL_COMM_WORLD, NULL);
       ncclGroupEnd();
     }
 
     if (zDown > -1) {
       ncclGroupStart();
-      ncclSend(dev_zDownSendBuffer, zSize, ncclChar, zDown, NCCL_COMM_WORLD, NULL);
-      ncclRecv(dev_zDownRecvBuffer, zSize, ncclChar, zDown, NCCL_COMM_WORLD, NULL);
+      ncclSend(dev_zDownSendBuffer, zSize, NCCL_dtype, zDown, NCCL_COMM_WORLD, NULL);
+      ncclRecv(dev_zDownRecvBuffer, zSize, NCCL_dtype, zDown, NCCL_COMM_WORLD, NULL);
       ncclGroupEnd();
     }
     TIMER_STOP(0);

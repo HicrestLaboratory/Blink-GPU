@@ -1,15 +1,15 @@
 #!/bin/bash
 
-#SBATCH --job-name=PingPong2nodes
-#SBATCH --output=sout/PingPong2nodes_%j.out
-#SBATCH --error=sout/PingPong2nodes_%j.err
+#SBATCH --job-name=PingPongIntraNode
+#SBATCH --output=sout/PingPongIntraNode_%j.out
+#SBATCH --error=sout/PingPongIntraNode_%j.err
 
 #SBATCH --partition=boost_usr_prod
 #SBATCH --account=IscrC_SHARP_0
 #SBATCH --time=00:05:00
 #SBATCH --qos=boost_qos_dbg
 
-#SBATCH --nodes=2
+#SBATCH --nodes=1
 #SBATCH --gres=gpu:4
 #SBATCH --ntasks-per-node=4
 #SBATCH --cpus-per-task=8
@@ -18,12 +18,13 @@
 mainfolder=/leonardo/home/userexternal/lpichett/MPI_GPU_banch/pingpong
 binfolder=${mainfolder}/bin
 outfolder=${mainfolder}/out
-explayout="2nodes"
+explayout="intraNode"
 
 echo " ------ PingPong ------ "
 echo "     myfolder: $mainfolder"
 echo "     binfolder: $binfolder"
 echo "     outfolder: $outfolder"
+echo "     explayout: $explayout"
 
 for binaryPath in "${binfolder}"/*
 do

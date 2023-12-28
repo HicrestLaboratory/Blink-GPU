@@ -33,7 +33,7 @@
 #define TID_DIGITS 10000
 
 #define dtype float
-#define MPI_dtype MPI_FLOAT
+#define NCCL_dtype ncclFloat
 
 // for nccl
 #include <nccl.h>
@@ -312,10 +312,10 @@ int main(int argc, char* argv[]) {
     ncclGroupStart();
     if (me == (world - 1)) {
       for (int r = 0; r < world - 1; ++r) {
-        ncclRecv(&dev_recvBuffer[r * msgsize], msgsize, ncclFloat, r, NCCL_COMM_WORLD, NULL);
+        ncclRecv(&dev_recvBuffer[r * msgsize], msgsize, NCCL_dtype, r, NCCL_COMM_WORLD, NULL);
       }
     } else {
-      ncclSend(dev_sendBuffer, msgsize, ncclFloat, (world - 1), NCCL_COMM_WORLD, NULL);
+      ncclSend(dev_sendBuffer, msgsize, NCCL_dtype, (world - 1), NCCL_COMM_WORLD, NULL);
     }
     ncclGroupEnd();
     TIMER_STOP(0);
