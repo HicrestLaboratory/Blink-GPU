@@ -57,11 +57,24 @@ extern "C" {
 
 #endif
 
-// #define DEBUG 3
+#ifdef NVLINK
+
+#include "../../include/helper_multiprocess.h"
+static const char shmName[] = "simpleIPCshm";
+
+#define MAX_DEVICES (32)
+
+#endif
+
+#define DEBUG 0
 #include "../../include/debug_utils.h"
 
 #define BLK_SIZE 256
 #define GRD_SIZE 4
+#define TID_DIGITS 10000
+
+#define dtype float
+#define NCCL_dtype ncclFloat
 
 #define PINGPONG_REPEATS 1000
 #define PINGPONG_MSG_SIZE 1024
@@ -140,32 +153,43 @@ int  assignDeviceToProcess(MPI_Comm *nodeComm, int *nnodes, int *mynodeid)
 }
 
 __global__
-void init_kernel(int n, char *input, int scale) {
-
+void init_kernel(int n, dtype *input, int rank) {
   int tid = blockIdx.x*blockDim.x + threadIdx.x;
 
-  for (int i=0; i<n; i++) {
-    int val_coord = tid * scale;
-    if (tid < n)
-        input[tid] = (char)val_coord;
+  dtype floattid = tid/(dtype)TID_DIGITS;
+  dtype val_coord = rank + floattid;
+  if (tid < n)
+      input[tid] = (dtype)val_coord;
+
+}
+
+__global__
+void test_kernel(int n, int ninputs, size_t *sizes, dtype **inputs, dtype *output) {
+  int tid = blockIdx.x*blockDim.x + threadIdx.x;
+  dtype tmp = 0.0;
+
+  if (tid < n) {
+    for (int i=0; i<ninputs; i++)
+      if (tid < sizes[i])
+        tmp += inputs[i][tid];
   }
+  output[tid] = tmp;
+
 }
 
-unsigned long long int check_result(int n, int myid, char* dev_recvBuffer, int recvid) {
+#ifdef NVLINK
 
-  unsigned long long int error = 0ULL;
-  char* checkBuffer = (char*)malloc(sizeof(char*) * n);
+typedef struct shmStruct_st {
+  size_t nprocesses;
+  int barrier;
+  int sense;
+  int devices[MAX_DEVICES];
+  int *canAccesPeer;
+  cudaIpcMemHandle_t memHandle[MAX_DEVICES];
+  cudaIpcEventHandle_t eventHandle[MAX_DEVICES];
+} shmStruct;
 
-  checkCudaErrors( cudaMemcpy(checkBuffer, dev_recvBuffer, n*sizeof(char), cudaMemcpyDeviceToHost) );
-  checkCudaErrors( cudaDeviceSynchronize() );
-
-  for (int i=0; i<n; i++)
-    error += (unsigned long long int)((recvid+1)*i - checkBuffer[i]);
-
-  free(checkBuffer);
-
-  return(error);
-}
+#endif
 
 #endif
 
@@ -242,8 +266,8 @@ int main(int argc, char* argv[]) {
   MPI_Barrier(MPI_COMM_WORLD);
 #endif
 
-  char* sendBuffer   = (char*)malloc(sizeof(char*) * msgSize);
-  char* recvBuffer   = (char*)malloc(sizeof(char*) * msgSize);
+  dtype* sendBuffer   = (dtype*)malloc(sizeof(dtype*) * msgSize);
+  dtype* recvBuffer   = (dtype*)malloc(sizeof(dtype*) * msgSize);
 
   for (int i = 0; i < msgSize; ++i) {
     sendBuffer[i]  = 0;
@@ -255,33 +279,58 @@ int main(int argc, char* argv[]) {
   DBG_CHECK(1)
 
 #ifdef CUDA
-  char *dev_sendBuffer, *dev_recvBuffer;
-  checkCudaErrors( cudaMalloc(&dev_sendBuffer, msgSize*sizeof(char)) );
-  checkCudaErrors( cudaMalloc(&dev_recvBuffer, msgSize*sizeof(char)) );
-  checkCudaErrors( cudaMemset(dev_sendBuffer, 0, msgSize*sizeof(char)) );
-  checkCudaErrors( cudaMemset(dev_recvBuffer, 0, msgSize*sizeof(char)) );
+  dtype *dev_sendBuffer, *dev_recvBuffer;
+  checkCudaErrors( cudaMalloc(&dev_sendBuffer, msgSize*sizeof(dtype)) );
+  checkCudaErrors( cudaMalloc(&dev_recvBuffer, msgSize*sizeof(dtype)) );
+  checkCudaErrors( cudaMemset(dev_sendBuffer, 0, msgSize*sizeof(dtype)) );
+  checkCudaErrors( cudaMemset(dev_recvBuffer, 0, msgSize*sizeof(dtype)) );
 #endif
-
-  TIMER_DEF(0);
-  TIMER_DEF(1);
 
   DBG_CHECK(1)
 
 #ifdef CUDA
   dim3 block_size(BLK_SIZE, 1, 1);
   dim3 grid_size(GRD_SIZE, 1, 1);
-  printf("block_size = %d, grid_size = %d, elements per thread = %f\n", block_size.x, grid_size.x, (float)msgSize/(block_size.x*grid_size.x));
-  init_kernel<<<grid_size, block_size>>>(msgSize, dev_sendBuffer, me+1);
+//   printf("block_size = %d, grid_size = %d, elements per thread = %f\n", block_size.x, grid_size.x, (float)msgSize/(block_size.x*grid_size.x));
+  init_kernel<<<grid_size, block_size>>>(msgSize, dev_sendBuffer, me);
   checkCudaErrors( cudaDeviceSynchronize() );
 #else
   for (int i = 0; i < msgSize; ++i)
     sendBuffer[i]  = i;
 #endif
 
-
   DBG_CHECK(1)
 
+  // ---------------------------------------
+  {
+    float *tmp0;
+    srand((unsigned int)time(NULL));
+    int x = rand() % (GRD_SIZE*BLK_SIZE);
+    tmp0 = (dtype*)malloc(sizeof(dtype)*(msgSize));
+    for (int i=0; i<(GRD_SIZE*BLK_SIZE); i++) tmp0[i] = 0.0;
+    checkCudaErrors( cudaMemcpy(tmp0, dev_sendBuffer, msgSize*sizeof(dtype), cudaMemcpyDeviceToHost) );
+    checkCudaErrors( cudaDeviceSynchronize() );
+
+    MPI_ALL_PRINT(
+      fprintf(fp, "extracted tid = %d\n", x);
+      fprintf(fp, "dev_sendBuffer = %6.4f\n", tmp0[x]);
+    )
+    free(tmp0);
+  }
+  MPI_Barrier(MPI_COMM_WORLD);
+  // ---------------------------------------
+
   INIT_EXPS
+  TIMER_DEF(0);
+  TIMER_DEF(1);
+  SET_EXPERIMENT_NAME(0, "pingpong")
+  SET_EXPERIMENT_TYPE(0, "nvlink")
+  if (nnodes > 1) {
+    SET_EXPERIMENT_LAYOUT(0, "interNodes")
+  } else {
+    SET_EXPERIMENT_LAYOUT(0, "intraNode")
+  }
+  SET_EXPERIMENT(0, "Total")
 
 
   fflush(stdout);
@@ -294,7 +343,108 @@ int main(int argc, char* argv[]) {
   timeTakenCUDA = 0.0;
 
 #ifdef NVLINK
-//   if (mynodeid == 0 || mynodeid == 1) {
+  if (nnodes == 1) {
+
+    // --------------------------------------------------------------
+    char *tmp_string = (char*) malloc( sizeof(char) * 1000 ), string[100];
+    tmp_string[0] = '\0';
+    int exitflag = 0;
+
+    sharedMemoryInfo info;
+//     int devCount, i;
+    int i;
+    volatile shmStruct *shm = NULL;
+    std::vector<void *> ptrs;
+    std::vector<cudaEvent_t> events;
+    std::vector<Process> processes;
+
+//     checkCudaErrors(cudaGetDeviceCount(&devCount));
+
+    if (sharedMemoryCreate(shmName, sizeof(*shm), &info) != 0) {
+      sprintf(string, "Failed to create shared memory slab\n");
+      strcat(tmp_string, string);
+      exitflag = 11;
+    }
+    shm = (volatile shmStruct *)info.addr;
+    memset((void *)shm, 0, sizeof(*shm));
+    shm->canAccesPeer = NULL;
+
+    // Pick all the devices that can access each other's memory for this test
+    // Keep in mind that CUDA has minimal support for fork() without a
+    // corresponding exec() in the child process, but in this case our
+    // spawnProcess will always exec, so no need to worry.
+    bool allPeers = true;
+    cudaDeviceProp prop;
+    checkCudaErrors(cudaGetDeviceProperties(&prop, dev));
+
+    // CUDA IPC is only supported on devices with unified addressing
+    if (!prop.unifiedAddressing) {
+      sprintf(string, "Device %d does not support unified addressing, skipping...\n", dev);
+      strcat(tmp_string, string);
+      goto nvlink_prop_print;
+    } else {
+      sprintf(string, "Device %d support unified addressing\n", dev);
+      strcat(tmp_string, string);
+    }
+    // This sample requires two processes accessing each device, so we need
+    // to ensure exclusive or prohibited mode is not set
+    if (prop.computeMode != cudaComputeModeDefault) {
+      sprintf(string, "Device %d is in an unsupported compute mode for this sample\n", dev);
+      strcat(tmp_string, string);
+      goto nvlink_prop_print;
+    } else {
+      sprintf(string, "Device %d is in a supported compute mode for this sample\n", dev);
+      strcat(tmp_string, string);
+    }
+
+    shm->canAccesPeer = (int*) malloc(sizeof(int)*deviceCount*deviceCount);
+    for (int j = 0; j < deviceCount && j != dev; j++) {
+      int canAccessPeerIJ, canAccessPeerJI;
+      checkCudaErrors(
+          cudaDeviceCanAccessPeer(&canAccessPeerJI, j, dev));
+      checkCudaErrors(
+          cudaDeviceCanAccessPeer(&canAccessPeerIJ, dev, j));
+
+      shm->canAccesPeer[dev * deviceCount + j] = (canAccessPeerIJ) ? 1 : 0;
+      shm->canAccesPeer[j * deviceCount + dev] = (canAccessPeerJI) ? 1 : 0;
+      if (!canAccessPeerIJ || !canAccessPeerJI) allPeers = false;
+    }
+
+
+    if (allPeers) {
+      // Enable peers here.  This isn't necessary for IPC, but it will
+      // setup the peers for the device.  For systems that only allow 8
+      // peers per GPU at a time, this acts to remove devices from CanAccessPeer
+      for (int j = 0; j < deviceCount && j != dev; j++) {
+        sprintf(string, "Device %d is peer capable, manage comment at line %d for enable the access\n", dev, __LINE__);
+//        checkCudaErrors(cudaSetDevice(dev));
+//        checkCudaErrors(cudaDeviceEnablePeerAccess(shm->devices[j], 0));
+//        checkCudaErrors(cudaSetDevice(shm->devices[j]));
+//        checkCudaErrors(cudaDeviceEnablePeerAccess(dev, 0));
+      }
+//       shm->devices[shm->nprocesses++] = dev;
+//       if (shm->nprocesses >= MAX_DEVICES) goto nvlink_prop_print;
+    } else {
+      sprintf(string, "Device %d is not peer capable with some other selected peers, skipping\n", dev);
+      strcat(tmp_string, string);
+    }
+
+    if (shm->nprocesses == 0) {
+      sprintf(string, "No CUDA devices support IPC\n");
+      strcat(tmp_string, string);
+      exitflag = 13;
+    }
+
+    nvlink_prop_print:  // per goto
+
+    MPI_ALL_PRINT(fprintf(fp, "%s", tmp_string);)
+    free(tmp_string);
+//     if (shm->canAccesPeer != NULL) {MPI_ALL_PRINT( FPRINT_MATRIX(fp, shm->canAccesPeer, deviceCount, deviceCount) )}
+    MPI_Barrier(MPI_COMM_WORLD);
+    if (exitflag != 0) exit(exitflag);
+    DBG_STOP(0)
+    // --------------------------------------------------------------
+
     int canAccess = -1;
     if (mynodeid == 0) {
       cudaDeviceEnablePeerAccess(1,0);
@@ -362,13 +512,58 @@ int main(int argc, char* argv[]) {
 
     checkCudaErrors( cudaDeviceSynchronize() );
     MPI_ALL_PRINT( fprintf(fp, "canAccess = %d\nAFTER: host_sendflag = %d, host_recvflag = %d\n", canAccess, host_sendflag, host_recvflag); )
-//   }
+  } else {
+    if (0 == me) printf("The NVLINK version is only implemented for intraNode communication\n");
+  }
 #else
   if (0 == me) printf("# the NVLINK macro is disabled\n");
 #endif
 
+  // ---------------------------------------
+  {
+    size_t test_sizes[1], *dev_test_sizes;
+    dtype *test_vector[1], **dev_test_vector;
+    srand((unsigned int)time(NULL));
+    int x = rand() % (GRD_SIZE*BLK_SIZE);
+
+    dtype *dev_checkVector, *checkVector;
+    checkVector = (dtype*) malloc(sizeof(dtype)*msgSize);
+    checkCudaErrors( cudaMalloc(&dev_checkVector,   sizeof(dtype) * msgSize) );
+    checkCudaErrors( cudaMemset(dev_checkVector, 0, sizeof(dtype) * msgSize) );
+
+    test_sizes[0] = msgSize;
+    test_vector[0] = dev_recvBuffer;
+
+    checkCudaErrors( cudaMalloc(&dev_test_sizes,  sizeof(size_t)) );
+    checkCudaErrors( cudaMalloc(&dev_test_vector, sizeof(dtype*)) );
+    checkCudaErrors( cudaMemcpy(dev_test_sizes,  test_sizes,  sizeof(size_t), cudaMemcpyHostToDevice) );
+    checkCudaErrors( cudaMemcpy(dev_test_vector, test_vector, sizeof(dtype*), cudaMemcpyHostToDevice) );
+
+    {
+      dim3 block_size(BLK_SIZE, 1, 1);
+      dim3 grid_size(GRD_SIZE, 1, 1);
+      test_kernel<<<grid_size, block_size>>>(msgSize, 1, dev_test_sizes, dev_test_vector, dev_checkVector);
+      checkCudaErrors( cudaDeviceSynchronize() );
+    }
+    checkCudaErrors( cudaMemcpy(checkVector, dev_checkVector, msgSize*sizeof(dtype), cudaMemcpyDeviceToHost) );
+    checkCudaErrors( cudaDeviceSynchronize() );
+
+    MPI_ALL_PRINT(
+      fprintf(fp, "extracted tid = %d\n", x);
+      fprintf(fp, "checkVector = %6.4f\n", checkVector[x]);
+    )
+
+    checkCudaErrors( cudaFree(dev_test_vector) );
+    checkCudaErrors( cudaFree(dev_checkVector) );
+    checkCudaErrors( cudaFree(dev_test_sizes) );
+    free(checkVector);
+  }
   MPI_Barrier(MPI_COMM_WORLD);
+  // ---------------------------------------
+
   if (0 == me) printf("# --------------------------------------------\n");
+  fflush(stdout);
+  MPI_Barrier(MPI_COMM_WORLD);
   if (me == 0) PRINT_EXPARIMENT_STATS
 
   MPI_Finalize();

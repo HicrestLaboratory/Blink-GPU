@@ -150,10 +150,19 @@
 #define PRINT_MATRIX( A, N, M) {                        \
     for (int i_macro=0; i_macro<(N); i_macro++) {       \
         for (int j_macro=0; j_macro<(M); j_macro++)     \
-            printf("%3.2f ", A[i_macro*(M) + j_macro]); \
+            printf("%d ", A[i_macro*(M) + j_macro]);    \
         printf("\n");                                   \
     }                                                   \
     printf("\n");                                       \
+}
+
+#define FPRINT_MATRIX( FP, A, N, M) {                     \
+    for (int i_macro=0; i_macro<(N); i_macro++) {         \
+        for (int j_macro=0; j_macro<(M); j_macro++)       \
+            fprintf(FP, "%d ", A[i_macro*(M) + j_macro]); \
+        fprintf(FP, "\n");                                \
+    }                                                     \
+    fprintf(FP, "\n");                                    \
 }
 
 #define PRINT_CSR( RW, CL, VL, N, M, NZ, NM ) {       \
