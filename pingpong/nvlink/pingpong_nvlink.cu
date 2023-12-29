@@ -74,7 +74,7 @@ static const char shmName[] = "simpleIPCshm";
 #define TID_DIGITS 10000
 
 #define dtype float
-#define NCCL_dtype ncclFloat
+#define MPI_dtype MPI_FLOAT
 
 #define PINGPONG_REPEATS 1000
 #define PINGPONG_MSG_SIZE 1024
@@ -266,14 +266,6 @@ int main(int argc, char* argv[]) {
   MPI_Barrier(MPI_COMM_WORLD);
 #endif
 
-  dtype* sendBuffer   = (dtype*)malloc(sizeof(dtype*) * msgSize);
-  dtype* recvBuffer   = (dtype*)malloc(sizeof(dtype*) * msgSize);
-
-  for (int i = 0; i < msgSize; ++i) {
-    sendBuffer[i]  = 0;
-    recvBuffer[i]  = 0;
-  }
-
   MPI_Status status;
 
   DBG_CHECK(1)
@@ -294,9 +286,6 @@ int main(int argc, char* argv[]) {
 //   printf("block_size = %d, grid_size = %d, elements per thread = %f\n", block_size.x, grid_size.x, (float)msgSize/(block_size.x*grid_size.x));
   init_kernel<<<grid_size, block_size>>>(msgSize, dev_sendBuffer, me);
   checkCudaErrors( cudaDeviceSynchronize() );
-#else
-  for (int i = 0; i < msgSize; ++i)
-    sendBuffer[i]  = i;
 #endif
 
   DBG_CHECK(1)
@@ -336,19 +325,17 @@ int main(int argc, char* argv[]) {
   fflush(stdout);
   MPI_Barrier(MPI_COMM_WORLD);
   if (0 == me) printf("# ----------------- NV LINK ------------------\n");
-  SET_EXPERIMENT(3, "NV LINK")
+  fflush(stdout);
+  MPI_Barrier(MPI_COMM_WORLD);
+  SET_EXPERIMENT(0, "NV LINK")
   DBG_CHECK(4)
-  interror = 0ULL;
-  timeTaken = 0.0;
-  timeTakenCUDA = 0.0;
 
 #ifdef NVLINK
   if (nnodes == 1) {
 
     // --------------------------------------------------------------
-    char *tmp_string = (char*) malloc( sizeof(char) * 1000 ), string[100];
-    tmp_string[0] = '\0';
-    int exitflag = 0;
+    STR_COLL_DEF
+    STR_COLL_INIT
 
     sharedMemoryInfo info;
 //     int devCount, i;
@@ -361,157 +348,123 @@ int main(int argc, char* argv[]) {
 //     checkCudaErrors(cudaGetDeviceCount(&devCount));
 
     if (sharedMemoryCreate(shmName, sizeof(*shm), &info) != 0) {
-      sprintf(string, "Failed to create shared memory slab\n");
-      strcat(tmp_string, string);
-      exitflag = 11;
+      STR_COLL_APPEND( sprintf(str_coll.buff, "Failed to create shared memory slab\n"); )
+      exit(__LINE__);
     }
     shm = (volatile shmStruct *)info.addr;
     memset((void *)shm, 0, sizeof(*shm));
-    shm->canAccesPeer = NULL;
 
     // Pick all the devices that can access each other's memory for this test
     // Keep in mind that CUDA has minimal support for fork() without a
     // corresponding exec() in the child process, but in this case our
     // spawnProcess will always exec, so no need to worry.
-    bool allPeers = true;
+    int allPeers = 1, myIPC = 1, allIPC;
     cudaDeviceProp prop;
     checkCudaErrors(cudaGetDeviceProperties(&prop, dev));
 
+    int* canAccesPeer = (int*) malloc(sizeof(int)*deviceCount*deviceCount);
+    for (int i = 0; i < deviceCount*deviceCount; i++) canAccesPeer[i] = 0;
+
     // CUDA IPC is only supported on devices with unified addressing
     if (!prop.unifiedAddressing) {
-      sprintf(string, "Device %d does not support unified addressing, skipping...\n", dev);
-      strcat(tmp_string, string);
-      goto nvlink_prop_print;
+      STR_COLL_APPEND( sprintf(str_coll.buff, "Device %d does not support unified addressing, skipping...\n", dev); )
+      myIPC = 0;
     } else {
-      sprintf(string, "Device %d support unified addressing\n", dev);
-      strcat(tmp_string, string);
+      STR_COLL_APPEND( sprintf(str_coll.buff, "Device %d support unified addressing\n", dev); )
     }
     // This sample requires two processes accessing each device, so we need
     // to ensure exclusive or prohibited mode is not set
     if (prop.computeMode != cudaComputeModeDefault) {
-      sprintf(string, "Device %d is in an unsupported compute mode for this sample\n", dev);
-      strcat(tmp_string, string);
-      goto nvlink_prop_print;
+      STR_COLL_APPEND( sprintf(str_coll.buff, "Device %d is in an unsupported compute mode for this sample\n", dev); )
+      myIPC = 0;
     } else {
-      sprintf(string, "Device %d is in a supported compute mode for this sample\n", dev);
-      strcat(tmp_string, string);
+      STR_COLL_APPEND( sprintf(str_coll.buff, "Device %d is in a supported compute mode for this sample\n", dev); )
     }
 
-    shm->canAccesPeer = (int*) malloc(sizeof(int)*deviceCount*deviceCount);
-    for (int j = 0; j < deviceCount && j != dev; j++) {
-      int canAccessPeerIJ, canAccessPeerJI;
-      checkCudaErrors(
-          cudaDeviceCanAccessPeer(&canAccessPeerJI, j, dev));
-      checkCudaErrors(
-          cudaDeviceCanAccessPeer(&canAccessPeerIJ, dev, j));
-
-      shm->canAccesPeer[dev * deviceCount + j] = (canAccessPeerIJ) ? 1 : 0;
-      shm->canAccesPeer[j * deviceCount + dev] = (canAccessPeerJI) ? 1 : 0;
-      if (!canAccessPeerIJ || !canAccessPeerJI) allPeers = false;
+    MPI_Allreduce(&myIPC, &allIPC, 1, MPI_INT, MPI_MIN, MPI_COMM_WORLD);
+    if (!allIPC) {
+      MPI_ALL_PRINT( fprintf(fp, "%s", STR_COLL_GIVE); )
+      exit(__LINE__);
     }
 
+    if (me == 0) {
+      for (int i = 0; i < deviceCount; i++) {
+        for (int j = 0; j < deviceCount; j++) {
+//           printf("[%d] at line %d (i,j) = (%d, %d)\n", me, __LINE__, i, j);
+          if (j != i) {
+            int canAccessPeerIJ, canAccessPeerJI;
+            checkCudaErrors( cudaDeviceCanAccessPeer(&canAccessPeerJI, j, i) );
+            checkCudaErrors( cudaDeviceCanAccessPeer(&canAccessPeerIJ, i, j) );
+
+            canAccesPeer[i * deviceCount + j] = (canAccessPeerIJ) ? 1 : 0;
+            canAccesPeer[j * deviceCount + i] = (canAccessPeerJI) ? 1 : 0;
+            if (!canAccessPeerIJ || !canAccessPeerJI) allPeers = 0;
+          } else {
+            canAccesPeer[i * deviceCount + j] = -1;
+          }
+        }
+      }
+    }
+
+    MPI_Barrier(MPI_COMM_WORLD);
+    MPI_Bcast(&allPeers, 1, MPI_INT, 0, MPI_COMM_WORLD);
+    MPI_Bcast(canAccesPeer, deviceCount*deviceCount, MPI_INT, 0, MPI_COMM_WORLD);
 
     if (allPeers) {
       // Enable peers here.  This isn't necessary for IPC, but it will
       // setup the peers for the device.  For systems that only allow 8
       // peers per GPU at a time, this acts to remove devices from CanAccessPeer
-      for (int j = 0; j < deviceCount && j != dev; j++) {
-        sprintf(string, "Device %d is peer capable, manage comment at line %d for enable the access\n", dev, __LINE__);
-//        checkCudaErrors(cudaSetDevice(dev));
-//        checkCudaErrors(cudaDeviceEnablePeerAccess(shm->devices[j], 0));
-//        checkCudaErrors(cudaSetDevice(shm->devices[j]));
-//        checkCudaErrors(cudaDeviceEnablePeerAccess(dev, 0));
+      for (int j = 0; j < deviceCount; j++) {
+        if (j != dev) {
+          checkCudaErrors(cudaDeviceEnablePeerAccess(j, 0));
+          STR_COLL_APPEND( sprintf(str_coll.buff, "Enabled access from device %d to device %d\n", dev, j); )
+        }
       }
-//       shm->devices[shm->nprocesses++] = dev;
-//       if (shm->nprocesses >= MAX_DEVICES) goto nvlink_prop_print;
     } else {
-      sprintf(string, "Device %d is not peer capable with some other selected peers, skipping\n", dev);
-      strcat(tmp_string, string);
+      if (me == 0) printf(str_coll.buff, "CUDA IPC is not supported by all the node's GPUs\n");
     }
 
-    if (shm->nprocesses == 0) {
-      sprintf(string, "No CUDA devices support IPC\n");
-      strcat(tmp_string, string);
-      exitflag = 13;
-    }
-
-    nvlink_prop_print:  // per goto
-
-    MPI_ALL_PRINT(fprintf(fp, "%s", tmp_string);)
-    free(tmp_string);
-//     if (shm->canAccesPeer != NULL) {MPI_ALL_PRINT( FPRINT_MATRIX(fp, shm->canAccesPeer, deviceCount, deviceCount) )}
+    MPI_ALL_PRINT(
+      fprintf(fp, "%s", STR_COLL_GIVE);
+      FPRINT_MATRIX(fp, canAccesPeer, deviceCount, deviceCount)
+    )
+    STR_COLL_FREE
     MPI_Barrier(MPI_COMM_WORLD);
-    if (exitflag != 0) exit(exitflag);
-    DBG_STOP(0)
+
+    dtype *peerBuffer;
+    cudaEvent_t event;
+    cudaIpcMemHandle_t sendHandle, recvHandle;
+    cudaIpcEventHandle_t sendEventHandle, recvEventHandle;
+
+    if (me == 0 || me == world-1) {
+      checkCudaErrors( cudaIpcGetMemHandle((cudaIpcMemHandle_t*)&sendHandle, dev_sendBuffer) );
+      checkCudaErrors( cudaEventCreate(&event, cudaEventDisableTiming | cudaEventInterprocess) );
+      checkCudaErrors( cudaIpcGetEventHandle((cudaIpcEventHandle_t*)&sendEventHandle, event) );
+    }
+    MPI_Barrier(MPI_COMM_WORLD);
+
+    if (me == 0) {
+      MPI_Send(&sendHandle, sizeof(cudaIpcMemHandle_t), MPI_BYTE, world-1, 0, MPI_COMM_WORLD);
+      MPI_Send(&sendEventHandle, sizeof(cudaIpcEventHandle_t), MPI_BYTE, world-1, 0, MPI_COMM_WORLD);
+      MPI_Recv(&recvHandle, sizeof(cudaIpcMemHandle_t), MPI_BYTE, world-1, 1, MPI_COMM_WORLD, &status);
+      MPI_Recv(&recvEventHandle, sizeof(cudaIpcEventHandle_t), MPI_BYTE, world-1, 1, MPI_COMM_WORLD, &status);
+    }
+    if (me == world-1) {
+      MPI_Recv(&recvHandle, sizeof(cudaIpcMemHandle_t), MPI_BYTE, 0, 0, MPI_COMM_WORLD, &status);
+      MPI_Recv(&recvEventHandle, sizeof(cudaIpcEventHandle_t), MPI_BYTE, 0, 0, MPI_COMM_WORLD, &status);
+      MPI_Send(&sendHandle, sizeof(cudaIpcMemHandle_t), MPI_BYTE, 0, 1, MPI_COMM_WORLD);
+      MPI_Send(&sendEventHandle, sizeof(cudaIpcEventHandle_t), MPI_BYTE, 0, 1, MPI_COMM_WORLD);
+    }
+
+    MPI_Barrier(MPI_COMM_WORLD);
+    if (me == 0 || me == world-1) {
+      checkCudaErrors( cudaIpcOpenMemHandle((void**)&peerBuffer, *(cudaIpcMemHandle_t*)&recvHandle, cudaIpcMemLazyEnablePeerAccess) );
+      checkCudaErrors( cudaIpcOpenEventHandle(&event, *(cudaIpcEventHandle_t *)&recvEventHandle) );
+
+      checkCudaErrors( cudaMemcpy(dev_recvBuffer, peerBuffer, sizeof(dtype)*msgSize, cudaMemcpyDeviceToDevice) );
+    }
     // --------------------------------------------------------------
 
-    int canAccess = -1;
-    if (mynodeid == 0) {
-      cudaDeviceEnablePeerAccess(1,0);
-      checkCudaErrors( cudaDeviceCanAccessPeer(&canAccess, mynodeid, 1) );
-    } else if (mynodeid == 1) {
-      cudaDeviceEnablePeerAccess(0,0);
-      checkCudaErrors( cudaDeviceCanAccessPeer(&canAccess, mynodeid, 0) );
-    }
-    checkCudaErrors( cudaDeviceSynchronize() );
-
-
-    int *my_devpointer = NULL, *recv_devpointer = NULL, *peer_devpointer = NULL, host_sendflag, host_recvflag;
-    cudaIpcMemHandle_t *memHandles[mynodesize], *peerHandle = NULL;
-    host_sendflag = (mynodeid+1)*10;
-    host_recvflag = -1;
-
-    MPI_ALL_PRINT( fprintf(fp, "canAccess = %d\nBEFORE: host_sendflag = %d, host_recvflag = %d\n", canAccess, host_sendflag, host_recvflag); )
-
-    checkCudaErrors( cudaMalloc(&my_devpointer, sizeof(int)) );
-    checkCudaErrors( cudaMalloc(&recv_devpointer, sizeof(int)) );
-    checkCudaErrors( cudaMemcpy(my_devpointer, &host_sendflag, sizeof(int), cudaMemcpyHostToDevice) );
-
-    for (int i=0; i<mynodesize; i++)
-      memHandles[i] = NULL;
-
-    MPI_ALL_PRINT(
-      fprintf(fp, "BEFORE: my_devpointer = %p, recv_devpointer = %p, peerHandle = %p\nmemHandles: ", my_devpointer, recv_devpointer, peerHandle);
-      for (int i=0; i<mynodesize; i++)
-        fprintf(fp, "%p ", memHandles[i]);
-      fprintf(fp, "\n");
-    )
-
-
-    cudaIpcMemHandle_t memHandle;
-    checkCudaErrors( cudaIpcGetMemHandle ( &memHandle, my_devpointer ) );
-    MPI_Allgather(&memHandle, sizeof(memHandle), MPI_BYTE, memHandles, sizeof(memHandle), MPI_BYTE, nodeComm);
-
-    if (mynodeid == 0) {
-      peerHandle = memHandles[1];
-    } else if (mynodeid == 1) {
-      peerHandle = memHandles[0];
-    }
-    MPI_Barrier(MPI_COMM_WORLD);
-
-    MPI_ALL_PRINT(
-      fprintf(fp, "AFTER: my_devpointer = %p, recv_devpointer = %p, peerHandle = %p\nmemHandles: ", my_devpointer, recv_devpointer, peerHandle);
-      for (int i=0; i<mynodesize; i++)
-        fprintf(fp, "%p ", memHandles[i]);
-      fprintf(fp, "\n");
-    )
-
-    if (mynodeid == 0 || mynodeid == 1) {
-      if (mynodeid == 0) {
-//         checkCudaErrors( cudaMemcpyPeer(recv_devpointer, 0, peer_pointer, 1, sizeof(int)) );
-        checkCudaErrors( cudaIpcOpenMemHandle ((void**)&peer_devpointer, memHandle, cudaIpcMemLazyEnablePeerAccess) );
-        checkCudaErrors( cudaMemcpy(recv_devpointer, peer_devpointer, sizeof(int), cudaMemcpyDeviceToDevice) );
-      }else {
-//         checkCudaErrors( cudaMemcpyPeer(recv_devpointer, 1, peer_pointer, 0, sizeof(int)) );
-        checkCudaErrors( cudaIpcOpenMemHandle ((void**)&peer_devpointer, memHandle, cudaIpcMemLazyEnablePeerAccess) );
-        checkCudaErrors( cudaMemcpy(recv_devpointer, peer_devpointer, sizeof(int), cudaMemcpyDeviceToDevice) );
-      }
-      checkCudaErrors( cudaDeviceSynchronize() );
-      checkCudaErrors( cudaMemcpy(&host_recvflag, recv_devpointer, sizeof(int), cudaMemcpyDeviceToHost) );
-    }
-
-    checkCudaErrors( cudaDeviceSynchronize() );
-    MPI_ALL_PRINT( fprintf(fp, "canAccess = %d\nAFTER: host_sendflag = %d, host_recvflag = %d\n", canAccess, host_sendflag, host_recvflag); )
   } else {
     if (0 == me) printf("The NVLINK version is only implemented for intraNode communication\n");
   }

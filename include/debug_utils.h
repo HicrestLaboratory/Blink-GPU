@@ -121,6 +121,47 @@
     }  \
   }
 
+#define STR_COLL_BLK 1024
+
+struct string_collector {
+    char *collector = NULL;
+    char *buff  = NULL;
+    int size = 0;
+    int len = 0;
+};
+
+#define STR_COLL_DEF struct string_collector str_coll;
+
+#define STR_COLL_INIT {                                           \
+  str_coll.collector = (char*)malloc(sizeof(char)*STR_COLL_BLK);  \
+  str_coll.buff = (char*)malloc(sizeof(char)*STR_COLL_BLK);       \
+  str_coll.collector[0]='\0';                                     \
+  str_coll.size = STR_COLL_BLK;                                   \
+  str_coll.len  = 0;                                              \
+}
+
+#define STR_COLL_APPEND(X) {                                                              \
+  X                                                                                       \
+  int n = strlen(str_coll.buff);                                                          \
+  if (str_coll.len + n >= str_coll.size) {                                                \
+    str_coll.collector = (char*)realloc(str_coll.collector, str_coll.size + STR_COLL_BLK);\
+    str_coll.size += STR_COLL_BLK;                                                        \
+  }                                                                                       \
+  memcpy(&str_coll.collector[str_coll.len], str_coll.buff, sizeof(char)*n);               \
+  str_coll.len += n;                                                                      \
+  str_coll.collector[str_coll.len]='\0';                                                  \
+  memset(str_coll.buff, 0, sizeof(char) * STR_COLL_BLK);                                  \
+}
+
+#define STR_COLL_GIVE str_coll.collector
+
+#define STR_COLL_FREE {       \
+    free(str_coll.collector); \
+    free(str_coll.buff);      \
+    str_coll.size = 0;        \
+    str_coll.len = 0;         \
+}
+
 #define OUTOFBOUNDS_NUMBER(FP, P) {                         \
     unsigned long long int i = 0;                           \
     if ((void*)P != NULL) {                                 \

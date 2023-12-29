@@ -19,18 +19,18 @@
 6. **Tested**: the experiment was tested on each considered architecture.
 
 ## Status of development
-**Last update**: 28/12/2023 13:30
+**Last update**: 29/12/2023 21:30
 
 | Benchmark   | Layout              | MPI + CudaMemcpy | NCCL            | GPUDirect       | Low-level NV-link |
 |-------------|---------------------|------------------|-----------------|-----------------|-------------------|
-| Ping-pong   | IntraNode           | 🟢               | 🟢               | ❌              | ▶                 |
-|             | InterNodes          | 🟢               | 🟢               | ❌              | ❌                |
-| Halo3d      | IntraNode  (2x2x1)  | 🟢               | 🟢               | ❌              | ❌                |
-|             | InterNodes (2x2x2)  | 🟢               | 🟢               | ❌              | ❌                |
-| Incast      | IntraNode           | 🟢               | 🟢               | ❌              | ❌                |
-|             | InterNodes          | 🟢               | 🟢               | ❌              | ❌                |
-| Sweep       | ??                  | □                | □               | ❌              | ❌                |
-|             | ??                  | □                | □               | ❌              | ❌                |
+| Ping-pong   | IntraNode           | 🟢               | 🟢               | ❌              | 🔵                |
+|             | InterNodes          | 🟢               | 🟢               | ❌              | □                 |
+| Halo3d      | IntraNode  (2x2x1)  | 🟢               | 🟢               | ❌              | □                 |
+|             | InterNodes (2x2x2)  | 🟢               | 🟢               | ❌              | □                 |
+| Incast      | IntraNode           | 🟢               | 🟢               | ❌              | □                 |
+|             | InterNodes          | 🟢               | 🟢               | ❌              | □                 |
+| Sweep       | ??                  | □                | □               | ❌              | □                 |
+|             | ??                  | □                | □               | ❌              | □                 |
 | Others (?)  | ??                  | ❌               | ❌               | ❌              | ❌                |
 |             | ??                  | ❌               | ❌               | ❌              | ❌                |
 
