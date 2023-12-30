@@ -391,6 +391,16 @@ int main(int argc, char* argv[]) {
       }
       TIMER_STOP(0);
       timeTakenCUDA += TIMER_ELAPSED(0);
+
+      TIMER_START(0);
+      if (me == world-1) {
+        for (int r = 0; r < world-1; r++) {
+          checkCudaErrors( cudaIpcCloseMemHandle(peerBuffer[r]) );
+          checkCudaErrors( cudaEventDestroy(recvEvent[r]) );
+        }
+      }
+      TIMER_STOP(0);
+      timeTakenCUDA += TIMER_ELAPSED(0);
     }
     MPI_Barrier(MPI_COMM_WORLD);
 
@@ -401,14 +411,6 @@ int main(int argc, char* argv[]) {
 
     // ---------------------------------------
     // PICO disable peers
-    MPI_Barrier(MPI_COMM_WORLD);
-    if (me == world-1) {
-      for (int r = 0; r < world-1; r++) {
-        checkCudaErrors( cudaIpcCloseMemHandle(peerBuffer[r]) );
-        checkCudaErrors( cudaEventDestroy(recvEvent[r]) );
-      }
-    }
-
     MPI_Barrier(MPI_COMM_WORLD);
     for (int j = 0; j < deviceCount; j++) {
       if (j != dev) {

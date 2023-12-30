@@ -343,6 +343,7 @@ int main(int argc, char* argv[]) {
 
     // --------------------------------------------------------------
     // ---------------------------------------
+    // PICO enable peer access
     STR_COLL_DEF
     STR_COLL_INIT
 
@@ -468,18 +469,21 @@ int main(int argc, char* argv[]) {
       TIMER_STOP(0);
       timeTakenCUDA += TIMER_ELAPSED(0);
 
+      TIMER_START(0);
+      if (me == 0 || me == world-1) {
+        checkCudaErrors( cudaIpcCloseMemHandle(peerBuffer) );
+        checkCudaErrors( cudaEventDestroy(event) );
+      }
+      TIMER_STOP(0);
+      timeTakenCUDA += TIMER_ELAPSED(0);
+
     }
     ADD_TIME_EXPERIMENT(0, timeTakenCUDA);
     ADD_TIME_EXPERIMENT(1, timeTakenMPI);
     ADD_TIME_EXPERIMENT(2, timeTakenMPI + timeTakenCUDA);
 
     // ---------------------------------------
-    MPI_Barrier(MPI_COMM_WORLD);
-    if (me == 0 || me == world-1) {
-      checkCudaErrors( cudaIpcCloseMemHandle(peerBuffer) );
-      checkCudaErrors( cudaEventDestroy(event) );
-    }
-
+    // PICO disable peer access
     MPI_Barrier(MPI_COMM_WORLD);
     for (int j = 0; j < deviceCount; j++) {
       if (j != dev) {
