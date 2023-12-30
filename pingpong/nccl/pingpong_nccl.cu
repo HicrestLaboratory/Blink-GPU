@@ -230,8 +230,6 @@ int main(int argc, char* argv[]) {
     recvBuffer[i]  = 0;
   }
 
-  MPI_Status status;
-
   DBG_CHECK(1)
 
 #ifdef CUDA
@@ -278,7 +276,6 @@ int main(int argc, char* argv[]) {
 
   INIT_EXPS
   TIMER_DEF(0);
-  TIMER_DEF(1);
   SET_EXPERIMENT_NAME(0, "pingpong")
   SET_EXPERIMENT_TYPE(0, "nccl")
   if (nnodes > 1) {
@@ -286,7 +283,7 @@ int main(int argc, char* argv[]) {
   } else {
     SET_EXPERIMENT_LAYOUT(0, "intraNode")
   }
-  SET_EXPERIMENT(0, "Total")
+  SET_EXPERIMENT(0, "TOTAL")
 
   if (0 == me) printf("# ---------------- Start NCCL ----------------\n");
   MPI_Barrier(MPI_COMM_WORLD);

@@ -275,13 +275,23 @@ int main(int argc, char* argv[]) {
   TIMER_DEF(0);
   TIMER_DEF(1);
   SET_EXPERIMENT_NAME(0, "pingpong")
+  SET_EXPERIMENT_NAME(1, "pingpong")
+  SET_EXPERIMENT_NAME(2, "pingpong")
   SET_EXPERIMENT_TYPE(0, "baseline")
+  SET_EXPERIMENT_TYPE(1, "baseline")
+  SET_EXPERIMENT_TYPE(2, "baseline")
   if (nnodes > 1) {
     SET_EXPERIMENT_LAYOUT(0, "interNodes")
+    SET_EXPERIMENT_LAYOUT(1, "interNodes")
+    SET_EXPERIMENT_LAYOUT(2, "interNodes")
   } else {
     SET_EXPERIMENT_LAYOUT(0, "intraNode")
+    SET_EXPERIMENT_LAYOUT(1, "intraNode")
+    SET_EXPERIMENT_LAYOUT(2, "intraNode")
   }
-  SET_EXPERIMENT(0, "Total")
+  SET_EXPERIMENT(0, "MPI")
+  SET_EXPERIMENT(1, "CUDA")
+  SET_EXPERIMENT(2, "TOTAL")
 
   if (0 == me) {
     printf("# Beginning benchmarking...\n");
@@ -332,6 +342,9 @@ int main(int argc, char* argv[]) {
 #endif
 
     }
+    ADD_TIME_EXPERIMENT(0, timeTaken)
+    ADD_TIME_EXPERIMENT(1, timeTakenCUDA)
+    ADD_TIME_EXPERIMENT(2, timeTaken + timeTakenCUDA)
 
 
     DBG_CHECK(1)
@@ -358,7 +371,6 @@ int main(int argc, char* argv[]) {
              TotalTimeTaken, KMsgsXchng, MbytesXchng, KMsgsXchng / TotalTimeTaken,
              MbytesXchng / TotalTimeTaken);
 #endif
-      ADD_TIME_EXPERIMENT(0, TotalTimeTaken)
     }
   }
   // ---------------------------------------
