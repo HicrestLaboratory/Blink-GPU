@@ -31,7 +31,7 @@ do
 	binaryFile=$(echo "$binaryPath" | sed 's|.*/||')
 	echo "binaryFile --> $binaryFile"
 	start_time="$(date -u +%s)"
-	exitcode=$(srun "${binaryPath}" > "${outfolder}/${binaryFile}_${explayout}.out" 2> "${outfolder}/${binaryFile}_${explayout}.err")
+	exitcode=$(srun "${binaryPath}" -pex 4 -pey 2 > "${outfolder}/${binaryFile}_${explayout}.out" 2> "${outfolder}/${binaryFile}_${explayout}.err")
 	end_time="$(date -u +%s)"
 
 	echo " exitcode:    $exitcode"

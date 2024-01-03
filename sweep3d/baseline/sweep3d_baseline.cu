@@ -373,21 +373,6 @@ int main(int argc, char* argv[]) {
   for (int i = 0; i < (repeats * 2); i++) {
     // Recreate communication pattern of sweep from (0,0) towards (Px,Py)
     for (int k = 0; k < nz; k += kba) {
-      // ---------------------------------------
-      TIMER_START(0);
-      if (xUp > -1) {
-        checkCudaErrors( cudaMemcpy(xSendBuffer, dev_xSendBuffer, xSize*sizeof(dtype), cudaMemcpyDeviceToHost) );
-      }
-
-      if (yUp > -1) {
-        checkCudaErrors( cudaMemcpy(ySendBuffer, dev_ySendBuffer, ySize*sizeof(dtype), cudaMemcpyDeviceToHost) );
-      }
-
-      checkCudaErrors( cudaDeviceSynchronize() );
-      TIMER_STOP(0);
-      timeTakenCUDA += TIMER_ELAPSED(0);
-      // ---------------------------------------
-
       TIMER_START(0);
       if (xDown > -1) {
         MPI_Recv(xRecvBuffer, (nx * kba * vars), MPI_dtype, xDown, 1000, MPI_COMM_WORLD, &status);
@@ -399,7 +384,37 @@ int main(int argc, char* argv[]) {
       TIMER_STOP(0);
       timeTakenMPI += TIMER_ELAPSED(0);
 
-      compute(sleep);
+      // ---------------------------------------
+      TIMER_START(0);
+      if (xUp > -1) {
+        checkCudaErrors( cudaMemcpy(dev_xRecvBuffer, xRecvBuffer, xSize*sizeof(dtype), cudaMemcpyHostToDevice) );
+      }
+
+      if (yUp > -1) {
+        checkCudaErrors( cudaMemcpy(dev_yRecvBuffer, yRecvBuffer, ySize*sizeof(dtype), cudaMemcpyHostToDevice) );
+      }
+
+      checkCudaErrors( cudaDeviceSynchronize() );
+      TIMER_STOP(0);
+      timeTakenCUDA += TIMER_ELAPSED(0);
+      // ---------------------------------------
+
+      compute(sleep);  // NOTE has sense to become GPU computation
+
+      // ---------------------------------------
+      TIMER_START(0);
+      if (xDown > -1) {
+        checkCudaErrors( cudaMemcpy(xSendBuffer, dev_xSendBuffer, xSize*sizeof(dtype), cudaMemcpyDeviceToHost) );
+      }
+
+      if (yDown > -1) {
+        checkCudaErrors( cudaMemcpy(ySendBuffer, dev_ySendBuffer, ySize*sizeof(dtype), cudaMemcpyDeviceToHost) );
+      }
+
+      checkCudaErrors( cudaDeviceSynchronize() );
+      TIMER_STOP(0);
+      timeTakenCUDA += TIMER_ELAPSED(0);
+      // ---------------------------------------
 
       TIMER_START(0);
       if (xUp > -1) {
@@ -411,40 +426,10 @@ int main(int argc, char* argv[]) {
       }
       TIMER_STOP(0);
       timeTakenMPI += TIMER_ELAPSED(0);
-
-      // ---------------------------------------
-      TIMER_START(0);
-      if (xDown > -1) {
-        checkCudaErrors( cudaMemcpy(dev_xSendBuffer, xSendBuffer, xSize*sizeof(dtype), cudaMemcpyHostToDevice) );
-      }
-
-      if (yDown > -1) {
-        checkCudaErrors( cudaMemcpy(dev_ySendBuffer, ySendBuffer, ySize*sizeof(dtype), cudaMemcpyHostToDevice) );
-      }
-
-      checkCudaErrors( cudaDeviceSynchronize() );
-      TIMER_STOP(0);
-      timeTakenCUDA += TIMER_ELAPSED(0);
-      // ---------------------------------------
     }
 
     // Recreate communication pattern of sweep from (Px,0) towards (0,Py)
     for (int k = 0; k < nz; k += kba) {
-      // ---------------------------------------
-      TIMER_START(0);
-      if (xDown > -1) {
-        checkCudaErrors( cudaMemcpy(xSendBuffer, dev_xSendBuffer, xSize*sizeof(dtype), cudaMemcpyDeviceToHost) );
-      }
-
-      if (yUp > -1) {
-        checkCudaErrors( cudaMemcpy(ySendBuffer, dev_ySendBuffer, ySize*sizeof(dtype), cudaMemcpyDeviceToHost) );
-      }
-
-      checkCudaErrors( cudaDeviceSynchronize() );
-      TIMER_STOP(0);
-      timeTakenCUDA += TIMER_ELAPSED(0);
-      // ---------------------------------------
-
       TIMER_START(0);
       if (xUp > -1) {
         MPI_Recv(xRecvBuffer, (nx * kba * vars), MPI_dtype, xUp, 2000, MPI_COMM_WORLD, &status);
@@ -456,7 +441,37 @@ int main(int argc, char* argv[]) {
       TIMER_STOP(0);
       timeTakenMPI += TIMER_ELAPSED(0);
 
-      compute(sleep);
+      // ---------------------------------------
+      TIMER_START(0);
+      if (xDown > -1) {
+        checkCudaErrors( cudaMemcpy(dev_xRecvBuffer, xRecvBuffer, xSize*sizeof(dtype), cudaMemcpyHostToDevice) );
+      }
+
+      if (yUp > -1) {
+        checkCudaErrors( cudaMemcpy(dev_yRecvBuffer, yRecvBuffer, ySize*sizeof(dtype), cudaMemcpyHostToDevice) );
+      }
+
+      checkCudaErrors( cudaDeviceSynchronize() );
+      TIMER_STOP(0);
+      timeTakenCUDA += TIMER_ELAPSED(0);
+      // ---------------------------------------
+
+      compute(sleep);  // NOTE has sense to become GPU computation
+
+      // ---------------------------------------
+      TIMER_START(0);
+      if (xUp > -1) {
+        checkCudaErrors( cudaMemcpy(xSendBuffer, dev_xSendBuffer, xSize*sizeof(dtype), cudaMemcpyDeviceToHost) );
+      }
+
+      if (yDown > -1) {
+        checkCudaErrors( cudaMemcpy(ySendBuffer, dev_ySendBuffer, ySize*sizeof(dtype), cudaMemcpyDeviceToHost) );
+      }
+
+      checkCudaErrors( cudaDeviceSynchronize() );
+      TIMER_STOP(0);
+      timeTakenCUDA += TIMER_ELAPSED(0);
+      // ---------------------------------------
 
       TIMER_START(0);
       if (xDown > -1) {
@@ -468,40 +483,10 @@ int main(int argc, char* argv[]) {
       }
       TIMER_STOP(0);
       timeTakenMPI += TIMER_ELAPSED(0);
-
-      // ---------------------------------------
-      TIMER_START(0);
-      if (xUp > -1) {
-        checkCudaErrors( cudaMemcpy(dev_xSendBuffer, xSendBuffer, xSize*sizeof(dtype), cudaMemcpyHostToDevice) );
-      }
-
-      if (yDown > -1) {
-        checkCudaErrors( cudaMemcpy(dev_ySendBuffer, ySendBuffer, ySize*sizeof(dtype), cudaMemcpyHostToDevice) );
-      }
-
-      checkCudaErrors( cudaDeviceSynchronize() );
-      TIMER_STOP(0);
-      timeTakenCUDA += TIMER_ELAPSED(0);
-      // ---------------------------------------
     }
 
     // Recreate communication pattern of sweep from (Px,Py) towards (0,0)
     for (int k = 0; k < nz; k += kba) {
-      // ---------------------------------------
-      TIMER_START(0);
-      if (xDown > -1) {
-        checkCudaErrors( cudaMemcpy(xSendBuffer, dev_xSendBuffer, xSize*sizeof(dtype), cudaMemcpyDeviceToHost) );
-      }
-
-      if (yDown > -1) {
-        checkCudaErrors( cudaMemcpy(ySendBuffer, dev_ySendBuffer, ySize*sizeof(dtype), cudaMemcpyDeviceToHost) );
-      }
-
-      checkCudaErrors( cudaDeviceSynchronize() );
-      TIMER_STOP(0);
-      timeTakenCUDA += TIMER_ELAPSED(0);
-      // ---------------------------------------
-
       TIMER_START(0);
       if (xUp > -1) {
         MPI_Recv(xRecvBuffer, (nx * kba * vars), MPI_dtype, xUp, 3000, MPI_COMM_WORLD, &status);
@@ -513,7 +498,37 @@ int main(int argc, char* argv[]) {
       TIMER_STOP(0);
       timeTakenMPI += TIMER_ELAPSED(0);
 
-      compute(sleep);
+      // ---------------------------------------
+      TIMER_START(0);
+      if (xDown > -1) {
+        checkCudaErrors( cudaMemcpy(dev_xRecvBuffer, xRecvBuffer, xSize*sizeof(dtype), cudaMemcpyHostToDevice) );
+      }
+
+      if (yDown > -1) {
+        checkCudaErrors( cudaMemcpy(dev_yRecvBuffer, yRecvBuffer, ySize*sizeof(dtype), cudaMemcpyHostToDevice) );
+      }
+
+      checkCudaErrors( cudaDeviceSynchronize() );
+      TIMER_STOP(0);
+      timeTakenCUDA += TIMER_ELAPSED(0);
+      // ---------------------------------------
+
+      compute(sleep);  // NOTE has sense to become GPU computation
+
+      // ---------------------------------------
+      TIMER_START(0);
+      if (xUp > -1) {
+        checkCudaErrors( cudaMemcpy(xSendBuffer, dev_xSendBuffer, xSize*sizeof(dtype), cudaMemcpyDeviceToHost) );
+      }
+
+      if (yUp > -1) {
+        checkCudaErrors( cudaMemcpy(ySendBuffer, dev_ySendBuffer, ySize*sizeof(dtype), cudaMemcpyDeviceToHost) );
+      }
+
+      checkCudaErrors( cudaDeviceSynchronize() );
+      TIMER_STOP(0);
+      timeTakenCUDA += TIMER_ELAPSED(0);
+      // ---------------------------------------
 
       TIMER_START(0);
       if (xDown > -1) {
@@ -525,40 +540,10 @@ int main(int argc, char* argv[]) {
       }
       TIMER_STOP(0);
       timeTakenMPI += TIMER_ELAPSED(0);
-
-      // ---------------------------------------
-      TIMER_START(0);
-      if (xUp > -1) {
-        checkCudaErrors( cudaMemcpy(dev_xSendBuffer, xSendBuffer, xSize*sizeof(dtype), cudaMemcpyHostToDevice) );
-      }
-
-      if (yUp > -1) {
-        checkCudaErrors( cudaMemcpy(dev_ySendBuffer, ySendBuffer, ySize*sizeof(dtype), cudaMemcpyHostToDevice) );
-      }
-
-      checkCudaErrors( cudaDeviceSynchronize() );
-      TIMER_STOP(0);
-      timeTakenCUDA += TIMER_ELAPSED(0);
-      // ---------------------------------------
     }
 
     // Recreate communication pattern of sweep from (0,Py) towards (Px,0)
     for (int k = 0; k < nz; k += kba) {
-      // ---------------------------------------
-      TIMER_START(0);
-      if (xUp > -1) {
-        checkCudaErrors( cudaMemcpy(xSendBuffer, dev_xSendBuffer, xSize*sizeof(dtype), cudaMemcpyDeviceToHost) );
-      }
-
-      if (yDown > -1) {
-        checkCudaErrors( cudaMemcpy(ySendBuffer, dev_ySendBuffer, ySize*sizeof(dtype), cudaMemcpyDeviceToHost) );
-      }
-
-      checkCudaErrors( cudaDeviceSynchronize() );
-      TIMER_STOP(0);
-      timeTakenCUDA += TIMER_ELAPSED(0);
-      // ---------------------------------------
-
       TIMER_START(0);
       if (xDown > -1) {
         MPI_Recv(xRecvBuffer, (nx * kba * vars), MPI_dtype, xDown, 4000, MPI_COMM_WORLD, &status);
@@ -570,7 +555,37 @@ int main(int argc, char* argv[]) {
       TIMER_STOP(0);
       timeTakenMPI += TIMER_ELAPSED(0);
 
-      compute(sleep);
+      // ---------------------------------------
+      TIMER_START(0);
+      if (xUp > -1) {
+        checkCudaErrors( cudaMemcpy(dev_xRecvBuffer, xRecvBuffer, xSize*sizeof(dtype), cudaMemcpyHostToDevice) );
+      }
+
+      if (yDown > -1) {
+        checkCudaErrors( cudaMemcpy(dev_yRecvBuffer, yRecvBuffer, ySize*sizeof(dtype), cudaMemcpyHostToDevice) );
+      }
+
+      checkCudaErrors( cudaDeviceSynchronize() );
+      TIMER_STOP(0);
+      timeTakenCUDA += TIMER_ELAPSED(0);
+      // ---------------------------------------
+
+      compute(sleep);  // NOTE has sense to become GPU computation
+
+      // ---------------------------------------
+      TIMER_START(0);
+      if (xDown > -1) {
+        checkCudaErrors( cudaMemcpy(xSendBuffer, dev_xSendBuffer, xSize*sizeof(dtype), cudaMemcpyDeviceToHost) );
+      }
+
+      if (yUp > -1) {
+        checkCudaErrors( cudaMemcpy(ySendBuffer, dev_ySendBuffer, ySize*sizeof(dtype), cudaMemcpyDeviceToHost) );
+      }
+
+      checkCudaErrors( cudaDeviceSynchronize() );
+      TIMER_STOP(0);
+      timeTakenCUDA += TIMER_ELAPSED(0);
+      // ---------------------------------------
 
       TIMER_START(0);
       if (xUp > -1) {
@@ -582,21 +597,6 @@ int main(int argc, char* argv[]) {
       }
       TIMER_STOP(0);
       timeTakenMPI += TIMER_ELAPSED(0);
-
-      // ---------------------------------------
-      TIMER_START(0);
-      if (xDown > -1) {
-        checkCudaErrors( cudaMemcpy(dev_xSendBuffer, xSendBuffer, xSize*sizeof(dtype), cudaMemcpyHostToDevice) );
-      }
-
-      if (yUp > -1) {
-        checkCudaErrors( cudaMemcpy(dev_ySendBuffer, ySendBuffer, ySize*sizeof(dtype), cudaMemcpyHostToDevice) );
-      }
-
-      checkCudaErrors( cudaDeviceSynchronize() );
-      TIMER_STOP(0);
-      timeTakenCUDA += TIMER_ELAPSED(0);
-      // ---------------------------------------
     }
   }
 
