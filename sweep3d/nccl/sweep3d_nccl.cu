@@ -405,6 +405,8 @@ int main(int argc, char* argv[]) {
   // data domain and we sweep from each of them, processing the top four first
   // and then the bottom four vertices next.
   for (int i = 0; i < (repeats * 2); i++) {
+
+    // =================================================================================================================
     // Recreate communication pattern of sweep from (0,0) towards (Px,Py)
     for (int k = 0; k < nz; k += kba) {
       TIMER_START(0);
@@ -430,7 +432,10 @@ int main(int argc, char* argv[]) {
       TIMER_STOP(0);
       timeTakenCUDA += TIMER_ELAPSED(0);
     }
+    // =================================================================================================================
 
+
+    // =================================================================================================================
     // Recreate communication pattern of sweep from (Px,0) towards (0,Py)
     for (int k = 0; k < nz; k += kba) {
       TIMER_START(0);
@@ -456,7 +461,10 @@ int main(int argc, char* argv[]) {
       TIMER_STOP(0);
       timeTakenCUDA += TIMER_ELAPSED(0);
     }
+    // =================================================================================================================
 
+
+    // =================================================================================================================
     // Recreate communication pattern of sweep from (Px,Py) towards (0,0)
     for (int k = 0; k < nz; k += kba) {
       TIMER_START(0);
@@ -482,7 +490,10 @@ int main(int argc, char* argv[]) {
       TIMER_STOP(0);
       timeTakenCUDA += TIMER_ELAPSED(0);
     }
+    // =================================================================================================================
 
+
+    // =================================================================================================================
     // Recreate communication pattern of sweep from (0,Py) towards (Px,0)
     for (int k = 0; k < nz; k += kba) {
       TIMER_START(0);
@@ -508,6 +519,7 @@ int main(int argc, char* argv[]) {
       TIMER_STOP(0);
       timeTakenCUDA += TIMER_ELAPSED(0);
     }
+    // =================================================================================================================
   }
 
   MPI_Barrier(MPI_COMM_WORLD);
