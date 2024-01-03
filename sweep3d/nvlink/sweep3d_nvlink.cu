@@ -137,7 +137,7 @@ int main(int argc, char* argv[]) {
 
   int me = -1, mynode = -1;
   int world = -1, nnodes = -1;
-  double timeTakenMPI = 0.0, timeTakenCUDA = 0.0, TotalTimeTaken = 0.0;
+  double timeTakenMPI = 0.0, timeTakenCUDAIPC = 0.0, timeTakenCUDACPY = 0.0;
 
   MPI_Comm_rank(MPI_COMM_WORLD, &me);
   MPI_Comm_size(MPI_COMM_WORLD, &world);
@@ -273,7 +273,7 @@ int main(int argc, char* argv[]) {
   const int yUp = (myY != (pey - 1)) ? me + pex : -1;
   const int yDown = (myY != 0) ? me - pex : -1;
 
-  MPI_Status status;
+  MPI_Status status, status2;
 
   // ---------------------------------------
   // PICO enable peer access
@@ -417,24 +417,30 @@ int main(int argc, char* argv[]) {
   TIMER_DEF(0);
   SET_EXPERIMENT_NAME(0, "sweep3d")
   SET_EXPERIMENT_TYPE(0, "nvlink")
-  SET_EXPERIMENT(0, "CUDA")
+  SET_EXPERIMENT(0, "CUDAipc")
 
   SET_EXPERIMENT_NAME(1, "sweep3d")
   SET_EXPERIMENT_TYPE(1, "nvlink")
-  SET_EXPERIMENT(1, "MPI")
+  SET_EXPERIMENT(1, "CUDAcpy")
 
   SET_EXPERIMENT_NAME(2, "sweep3d")
   SET_EXPERIMENT_TYPE(2, "nvlink")
-  SET_EXPERIMENT(2, "TOTAL")
+  SET_EXPERIMENT(2, "MPI")
+
+  SET_EXPERIMENT_NAME(3, "sweep3d")
+  SET_EXPERIMENT_TYPE(3, "nvlink")
+  SET_EXPERIMENT(3, "TOTAL")
 
   if (nnodes > 1) {
     SET_EXPERIMENT_LAYOUT(0, "interNodes")
     SET_EXPERIMENT_LAYOUT(1, "interNodes")
     SET_EXPERIMENT_LAYOUT(2, "interNodes")
+    SET_EXPERIMENT_LAYOUT(3, "interNodes")
   } else {
     SET_EXPERIMENT_LAYOUT(0, "intraNode")
     SET_EXPERIMENT_LAYOUT(1, "intraNode")
     SET_EXPERIMENT_LAYOUT(2, "intraNode")
+    SET_EXPERIMENT_LAYOUT(3, "intraNode")
   }
 
 
@@ -464,54 +470,71 @@ int main(int argc, char* argv[]) {
     for (int k = 0; k < nz; k += kba) {
       TIMER_START(0);
       if (xDown > -1) {
-        MPI_Recv(xRecvBuffer, (nx * kba * vars), MPI_dtype, xDown, 1000, MPI_COMM_WORLD, &status);
+        MPI_Recv(&xRecvHandle, sizeof(cudaIpcMemHandle_t), MPI_BYTE, xDown, 1000, MPI_COMM_WORLD, &status);
+        MPI_Recv(&xRecvEventHandle, sizeof(cudaIpcMemHandle_t), MPI_BYTE, xDown, 1000, MPI_COMM_WORLD, &status2);
       }
 
       if (yDown > -1) {
-        MPI_Recv(yRecvBuffer, (ny * kba * vars), MPI_dtype, yDown, 1000, MPI_COMM_WORLD, &status);
+        MPI_Recv(&yRecvHandle, sizeof(cudaIpcMemHandle_t), MPI_BYTE, yDown, 1000, MPI_COMM_WORLD, &status);
+        MPI_Recv(&yRecvEventHandle, sizeof(cudaIpcMemHandle_t), MPI_BYTE, yDown, 1000, MPI_COMM_WORLD, &status2);
       }
       TIMER_STOP(0);
       timeTakenMPI += TIMER_ELAPSED(0);
 
       // ---------------------------------------
       TIMER_START(0);
-      if (xUp > -1) {
-        checkCudaErrors( cudaMemcpy(dev_xRecvBuffer, xRecvBuffer, xSize*sizeof(dtype), cudaMemcpyHostToDevice) );
+      if (xDown > -1) {
+        checkCudaErrors( cudaIpcOpenMemHandle((void**)&xPeerBuffer, *(cudaIpcMemHandle_t*)&xRecvHandle, cudaIpcMemLazyEnablePeerAccess) );
+        checkCudaErrors( cudaIpcOpenEventHandle(&xRecvEvent, *(cudaIpcEventHandle_t *)&xRecvEventHandle) );
       }
-
-      if (yUp > -1) {
-        checkCudaErrors( cudaMemcpy(dev_yRecvBuffer, yRecvBuffer, ySize*sizeof(dtype), cudaMemcpyHostToDevice) );
+      if (yDown > -1) {
+        checkCudaErrors( cudaIpcOpenMemHandle((void**)&yPeerBuffer, *(cudaIpcMemHandle_t*)&yRecvHandle, cudaIpcMemLazyEnablePeerAccess) );
+        checkCudaErrors( cudaIpcOpenEventHandle(&yRecvEvent, *(cudaIpcEventHandle_t *)&yRecvEventHandle) );
       }
+      TIMER_STOP(0);
+      timeTakenCUDAIPC += TIMER_ELAPSED(0);
 
+      TIMER_START(0);
+      if (xDown > -1) {
+        checkCudaErrors( cudaMemcpy(dev_xRecvBuffer, xPeerBuffer, sizeof(dtype)*xSize, cudaMemcpyDeviceToDevice) );
+      }
+      if (yDown > -1) {
+        checkCudaErrors( cudaMemcpy(dev_yRecvBuffer, yPeerBuffer, sizeof(dtype)*ySize, cudaMemcpyDeviceToDevice) );
+      }
       checkCudaErrors( cudaDeviceSynchronize() );
       TIMER_STOP(0);
-      timeTakenCUDA += TIMER_ELAPSED(0);
+      timeTakenCUDACPY += TIMER_ELAPSED(0);
       // ---------------------------------------
 
       compute(sleep);  // NOTE has sense to become GPU computation
 
       // ---------------------------------------
       TIMER_START(0);
-      if (xDown > -1) {
-        checkCudaErrors( cudaMemcpy(xSendBuffer, dev_xSendBuffer, xSize*sizeof(dtype), cudaMemcpyDeviceToHost) );
+      if (xUp > -1) {
+        checkCudaErrors( cudaIpcGetMemHandle((cudaIpcMemHandle_t*)&xSendHandle, dev_xSendBuffer) );
+        checkCudaErrors( cudaEventCreate(&xSendEvent, cudaEventDisableTiming | cudaEventInterprocess) );
+        checkCudaErrors( cudaIpcGetEventHandle((cudaIpcEventHandle_t*)&xSendEventHandle, xSendEvent) );
       }
-
-      if (yDown > -1) {
-        checkCudaErrors( cudaMemcpy(ySendBuffer, dev_ySendBuffer, ySize*sizeof(dtype), cudaMemcpyDeviceToHost) );
+      MPI_Barrier(MPI_COMM_WORLD);
+      if (yUp > -1) {
+        checkCudaErrors( cudaIpcGetMemHandle((cudaIpcMemHandle_t*)&ySendHandle, dev_ySendBuffer) );
+        checkCudaErrors( cudaEventCreate(&ySendEvent, cudaEventDisableTiming | cudaEventInterprocess) );
+        checkCudaErrors( cudaIpcGetEventHandle((cudaIpcEventHandle_t*)&ySendEventHandle, ySendEvent) );
       }
-
-      checkCudaErrors( cudaDeviceSynchronize() );
+      MPI_Barrier(MPI_COMM_WORLD);
       TIMER_STOP(0);
-      timeTakenCUDA += TIMER_ELAPSED(0);
+      timeTakenCUDAIPC += TIMER_ELAPSED(0);
       // ---------------------------------------
 
       TIMER_START(0);
       if (xUp > -1) {
-        MPI_Send(xSendBuffer, (nx * kba * vars), MPI_dtype, xUp, 1000, MPI_COMM_WORLD);
+        MPI_Send(&xSendHandle, sizeof(cudaIpcMemHandle_t), MPI_BYTE, xUp, 1000, MPI_COMM_WORLD);
+        MPI_Send(&xSendEventHandle, sizeof(cudaIpcEventHandle_t), MPI_BYTE, xUp, 1000, MPI_COMM_WORLD);
       }
 
       if (yUp > -1) {
-        MPI_Send(ySendBuffer, (ny * kba * vars), MPI_dtype, yUp, 1000, MPI_COMM_WORLD);
+        MPI_Send(&ySendHandle, sizeof(cudaIpcMemHandle_t), MPI_BYTE, yUp, 1000, MPI_COMM_WORLD);
+        MPI_Send(&ySendEventHandle, sizeof(cudaIpcEventHandle_t), MPI_BYTE, yUp, 1000, MPI_COMM_WORLD);
       }
       TIMER_STOP(0);
       timeTakenMPI += TIMER_ELAPSED(0);
@@ -524,54 +547,71 @@ int main(int argc, char* argv[]) {
     for (int k = 0; k < nz; k += kba) {
       TIMER_START(0);
       if (xUp > -1) {
-        MPI_Recv(xRecvBuffer, (nx * kba * vars), MPI_dtype, xUp, 2000, MPI_COMM_WORLD, &status);
+        MPI_Recv(&xRecvHandle, sizeof(cudaIpcMemHandle_t), MPI_BYTE, xUp, 2000, MPI_COMM_WORLD, &status);
+        MPI_Recv(&xRecvEventHandle, sizeof(cudaIpcMemHandle_t), MPI_BYTE, xUp, 2000, MPI_COMM_WORLD, &status2);
       }
 
       if (yDown > -1) {
-        MPI_Recv(yRecvBuffer, (ny * kba * vars), MPI_dtype, yDown, 2000, MPI_COMM_WORLD, &status);
+        MPI_Recv(&yRecvHandle, sizeof(cudaIpcMemHandle_t), MPI_BYTE, yDown, 2000, MPI_COMM_WORLD, &status);
+        MPI_Recv(&yRecvEventHandle, sizeof(cudaIpcMemHandle_t), MPI_BYTE, yDown, 2000, MPI_COMM_WORLD, &status2);
       }
       TIMER_STOP(0);
       timeTakenMPI += TIMER_ELAPSED(0);
 
       // ---------------------------------------
       TIMER_START(0);
-      if (xDown > -1) {
-        checkCudaErrors( cudaMemcpy(dev_xRecvBuffer, xRecvBuffer, xSize*sizeof(dtype), cudaMemcpyHostToDevice) );
+      if (xUp > -1) {
+        checkCudaErrors( cudaIpcOpenMemHandle((void**)&xPeerBuffer, *(cudaIpcMemHandle_t*)&xRecvHandle, cudaIpcMemLazyEnablePeerAccess) );
+        checkCudaErrors( cudaIpcOpenEventHandle(&xRecvEvent, *(cudaIpcEventHandle_t *)&xRecvEventHandle) );
       }
-
-      if (yUp > -1) {
-        checkCudaErrors( cudaMemcpy(dev_yRecvBuffer, yRecvBuffer, ySize*sizeof(dtype), cudaMemcpyHostToDevice) );
+      if (yDown > -1) {
+        checkCudaErrors( cudaIpcOpenMemHandle((void**)&yPeerBuffer, *(cudaIpcMemHandle_t*)&yRecvHandle, cudaIpcMemLazyEnablePeerAccess) );
+        checkCudaErrors( cudaIpcOpenEventHandle(&yRecvEvent, *(cudaIpcEventHandle_t *)&yRecvEventHandle) );
       }
+      TIMER_STOP(0);
+      timeTakenCUDAIPC += TIMER_ELAPSED(0);
 
+      TIMER_START(0);
+      if (xUp > -1) {
+        checkCudaErrors( cudaMemcpy(dev_xRecvBuffer, xPeerBuffer, sizeof(dtype)*xSize, cudaMemcpyDeviceToDevice) );
+      }
+      if (yDown > -1) {
+        checkCudaErrors( cudaMemcpy(dev_yRecvBuffer, yPeerBuffer, sizeof(dtype)*ySize, cudaMemcpyDeviceToDevice) );
+      }
       checkCudaErrors( cudaDeviceSynchronize() );
       TIMER_STOP(0);
-      timeTakenCUDA += TIMER_ELAPSED(0);
+      timeTakenCUDACPY += TIMER_ELAPSED(0);
       // ---------------------------------------
 
       compute(sleep);  // NOTE has sense to become GPU computation
 
       // ---------------------------------------
       TIMER_START(0);
-      if (xUp > -1) {
-        checkCudaErrors( cudaMemcpy(xSendBuffer, dev_xSendBuffer, xSize*sizeof(dtype), cudaMemcpyDeviceToHost) );
+      if (xDown > -1) {
+        checkCudaErrors( cudaIpcGetMemHandle((cudaIpcMemHandle_t*)&xSendHandle, dev_xSendBuffer) );
+        checkCudaErrors( cudaEventCreate(&xSendEvent, cudaEventDisableTiming | cudaEventInterprocess) );
+        checkCudaErrors( cudaIpcGetEventHandle((cudaIpcEventHandle_t*)&xSendEventHandle, xSendEvent) );
       }
-
-      if (yDown > -1) {
-        checkCudaErrors( cudaMemcpy(ySendBuffer, dev_ySendBuffer, ySize*sizeof(dtype), cudaMemcpyDeviceToHost) );
+      MPI_Barrier(MPI_COMM_WORLD);
+      if (yUp > -1) {
+        checkCudaErrors( cudaIpcGetMemHandle((cudaIpcMemHandle_t*)&ySendHandle, dev_ySendBuffer) );
+        checkCudaErrors( cudaEventCreate(&ySendEvent, cudaEventDisableTiming | cudaEventInterprocess) );
+        checkCudaErrors( cudaIpcGetEventHandle((cudaIpcEventHandle_t*)&ySendEventHandle, ySendEvent) );
       }
-
-      checkCudaErrors( cudaDeviceSynchronize() );
+      MPI_Barrier(MPI_COMM_WORLD);
       TIMER_STOP(0);
-      timeTakenCUDA += TIMER_ELAPSED(0);
+      timeTakenCUDAIPC += TIMER_ELAPSED(0);
       // ---------------------------------------
 
       TIMER_START(0);
       if (xDown > -1) {
-        MPI_Send(xSendBuffer, (nx * kba * vars), MPI_dtype, xDown, 2000, MPI_COMM_WORLD);
+        MPI_Send(&xSendHandle, sizeof(cudaIpcMemHandle_t), MPI_BYTE, xDown, 2000, MPI_COMM_WORLD);
+        MPI_Send(&xSendEventHandle, sizeof(cudaIpcEventHandle_t), MPI_BYTE, xDown, 2000, MPI_COMM_WORLD);
       }
 
       if (yUp > -1) {
-        MPI_Send(ySendBuffer, (ny * kba * vars), MPI_dtype, yUp, 2000, MPI_COMM_WORLD);
+        MPI_Send(&ySendHandle, sizeof(cudaIpcMemHandle_t), MPI_BYTE, yUp, 2000, MPI_COMM_WORLD);
+        MPI_Send(&ySendEventHandle, sizeof(cudaIpcEventHandle_t), MPI_BYTE, yUp, 2000, MPI_COMM_WORLD);
       }
       TIMER_STOP(0);
       timeTakenMPI += TIMER_ELAPSED(0);
@@ -584,54 +624,71 @@ int main(int argc, char* argv[]) {
     for (int k = 0; k < nz; k += kba) {
       TIMER_START(0);
       if (xUp > -1) {
-        MPI_Recv(xRecvBuffer, (nx * kba * vars), MPI_dtype, xUp, 3000, MPI_COMM_WORLD, &status);
+        MPI_Recv(&xRecvHandle, sizeof(cudaIpcMemHandle_t), MPI_BYTE, xUp, 3000, MPI_COMM_WORLD, &status);
+        MPI_Recv(&xRecvEventHandle, sizeof(cudaIpcMemHandle_t), MPI_BYTE, xUp, 3000, MPI_COMM_WORLD, &status2);
       }
 
       if (yUp > -1) {
-        MPI_Recv(yRecvBuffer, (ny * kba * vars), MPI_dtype, yUp, 3000, MPI_COMM_WORLD, &status);
+        MPI_Recv(&yRecvHandle, sizeof(cudaIpcMemHandle_t), MPI_BYTE, yUp, 3000, MPI_COMM_WORLD, &status);
+        MPI_Recv(&yRecvEventHandle, sizeof(cudaIpcMemHandle_t), MPI_BYTE, yUp, 3000, MPI_COMM_WORLD, &status2);
       }
       TIMER_STOP(0);
       timeTakenMPI += TIMER_ELAPSED(0);
 
       // ---------------------------------------
       TIMER_START(0);
-      if (xDown > -1) {
-        checkCudaErrors( cudaMemcpy(dev_xRecvBuffer, xRecvBuffer, xSize*sizeof(dtype), cudaMemcpyHostToDevice) );
+      if (xUp > -1) {
+        checkCudaErrors( cudaIpcOpenMemHandle((void**)&xPeerBuffer, *(cudaIpcMemHandle_t*)&xRecvHandle, cudaIpcMemLazyEnablePeerAccess) );
+        checkCudaErrors( cudaIpcOpenEventHandle(&xRecvEvent, *(cudaIpcEventHandle_t *)&xRecvEventHandle) );
       }
-
-      if (yDown > -1) {
-        checkCudaErrors( cudaMemcpy(dev_yRecvBuffer, yRecvBuffer, ySize*sizeof(dtype), cudaMemcpyHostToDevice) );
+      if (yUp > -1) {
+        checkCudaErrors( cudaIpcOpenMemHandle((void**)&yPeerBuffer, *(cudaIpcMemHandle_t*)&yRecvHandle, cudaIpcMemLazyEnablePeerAccess) );
+        checkCudaErrors( cudaIpcOpenEventHandle(&yRecvEvent, *(cudaIpcEventHandle_t *)&yRecvEventHandle) );
       }
+      TIMER_STOP(0);
+      timeTakenCUDAIPC += TIMER_ELAPSED(0);
 
+      TIMER_START(0);
+      if (xUp > -1) {
+        checkCudaErrors( cudaMemcpy(dev_xRecvBuffer, xPeerBuffer, sizeof(dtype)*xSize, cudaMemcpyDeviceToDevice) );
+      }
+      if (yUp > -1) {
+        checkCudaErrors( cudaMemcpy(dev_yRecvBuffer, yPeerBuffer, sizeof(dtype)*ySize, cudaMemcpyDeviceToDevice) );
+      }
       checkCudaErrors( cudaDeviceSynchronize() );
       TIMER_STOP(0);
-      timeTakenCUDA += TIMER_ELAPSED(0);
+      timeTakenCUDACPY += TIMER_ELAPSED(0);
       // ---------------------------------------
 
       compute(sleep);  // NOTE has sense to become GPU computation
 
       // ---------------------------------------
       TIMER_START(0);
-      if (xUp > -1) {
-        checkCudaErrors( cudaMemcpy(xSendBuffer, dev_xSendBuffer, xSize*sizeof(dtype), cudaMemcpyDeviceToHost) );
+      if (xDown > -1) {
+        checkCudaErrors( cudaIpcGetMemHandle((cudaIpcMemHandle_t*)&xSendHandle, dev_xSendBuffer) );
+        checkCudaErrors( cudaEventCreate(&xSendEvent, cudaEventDisableTiming | cudaEventInterprocess) );
+        checkCudaErrors( cudaIpcGetEventHandle((cudaIpcEventHandle_t*)&xSendEventHandle, xSendEvent) );
       }
-
-      if (yUp > -1) {
-        checkCudaErrors( cudaMemcpy(ySendBuffer, dev_ySendBuffer, ySize*sizeof(dtype), cudaMemcpyDeviceToHost) );
+      MPI_Barrier(MPI_COMM_WORLD);
+      if (yDown > -1) {
+        checkCudaErrors( cudaIpcGetMemHandle((cudaIpcMemHandle_t*)&ySendHandle, dev_ySendBuffer) );
+        checkCudaErrors( cudaEventCreate(&ySendEvent, cudaEventDisableTiming | cudaEventInterprocess) );
+        checkCudaErrors( cudaIpcGetEventHandle((cudaIpcEventHandle_t*)&ySendEventHandle, ySendEvent) );
       }
-
-      checkCudaErrors( cudaDeviceSynchronize() );
+      MPI_Barrier(MPI_COMM_WORLD);
       TIMER_STOP(0);
-      timeTakenCUDA += TIMER_ELAPSED(0);
+      timeTakenCUDAIPC += TIMER_ELAPSED(0);
       // ---------------------------------------
 
       TIMER_START(0);
       if (xDown > -1) {
-        MPI_Send(xSendBuffer, (nx * kba * vars), MPI_dtype, xDown, 3000, MPI_COMM_WORLD);
+        MPI_Send(&xSendHandle, sizeof(cudaIpcMemHandle_t), MPI_BYTE, xDown, 3000, MPI_COMM_WORLD);
+        MPI_Send(&xSendEventHandle, sizeof(cudaIpcEventHandle_t), MPI_BYTE, xDown, 3000, MPI_COMM_WORLD);
       }
 
       if (yDown > -1) {
-        MPI_Send(ySendBuffer, (ny * kba * vars), MPI_dtype, yDown, 3000, MPI_COMM_WORLD);
+        MPI_Send(&ySendHandle, sizeof(cudaIpcMemHandle_t), MPI_BYTE, yDown, 3000, MPI_COMM_WORLD);
+        MPI_Send(&ySendEventHandle, sizeof(cudaIpcEventHandle_t), MPI_BYTE, yDown, 3000, MPI_COMM_WORLD);
       }
       TIMER_STOP(0);
       timeTakenMPI += TIMER_ELAPSED(0);
@@ -644,54 +701,71 @@ int main(int argc, char* argv[]) {
     for (int k = 0; k < nz; k += kba) {
       TIMER_START(0);
       if (xDown > -1) {
-        MPI_Recv(xRecvBuffer, (nx * kba * vars), MPI_dtype, xDown, 4000, MPI_COMM_WORLD, &status);
+        MPI_Recv(&xRecvHandle, sizeof(cudaIpcMemHandle_t), MPI_BYTE, xDown, 4000, MPI_COMM_WORLD, &status);
+        MPI_Recv(&xRecvEventHandle, sizeof(cudaIpcMemHandle_t), MPI_BYTE, xDown, 4000, MPI_COMM_WORLD, &status2);
       }
 
       if (yUp > -1) {
-        MPI_Recv(yRecvBuffer, (ny * kba * vars), MPI_dtype, yUp, 4000, MPI_COMM_WORLD, &status);
+        MPI_Recv(&yRecvHandle, sizeof(cudaIpcMemHandle_t), MPI_BYTE, yUp, 4000, MPI_COMM_WORLD, &status);
+        MPI_Recv(&yRecvEventHandle, sizeof(cudaIpcMemHandle_t), MPI_BYTE, yUp, 4000, MPI_COMM_WORLD, &status2);
       }
       TIMER_STOP(0);
       timeTakenMPI += TIMER_ELAPSED(0);
 
       // ---------------------------------------
       TIMER_START(0);
-      if (xUp > -1) {
-        checkCudaErrors( cudaMemcpy(dev_xRecvBuffer, xRecvBuffer, xSize*sizeof(dtype), cudaMemcpyHostToDevice) );
+      if (xDown > -1) {
+        checkCudaErrors( cudaIpcOpenMemHandle((void**)&xPeerBuffer, *(cudaIpcMemHandle_t*)&xRecvHandle, cudaIpcMemLazyEnablePeerAccess) );
+        checkCudaErrors( cudaIpcOpenEventHandle(&xRecvEvent, *(cudaIpcEventHandle_t *)&xRecvEventHandle) );
       }
-
-      if (yDown > -1) {
-        checkCudaErrors( cudaMemcpy(dev_yRecvBuffer, yRecvBuffer, ySize*sizeof(dtype), cudaMemcpyHostToDevice) );
+      if (yUp > -1) {
+        checkCudaErrors( cudaIpcOpenMemHandle((void**)&yPeerBuffer, *(cudaIpcMemHandle_t*)&yRecvHandle, cudaIpcMemLazyEnablePeerAccess) );
+        checkCudaErrors( cudaIpcOpenEventHandle(&yRecvEvent, *(cudaIpcEventHandle_t *)&yRecvEventHandle) );
       }
+      TIMER_STOP(0);
+      timeTakenCUDAIPC += TIMER_ELAPSED(0);
 
+      TIMER_START(0);
+      if (xDown > -1) {
+        checkCudaErrors( cudaMemcpy(dev_xRecvBuffer, xPeerBuffer, sizeof(dtype)*xSize, cudaMemcpyDeviceToDevice) );
+      }
+      if (yUp > -1) {
+        checkCudaErrors( cudaMemcpy(dev_yRecvBuffer, yPeerBuffer, sizeof(dtype)*ySize, cudaMemcpyDeviceToDevice) );
+      }
       checkCudaErrors( cudaDeviceSynchronize() );
       TIMER_STOP(0);
-      timeTakenCUDA += TIMER_ELAPSED(0);
+      timeTakenCUDACPY += TIMER_ELAPSED(0);
       // ---------------------------------------
 
       compute(sleep);  // NOTE has sense to become GPU computation
 
       // ---------------------------------------
       TIMER_START(0);
-      if (xDown > -1) {
-        checkCudaErrors( cudaMemcpy(xSendBuffer, dev_xSendBuffer, xSize*sizeof(dtype), cudaMemcpyDeviceToHost) );
+      if (xUp > -1) {
+        checkCudaErrors( cudaIpcGetMemHandle((cudaIpcMemHandle_t*)&xSendHandle, dev_xSendBuffer) );
+        checkCudaErrors( cudaEventCreate(&xSendEvent, cudaEventDisableTiming | cudaEventInterprocess) );
+        checkCudaErrors( cudaIpcGetEventHandle((cudaIpcEventHandle_t*)&xSendEventHandle, xSendEvent) );
       }
-
-      if (yUp > -1) {
-        checkCudaErrors( cudaMemcpy(ySendBuffer, dev_ySendBuffer, ySize*sizeof(dtype), cudaMemcpyDeviceToHost) );
+      MPI_Barrier(MPI_COMM_WORLD);
+      if (yDown > -1) {
+        checkCudaErrors( cudaIpcGetMemHandle((cudaIpcMemHandle_t*)&ySendHandle, dev_ySendBuffer) );
+        checkCudaErrors( cudaEventCreate(&ySendEvent, cudaEventDisableTiming | cudaEventInterprocess) );
+        checkCudaErrors( cudaIpcGetEventHandle((cudaIpcEventHandle_t*)&ySendEventHandle, ySendEvent) );
       }
-
-      checkCudaErrors( cudaDeviceSynchronize() );
+      MPI_Barrier(MPI_COMM_WORLD);
       TIMER_STOP(0);
-      timeTakenCUDA += TIMER_ELAPSED(0);
+      timeTakenCUDAIPC += TIMER_ELAPSED(0);
       // ---------------------------------------
 
       TIMER_START(0);
       if (xUp > -1) {
-        MPI_Send(xSendBuffer, (nx * kba * vars), MPI_dtype, xUp, 4000, MPI_COMM_WORLD);
+        MPI_Send(&xSendHandle, sizeof(cudaIpcMemHandle_t), MPI_BYTE, xUp, 4000, MPI_COMM_WORLD);
+        MPI_Send(&xSendEventHandle, sizeof(cudaIpcEventHandle_t), MPI_BYTE, xUp, 4000, MPI_COMM_WORLD);
       }
 
       if (yDown > -1) {
-        MPI_Send(ySendBuffer, (ny * kba * vars), MPI_dtype, yDown, 4000, MPI_COMM_WORLD);
+        MPI_Send(&ySendHandle, sizeof(cudaIpcMemHandle_t), MPI_BYTE, yDown, 4000, MPI_COMM_WORLD);
+        MPI_Send(&ySendEventHandle, sizeof(cudaIpcEventHandle_t), MPI_BYTE, yDown, 4000, MPI_COMM_WORLD);
       }
       TIMER_STOP(0);
       timeTakenMPI += TIMER_ELAPSED(0);
@@ -701,10 +775,10 @@ int main(int argc, char* argv[]) {
 
   MPI_Barrier(MPI_COMM_WORLD);
   gettimeofday(&end, NULL);
-  ADD_TIME_EXPERIMENT(0, timeTakenCUDA)
-  ADD_TIME_EXPERIMENT(1, timeTakenMPI)
-  TotalTimeTaken = timeTakenCUDA + timeTakenMPI;
-  ADD_TIME_EXPERIMENT(2, TotalTimeTaken)
+  ADD_TIME_EXPERIMENT(0, timeTakenCUDAIPC)
+  ADD_TIME_EXPERIMENT(1, timeTakenCUDACPY)
+  ADD_TIME_EXPERIMENT(2, timeTakenMPI)
+  ADD_TIME_EXPERIMENT(3, timeTakenCUDAIPC + timeTakenMPI + timeTakenCUDACPY)
 
   // ---------------------------------------
   // PICO disable peer access

@@ -37,8 +37,7 @@ BASELINE_MODULES=load_baseline_modules.sh
 
 
 
-# all: $(BINFOLDER)/$(NAME)_baseline $(BINFOLDER)/$(NAME)_nccl $(BINFOLDER)/$(NAME)_nvlink
-all: $(BINFOLDER)/$(NAME)_baseline $(BINFOLDER)/$(NAME)_nccl
+all: $(BINFOLDER)/$(NAME)_baseline $(BINFOLDER)/$(NAME)_nccl $(BINFOLDER)/$(NAME)_nvlink
 
 
 # --------------- Baseline ---------------
@@ -67,21 +66,21 @@ $(BINFOLDER)/$(NAME)_nccl: nccl/$(NAME)_nccl.cu $(NCCL_MODULES)
 	rm $(NCCL_MODULES)
 # ----------------------------------------
 
-# # ---------------- NVLink ----------------
-# $(NVLINK_MODULES):
-# 	@echo "module purge" > $@
-# 	@echo "module load openmpi" > $@
-# 	@echo "module load cuda" >> $@
-#
-# helper_multiprocess.o: ../include/helper_multiprocess.cpp $(NVLINK_MODULES)
-# 	source $(NVLINK_MODULES) ; $(CC) $(INCL) --threads 0 -o $@ -c $<
-#
-# $(BINFOLDER)/$(NAME)_nvlink: nvlink/$(NAME)_nvlink.cu $(NVLINK_MODULES) helper_multiprocess.o
-# 	mkdir -p $(BINFOLDER) $(OUTFOLDER) $(SOUTFOLDER)
-# 	source $(NVLINK_MODULES) ; $(CC) $(CFLAGS) helper_multiprocess.o -o $@ $< $(INCL) $(LIBS) $(LIBFLAGS) $(MPI) $(CUDA) -lstdc++ -lm -Wno-deprecated-gpu-targets $(DBGFLAGS)
-# 	rm $(NVLINK_MODULES)
-# 	rm helper_multiprocess.o
-# # ----------------------------------------
+# ---------------- NVLink ----------------
+$(NVLINK_MODULES):
+	@echo "module purge" > $@
+	@echo "module load openmpi" > $@
+	@echo "module load cuda" >> $@
+
+helper_multiprocess.o: ../include/helper_multiprocess.cpp $(NVLINK_MODULES)
+	source $(NVLINK_MODULES) ; $(CC) $(INCL) --threads 0 -o $@ -c $<
+
+$(BINFOLDER)/$(NAME)_nvlink: nvlink/$(NAME)_nvlink.cu $(NVLINK_MODULES) helper_multiprocess.o
+	mkdir -p $(BINFOLDER) $(OUTFOLDER) $(SOUTFOLDER)
+	source $(NVLINK_MODULES) ; $(CC) $(CFLAGS) helper_multiprocess.o -o $@ $< $(INCL) $(LIBS) $(LIBFLAGS) $(MPI) $(CUDA) -lstdc++ -lm -Wno-deprecated-gpu-targets $(DBGFLAGS)
+	rm $(NVLINK_MODULES)
+	rm helper_multiprocess.o
+# ----------------------------------------
 
 clean:
 	rm -r $(BINFOLDER)/*
