@@ -140,7 +140,7 @@ int main(int argc, char* argv[]) {
 
   int me = -1, mynode = -1;
   int world = -1, nnodes = -1;
-  double timeTakenMPI = 0.0, timeTakenCUDA = 0.0, TotalTimeTaken = 0.0;
+  double timeTakenMPI = 0.0, timeTakenCUDAIPC = 0.0, timeTakenCUDACPY = 0.0, TotalTimeTaken = 0.0;
 
   MPI_Comm_rank(MPI_COMM_WORLD, &me);
   MPI_Comm_size(MPI_COMM_WORLD, &world);
@@ -541,24 +541,30 @@ int main(int argc, char* argv[]) {
   TIMER_DEF(0);
   SET_EXPERIMENT_NAME(0, "halo3d")
   SET_EXPERIMENT_TYPE(0, "nvlink")
-  SET_EXPERIMENT(0, "CUDA")
+  SET_EXPERIMENT(0, "CUDAipc")
 
   SET_EXPERIMENT_NAME(1, "halo3d")
   SET_EXPERIMENT_TYPE(1, "nvlink")
-  SET_EXPERIMENT(1, "MPI")
+  SET_EXPERIMENT(1, "CUDAcpy")
 
   SET_EXPERIMENT_NAME(2, "halo3d")
   SET_EXPERIMENT_TYPE(2, "nvlink")
-  SET_EXPERIMENT(2, "TOTAL")
+  SET_EXPERIMENT(2, "MPI")
+
+  SET_EXPERIMENT_NAME(3, "halo3d")
+  SET_EXPERIMENT_TYPE(3, "nvlink")
+  SET_EXPERIMENT(3, "TOTAL")
 
   if (nnodes > 1) {
     SET_EXPERIMENT_LAYOUT(0, "interNodes")
     SET_EXPERIMENT_LAYOUT(1, "interNodes")
     SET_EXPERIMENT_LAYOUT(2, "interNodes")
+    SET_EXPERIMENT_LAYOUT(3, "interNodes")
   } else {
     SET_EXPERIMENT_LAYOUT(0, "intraNode")
     SET_EXPERIMENT_LAYOUT(1, "intraNode")
     SET_EXPERIMENT_LAYOUT(2, "intraNode")
+    SET_EXPERIMENT_LAYOUT(3, "intraNode")
   }
 
 
@@ -613,7 +619,7 @@ int main(int argc, char* argv[]) {
     }
     MPI_Barrier(MPI_COMM_WORLD);
     TIMER_STOP(0);
-    timeTakenCUDA += TIMER_ELAPSED(0);
+    timeTakenCUDAIPC += TIMER_ELAPSED(0);
     // ---------------------------------------
 
     TIMER_START(0);
@@ -641,17 +647,24 @@ int main(int argc, char* argv[]) {
     if (xUp > -1) {
       checkCudaErrors( cudaIpcOpenMemHandle((void**)&xUpPeerBuffer, *(cudaIpcMemHandle_t*)&xUpRecvHandle, cudaIpcMemLazyEnablePeerAccess) );
       checkCudaErrors( cudaIpcOpenEventHandle(&xUpRecvEvent, *(cudaIpcEventHandle_t *)&xUpRecvEventHandle) );
-
-      checkCudaErrors( cudaMemcpy(dev_xUpRecvBuffer, xUpPeerBuffer, sizeof(dtype)*xSize, cudaMemcpyDeviceToDevice) );
     }
     if (xDown > -1) {
       checkCudaErrors( cudaIpcOpenMemHandle((void**)&xDownPeerBuffer, *(cudaIpcMemHandle_t*)&xDownRecvHandle, cudaIpcMemLazyEnablePeerAccess) );
       checkCudaErrors( cudaIpcOpenEventHandle(&xDownRecvEvent, *(cudaIpcEventHandle_t *)&xDownRecvEventHandle) );
-
-      checkCudaErrors( cudaMemcpy(dev_xDownRecvBuffer, xDownPeerBuffer, sizeof(dtype)*xSize, cudaMemcpyDeviceToDevice) );
     }
     TIMER_STOP(0);
-    timeTakenCUDA += TIMER_ELAPSED(0);
+    timeTakenCUDAIPC += TIMER_ELAPSED(0);
+
+    TIMER_START(0);
+    if (xUp > -1) {
+      checkCudaErrors( cudaMemcpy(dev_xUpRecvBuffer, xUpPeerBuffer, sizeof(dtype)*xSize, cudaMemcpyDeviceToDevice) );
+    }
+    if (xDown > -1) {
+      checkCudaErrors( cudaMemcpy(dev_xDownRecvBuffer, xDownPeerBuffer, sizeof(dtype)*xSize, cudaMemcpyDeviceToDevice) );
+    }
+    checkCudaErrors( cudaDeviceSynchronize() );
+    TIMER_STOP(0);
+    timeTakenCUDACPY += TIMER_ELAPSED(0);
     // ---------------------------------------
 
     // ---------------------------------------
@@ -665,7 +678,7 @@ int main(int argc, char* argv[]) {
       checkCudaErrors( cudaEventDestroy(xDownRecvEvent) );
     }
     TIMER_STOP(0);
-    timeTakenCUDA += TIMER_ELAPSED(0);
+    timeTakenCUDAIPC += TIMER_ELAPSED(0);
     // ---------------------------------------
 
     // =================================================================================================================
@@ -685,7 +698,7 @@ int main(int argc, char* argv[]) {
     }
     MPI_Barrier(MPI_COMM_WORLD);
     TIMER_STOP(0);
-    timeTakenCUDA += TIMER_ELAPSED(0);
+    timeTakenCUDAIPC += TIMER_ELAPSED(0);
     // ---------------------------------------
 
     TIMER_START(0);
@@ -713,17 +726,25 @@ int main(int argc, char* argv[]) {
     if (yUp > -1) {
       checkCudaErrors( cudaIpcOpenMemHandle((void**)&yUpPeerBuffer, *(cudaIpcMemHandle_t*)&yUpRecvHandle, cudaIpcMemLazyEnablePeerAccess) );
       checkCudaErrors( cudaIpcOpenEventHandle(&yUpRecvEvent, *(cudaIpcEventHandle_t *)&yUpRecvEventHandle) );
-
-      checkCudaErrors( cudaMemcpy(dev_yUpRecvBuffer, yUpPeerBuffer, sizeof(dtype)*ySize, cudaMemcpyDeviceToDevice) );
     }
     if (yDown > -1) {
       checkCudaErrors( cudaIpcOpenMemHandle((void**)&yDownPeerBuffer, *(cudaIpcMemHandle_t*)&yDownRecvHandle, cudaIpcMemLazyEnablePeerAccess) );
       checkCudaErrors( cudaIpcOpenEventHandle(&yDownRecvEvent, *(cudaIpcEventHandle_t *)&yDownRecvEventHandle) );
-
-      checkCudaErrors( cudaMemcpy(dev_yDownRecvBuffer, yDownPeerBuffer, sizeof(dtype)*ySize, cudaMemcpyDeviceToDevice) );
     }
     TIMER_STOP(0);
-    timeTakenCUDA += TIMER_ELAPSED(0);
+    timeTakenCUDAIPC += TIMER_ELAPSED(0);
+
+
+    TIMER_START(0);
+    if (yUp > -1) {
+      checkCudaErrors( cudaMemcpy(dev_yUpRecvBuffer, yUpPeerBuffer, sizeof(dtype)*ySize, cudaMemcpyDeviceToDevice) );
+    }
+    if (yDown > -1) {
+      checkCudaErrors( cudaMemcpy(dev_yDownRecvBuffer, yDownPeerBuffer, sizeof(dtype)*ySize, cudaMemcpyDeviceToDevice) );
+    }
+    checkCudaErrors( cudaDeviceSynchronize() );
+    TIMER_STOP(0);
+    timeTakenCUDACPY += TIMER_ELAPSED(0);
     // ---------------------------------------
 
     // ---------------------------------------
@@ -737,7 +758,7 @@ int main(int argc, char* argv[]) {
       checkCudaErrors( cudaEventDestroy(yDownRecvEvent) );
     }
     TIMER_STOP(0);
-    timeTakenCUDA += TIMER_ELAPSED(0);
+    timeTakenCUDAIPC += TIMER_ELAPSED(0);
     // ---------------------------------------
 
     // =================================================================================================================
@@ -757,7 +778,7 @@ int main(int argc, char* argv[]) {
     }
     MPI_Barrier(MPI_COMM_WORLD);
     TIMER_STOP(0);
-    timeTakenCUDA += TIMER_ELAPSED(0);
+    timeTakenCUDAIPC += TIMER_ELAPSED(0);
     // ---------------------------------------
 
     TIMER_START(0);
@@ -785,17 +806,25 @@ int main(int argc, char* argv[]) {
     if (zUp > -1) {
       checkCudaErrors( cudaIpcOpenMemHandle((void**)&zUpPeerBuffer, *(cudaIpcMemHandle_t*)&zUpRecvHandle, cudaIpcMemLazyEnablePeerAccess) );
       checkCudaErrors( cudaIpcOpenEventHandle(&zUpRecvEvent, *(cudaIpcEventHandle_t *)&zUpRecvEventHandle) );
-
-      checkCudaErrors( cudaMemcpy(dev_zUpRecvBuffer, zUpPeerBuffer, sizeof(dtype)*zSize, cudaMemcpyDeviceToDevice) );
     }
     if (zDown > -1) {
       checkCudaErrors( cudaIpcOpenMemHandle((void**)&zDownPeerBuffer, *(cudaIpcMemHandle_t*)&zDownRecvHandle, cudaIpcMemLazyEnablePeerAccess) );
       checkCudaErrors( cudaIpcOpenEventHandle(&zDownRecvEvent, *(cudaIpcEventHandle_t *)&zDownRecvEventHandle) );
-
-      checkCudaErrors( cudaMemcpy(dev_zDownRecvBuffer, zDownPeerBuffer, sizeof(dtype)*zSize, cudaMemcpyDeviceToDevice) );
     }
     TIMER_STOP(0);
-    timeTakenCUDA += TIMER_ELAPSED(0);
+    timeTakenCUDAIPC += TIMER_ELAPSED(0);
+
+
+    TIMER_START(0);
+    if (zUp > -1) {
+      checkCudaErrors( cudaMemcpy(dev_zUpRecvBuffer, zUpPeerBuffer, sizeof(dtype)*zSize, cudaMemcpyDeviceToDevice) );
+    }
+    if (zDown > -1) {
+      checkCudaErrors( cudaMemcpy(dev_zDownRecvBuffer, zDownPeerBuffer, sizeof(dtype)*zSize, cudaMemcpyDeviceToDevice) );
+    }
+    checkCudaErrors( cudaDeviceSynchronize() );
+    TIMER_STOP(0);
+    timeTakenCUDACPY += TIMER_ELAPSED(0);
     // ---------------------------------------
 
     // ---------------------------------------
@@ -809,17 +838,18 @@ int main(int argc, char* argv[]) {
       checkCudaErrors( cudaEventDestroy(zDownRecvEvent) );
     }
     TIMER_STOP(0);
-    timeTakenCUDA += TIMER_ELAPSED(0);
+    timeTakenCUDAIPC += TIMER_ELAPSED(0);
     // ---------------------------------------
 
     // =================================================================================================================
   }
 
   gettimeofday(&end, NULL);
-  ADD_TIME_EXPERIMENT(0, timeTakenCUDA)
-  ADD_TIME_EXPERIMENT(1, timeTakenMPI)
-  TotalTimeTaken = timeTakenCUDA + timeTakenMPI;
-  ADD_TIME_EXPERIMENT(2, TotalTimeTaken)
+  ADD_TIME_EXPERIMENT(0, timeTakenCUDAIPC)
+  ADD_TIME_EXPERIMENT(1, timeTakenCUDACPY)
+  ADD_TIME_EXPERIMENT(2, timeTakenMPI)
+  TotalTimeTaken = timeTakenCUDAIPC + timeTakenMPI + timeTakenCUDACPY;
+  ADD_TIME_EXPERIMENT(3, TotalTimeTaken)
 
   // ---------------------------------------
   // PICO disable peer access

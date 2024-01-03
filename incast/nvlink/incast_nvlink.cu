@@ -119,7 +119,7 @@ int main(int argc, char* argv[]) {
 
   int me = -1, mynode = -1;
   int world = -1, nnodes = -1;
-  double timeTakenMPI = 0.0, timeTakenCUDA = 0.0;
+  double timeTakenMPI = 0.0, timeTakenCUDAIPC = 0.0, timeTakenCUDACPY = 0.0;
 
   MPI_Comm_size(MPI_COMM_WORLD, &world);
   MPI_Comm_rank(MPI_COMM_WORLD, &me);
@@ -238,24 +238,30 @@ int main(int argc, char* argv[]) {
   TIMER_DEF(1);
   SET_EXPERIMENT_NAME(0, "incast")
   SET_EXPERIMENT_TYPE(0, "nvlink")
-  SET_EXPERIMENT(0, "CUDA")
+  SET_EXPERIMENT(0, "CUDAipc")
 
   SET_EXPERIMENT_NAME(1, "incast")
   SET_EXPERIMENT_TYPE(1, "nvlink")
-  SET_EXPERIMENT(1, "MPI")
+  SET_EXPERIMENT(1, "CUDAcpy")
 
   SET_EXPERIMENT_NAME(2, "incast")
   SET_EXPERIMENT_TYPE(2, "nvlink")
-  SET_EXPERIMENT(2, "TOTAL")
+  SET_EXPERIMENT(2, "MPI")
+
+  SET_EXPERIMENT_NAME(3, "incast")
+  SET_EXPERIMENT_TYPE(3, "nvlink")
+  SET_EXPERIMENT(3, "TOTAL")
 
   if (nnodes > 1) {
     SET_EXPERIMENT_LAYOUT(0, "interNodes")
     SET_EXPERIMENT_LAYOUT(1, "interNodes")
     SET_EXPERIMENT_LAYOUT(2, "interNodes")
+    SET_EXPERIMENT_LAYOUT(3, "interNodes")
   } else {
     SET_EXPERIMENT_LAYOUT(0, "intraNode")
     SET_EXPERIMENT_LAYOUT(1, "intraNode")
     SET_EXPERIMENT_LAYOUT(2, "intraNode")
+    SET_EXPERIMENT_LAYOUT(3, "intraNode")
   }
 
   MPI_Barrier(MPI_COMM_WORLD);
@@ -358,7 +364,7 @@ int main(int argc, char* argv[]) {
       }
       MPI_Barrier(MPI_COMM_WORLD);
       TIMER_STOP(0);
-      timeTakenCUDA += TIMER_ELAPSED(0);
+      timeTakenCUDAIPC += TIMER_ELAPSED(0);
 
 
       TIMER_START(1);
@@ -380,17 +386,22 @@ int main(int argc, char* argv[]) {
       timeTakenMPI += TIMER_ELAPSED(1);
 
 
-      TIMER_START(0);
       if (me == world-1) {
         for (int r = 0; r < world - 1; r++) {
+          TIMER_START(0);
           checkCudaErrors( cudaIpcOpenMemHandle((void**)&(peerBuffer[r]), *(cudaIpcMemHandle_t*)&(recvHandle[r]), cudaIpcMemLazyEnablePeerAccess) );
           checkCudaErrors( cudaIpcOpenEventHandle(&recvEvent[r], *(cudaIpcEventHandle_t *)&recvEventHandle[r]) );
+          TIMER_STOP(0);
+          timeTakenCUDAIPC += TIMER_ELAPSED(0);
 
+          TIMER_START(0);
           checkCudaErrors( cudaMemcpy(&dev_recvBuffer[r * msgsize], peerBuffer[r], sizeof(dtype)*msgsize, cudaMemcpyDeviceToDevice) );
+          checkCudaErrors( cudaDeviceSynchronize() );
+          TIMER_STOP(0);
+          timeTakenCUDACPY += TIMER_ELAPSED(0);
         }
       }
-      TIMER_STOP(0);
-      timeTakenCUDA += TIMER_ELAPSED(0);
+
 
       TIMER_START(0);
       if (me == world-1) {
@@ -400,14 +411,15 @@ int main(int argc, char* argv[]) {
         }
       }
       TIMER_STOP(0);
-      timeTakenCUDA += TIMER_ELAPSED(0);
+      timeTakenCUDAIPC += TIMER_ELAPSED(0);
     }
     MPI_Barrier(MPI_COMM_WORLD);
 
     gettimeofday(&end, NULL);
-    ADD_TIME_EXPERIMENT(0, timeTakenCUDA)
-    ADD_TIME_EXPERIMENT(1, timeTakenMPI)
-    ADD_TIME_EXPERIMENT(2, timeTakenCUDA + timeTakenMPI)
+    ADD_TIME_EXPERIMENT(0, timeTakenCUDAIPC)
+    ADD_TIME_EXPERIMENT(1, timeTakenCUDACPY)
+    ADD_TIME_EXPERIMENT(2, timeTakenMPI)
+    ADD_TIME_EXPERIMENT(3, timeTakenCUDAIPC + timeTakenMPI + timeTakenCUDACPY)
 
     // ---------------------------------------
     // PICO disable peers
@@ -494,7 +506,7 @@ int main(int argc, char* argv[]) {
 
   fflush(stdout);
   MPI_Barrier(MPI_COMM_WORLD);
-  if (me == 0) PRINT_EXPARIMENT_STATS
+  if (me == world-1) PRINT_EXPARIMENT_STATS
 
   MPI_Finalize();
 }
