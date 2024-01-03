@@ -38,7 +38,7 @@ BASELINE_MODULES=load_baseline_modules.sh
 
 
 # all: $(BINFOLDER)/$(NAME)_baseline $(BINFOLDER)/$(NAME)_nccl $(BINFOLDER)/$(NAME)_nvlink
-all: $(BINFOLDER)/$(NAME)_baseline
+all: $(BINFOLDER)/$(NAME)_baseline $(BINFOLDER)/$(NAME)_nccl
 
 
 # --------------- Baseline ---------------
@@ -54,19 +54,19 @@ $(BINFOLDER)/$(NAME)_baseline: baseline/$(NAME)_baseline.cu $(BASELINE_MODULES)
 # ----------------------------------------
 
 
-# # ----------------- Nccl -----------------
-# $(NCCL_MODULES):
-# 	@echo "module purge" > $@
-# 	@echo "module load openmpi" > $@
-# 	@echo "module load cuda" >> $@
-# 	@echo "module load nccl" >> $@
-#
-# $(BINFOLDER)/$(NAME)_nccl: nccl/$(NAME)_nccl.cu $(NCCL_MODULES)
-# 	mkdir -p $(BINFOLDER) $(OUTFOLDER) $(SOUTFOLDER)
-# 	source $(NCCL_MODULES) ; $(CC) $(CFLAGS) -o $@ $< $(INCL) $(LIBS) $(LIBFLAGS) $(MPI) $(CUDA) $(NCCL) -lstdc++ -lm -Wno-deprecated-gpu-targets $(DBGFLAGS)
-# 	rm $(NCCL_MODULES)
-# # ----------------------------------------
-#
+# ----------------- Nccl -----------------
+$(NCCL_MODULES):
+	@echo "module purge" > $@
+	@echo "module load openmpi" > $@
+	@echo "module load cuda" >> $@
+	@echo "module load nccl" >> $@
+
+$(BINFOLDER)/$(NAME)_nccl: nccl/$(NAME)_nccl.cu $(NCCL_MODULES)
+	mkdir -p $(BINFOLDER) $(OUTFOLDER) $(SOUTFOLDER)
+	source $(NCCL_MODULES) ; $(CC) $(CFLAGS) -o $@ $< $(INCL) $(LIBS) $(LIBFLAGS) $(MPI) $(CUDA) $(NCCL) -lstdc++ -lm -Wno-deprecated-gpu-targets $(DBGFLAGS)
+	rm $(NCCL_MODULES)
+# ----------------------------------------
+
 # # ---------------- NVLink ----------------
 # $(NVLINK_MODULES):
 # 	@echo "module purge" > $@

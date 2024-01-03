@@ -439,6 +439,7 @@ int main(int argc, char* argv[]) {
   // ---------------------------------------
 
   // ---------------------------------------
+  // PICO init nccl comm
   ncclUniqueId Id;
   ncclComm_t NCCL_COMM_WORLD, NCCL_COMM_NODE;
 

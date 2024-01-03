@@ -19,7 +19,7 @@
 6. **Tested**: the experiment was tested on each considered architecture.
 
 ## Status of development
-**Last update**: 3/1/2024 15:00
+**Last update**: 3/1/2024 16:00
 
 | Benchmark   | Layout              | MPI + CudaMemcpy | NCCL            | GPUDirect       | Low-level NV-link |
 |-------------|---------------------|------------------|-----------------|-----------------|-------------------|
@@ -29,8 +29,8 @@
 |             | InterNodes (2x2x2)  | 🟢               | 🟢               | ❌              | □                 |
 | Incast      | IntraNode           | 🟢               | 🟢               | ❌              | 🟢                |
 |             | InterNodes          | 🟢               | 🟢               | ❌              | □                 |
-| Sweep3d     | IntraNode           | 🔵               | □               | ❌              | □                 |
-|             | InterNodes          | 🔵               | □               | ❌              | □                 |
+| Sweep3d     | IntraNode           | 🔵               | 🔵               | ❌              | □                 |
+|             | InterNodes          | 🔵               | 🔵               | ❌              | □                 |
 | Others (?)  | ??                  | ❌               | ❌               | ❌              | ❌                |
 |             | ??                  | ❌               | ❌               | ❌              | ❌                |
 
