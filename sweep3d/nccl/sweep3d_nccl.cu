@@ -27,6 +27,8 @@
 
 #define NCCL
 
+#define DEBUG 2
+
 #include "../../include/experiment_utils.h"
 #include "../../include/debug_utils.h"
 #include "../../include/helper_cuda.h"
@@ -114,6 +116,15 @@ int  assignDeviceToProcess(MPI_Comm *nodeComm, int *nnodes, int *mynodeid)
 }
 
 __global__
+void GPU_compute (int n, dtype *input, dtype *output) {
+  int tid = blockIdx.x*blockDim.x + threadIdx.x;
+
+  if (tid < n)
+    if (input[tid] > output[tid])
+      output[tid] = input[tid];
+}
+
+__global__
 void init_kernel(int n, dtype *input, int rank) {
   int tid = blockIdx.x*blockDim.x + threadIdx.x;
 
@@ -143,10 +154,18 @@ int main(int argc, char* argv[]) {
 
   int me = -1, mynode = -1;
   int world = -1, nnodes = -1;
-  double timeTakenMPI = 0.0, timeTakenCUDA = 0.0, TotalTimeTaken = 0.0;
+  double timeTakenMPI = 0.0, timeTakenCUDA = 0.0, TotalTimeTaken = 0.0, timeTakenCOMPUTE = 0.0;
 
   MPI_Comm_rank(MPI_COMM_WORLD, &me);
   MPI_Comm_size(MPI_COMM_WORLD, &world);
+
+  // ------------------------------------------ DBG print ------------------------------------------
+
+  DBG_PRINT(1, MPI_PROCESS_PRINT(MPI_COMM_WORLD, 0, printf("%s\n", COLOUR(AC_RED, CHECKPOINTS)); ) )
+
+  DBG_PRINT(2, MPI_PROCESS_PRINT(MPI_COMM_WORLD, 0, printf("%s\n", COLOUR(AC_RED, ALL_RESULT_VECTORS)); ) )
+
+  // -----------------------------------------------------------------------------------------------
 
   int pex = -1;
   int pey = -1;
@@ -294,6 +313,12 @@ int main(int argc, char* argv[]) {
   checkCudaErrors( cudaMalloc(&dev_xRecvBuffer, sizeof(dtype) * xSize) );
   checkCudaErrors( cudaMalloc(&dev_ySendBuffer, sizeof(dtype) * ySize) );
   checkCudaErrors( cudaMalloc(&dev_yRecvBuffer, sizeof(dtype) * ySize) );
+
+  dtype *dev_xResultBuffer[4], *dev_yResultBuffer[4];
+  for(int i=0; i<4; i++) {
+    checkCudaErrors( cudaMalloc(&dev_xResultBuffer[i], sizeof(dtype) * xSize) );
+    checkCudaErrors( cudaMalloc(&dev_yResultBuffer[i], sizeof(dtype) * ySize) );
+  }
   // ---------------------------------------------------------------------------------------
 
   // ---------------------------------------
@@ -311,6 +336,11 @@ int main(int argc, char* argv[]) {
   checkCudaErrors( cudaMemset(dev_xRecvBuffer, 0, sizeof(dtype) * xSize) );
   checkCudaErrors( cudaMemset(dev_ySendBuffer, 0, sizeof(dtype) * ySize) );
   checkCudaErrors( cudaMemset(dev_yRecvBuffer, 0, sizeof(dtype) * ySize) );
+
+  for(int i=0; i<4; i++) {
+    checkCudaErrors( cudaMemset(dev_xResultBuffer[i], 0, sizeof(dtype) * xSize) );
+    checkCudaErrors( cudaMemset(dev_yResultBuffer[i], 0, sizeof(dtype) * ySize) );
+  }
 
   {
     dim3 block_size(BLK_SIZE, 1, 1);
@@ -393,10 +423,22 @@ int main(int argc, char* argv[]) {
   SET_EXPERIMENT_TYPE(0, "nccl")
   SET_EXPERIMENT(0, "CUDA")
 
+  SET_EXPERIMENT_NAME(1, "sweep3d")
+  SET_EXPERIMENT_TYPE(1, "nccl")
+  SET_EXPERIMENT(1, "TOTAL")
+
+  SET_EXPERIMENT_NAME(2, "sweep3d")
+  SET_EXPERIMENT_TYPE(2, "nccl")
+  SET_EXPERIMENT(2, "Compu")
+
   if (nnodes > 1) {
     SET_EXPERIMENT_LAYOUT(0, "interNodes")
+    SET_EXPERIMENT_LAYOUT(1, "interNodes")
+    SET_EXPERIMENT_LAYOUT(2, "interNodes")
   } else {
     SET_EXPERIMENT_LAYOUT(0, "intraNode")
+    SET_EXPERIMENT_LAYOUT(1, "intraNode")
+    SET_EXPERIMENT_LAYOUT(2, "intraNode")
   }
 
   gettimeofday(&start, NULL);
@@ -420,7 +462,20 @@ int main(int argc, char* argv[]) {
       TIMER_STOP(0);
       timeTakenCUDA += TIMER_ELAPSED(0);
 
-      compute(sleep);
+      TIMER_START(0);
+      {
+        dim3 block_size(BLK_SIZE, 1, 1);
+        dim3 grid_size(GRD_SIZE, 1, 1);
+        GPU_compute<<<grid_size, block_size>>>(xSize, dev_xRecvBuffer, dev_xResultBuffer[0]);
+        GPU_compute<<<grid_size, block_size>>>(ySize, dev_yRecvBuffer, dev_yResultBuffer[0]);
+        checkCudaErrors( cudaDeviceSynchronize() );
+      }
+      TIMER_STOP(0);
+      timeTakenCOMPUTE += TIMER_ELAPSED(0);
+
+      checkCudaErrors( cudaMemset(dev_xRecvBuffer, 0, sizeof(dtype) * xSize) );
+      checkCudaErrors( cudaMemset(dev_yRecvBuffer, 0, sizeof(dtype) * ySize) );
+      checkCudaErrors( cudaDeviceSynchronize() );
 
       TIMER_START(0);
       if (xUp > -1) {
@@ -449,7 +504,20 @@ int main(int argc, char* argv[]) {
       TIMER_STOP(0);
       timeTakenCUDA += TIMER_ELAPSED(0);
 
-      compute(sleep);
+      TIMER_START(0);
+      {
+        dim3 block_size(BLK_SIZE, 1, 1);
+        dim3 grid_size(GRD_SIZE, 1, 1);
+        GPU_compute<<<grid_size, block_size>>>(xSize, dev_xRecvBuffer, dev_xResultBuffer[1]);
+        GPU_compute<<<grid_size, block_size>>>(ySize, dev_yRecvBuffer, dev_yResultBuffer[1]);
+        checkCudaErrors( cudaDeviceSynchronize() );
+      }
+      TIMER_STOP(0);
+      timeTakenCOMPUTE += TIMER_ELAPSED(0);
+
+      checkCudaErrors( cudaMemset(dev_xRecvBuffer, 0, sizeof(dtype) * xSize) );
+      checkCudaErrors( cudaMemset(dev_yRecvBuffer, 0, sizeof(dtype) * ySize) );
+      checkCudaErrors( cudaDeviceSynchronize() );
 
       TIMER_START(0);
       if (xDown > -1) {
@@ -478,7 +546,20 @@ int main(int argc, char* argv[]) {
       TIMER_STOP(0);
       timeTakenCUDA += TIMER_ELAPSED(0);
 
-      compute(sleep);
+      TIMER_START(0);
+      {
+        dim3 block_size(BLK_SIZE, 1, 1);
+        dim3 grid_size(GRD_SIZE, 1, 1);
+        GPU_compute<<<grid_size, block_size>>>(xSize, dev_xRecvBuffer, dev_xResultBuffer[2]);
+        GPU_compute<<<grid_size, block_size>>>(ySize, dev_yRecvBuffer, dev_yResultBuffer[2]);
+        checkCudaErrors( cudaDeviceSynchronize() );
+      }
+      TIMER_STOP(0);
+      timeTakenCOMPUTE += TIMER_ELAPSED(0);
+
+      checkCudaErrors( cudaMemset(dev_xRecvBuffer, 0, sizeof(dtype) * xSize) );
+      checkCudaErrors( cudaMemset(dev_yRecvBuffer, 0, sizeof(dtype) * ySize) );
+      checkCudaErrors( cudaDeviceSynchronize() );
 
       TIMER_START(0);
       if (xDown > -1) {
@@ -507,7 +588,20 @@ int main(int argc, char* argv[]) {
       TIMER_STOP(0);
       timeTakenCUDA += TIMER_ELAPSED(0);
 
-      compute(sleep);
+      TIMER_START(0);
+      {
+        dim3 block_size(BLK_SIZE, 1, 1);
+        dim3 grid_size(GRD_SIZE, 1, 1);
+        GPU_compute<<<grid_size, block_size>>>(xSize, dev_xRecvBuffer, dev_xResultBuffer[3]);
+        GPU_compute<<<grid_size, block_size>>>(ySize, dev_yRecvBuffer, dev_yResultBuffer[3]);
+        checkCudaErrors( cudaDeviceSynchronize() );
+      }
+      TIMER_STOP(0);
+      timeTakenCOMPUTE += TIMER_ELAPSED(0);
+
+      checkCudaErrors( cudaMemset(dev_xRecvBuffer, 0, sizeof(dtype) * xSize) );
+      checkCudaErrors( cudaMemset(dev_yRecvBuffer, 0, sizeof(dtype) * ySize) );
+      checkCudaErrors( cudaDeviceSynchronize() );
 
       TIMER_START(0);
       if (xUp > -1) {
@@ -525,14 +619,15 @@ int main(int argc, char* argv[]) {
   MPI_Barrier(MPI_COMM_WORLD);
   gettimeofday(&end, NULL);
   ADD_TIME_EXPERIMENT(0, timeTakenCUDA)
+  ADD_TIME_EXPERIMENT(1, timeTakenCUDA)
+  ADD_TIME_EXPERIMENT(2, timeTakenCOMPUTE)
 
   MPI_Barrier(MPI_COMM_WORLD);
 
   // ---------------------------------------
   {
-    // BUG to check the sense of the test
-    size_t test_sizes[2], *dev_test_sizes;
-    dtype *test_vector[2], **dev_test_vector;
+    size_t test_sizes[8], *dev_test_sizes;
+    dtype *test_vector[8], **dev_test_vector;
     srand((unsigned int)time(NULL));
     int x = rand() % (GRD_SIZE*BLK_SIZE);
     int maxSize = (xSize > ySize) ? xSize : ySize;
@@ -544,24 +639,55 @@ int main(int argc, char* argv[]) {
 
     test_sizes[0] = xSize;
     test_sizes[1] = ySize;
-    test_vector[0] = dev_xRecvBuffer;
-    test_vector[1] = dev_yRecvBuffer;
+    test_sizes[2] = xSize;
+    test_sizes[3] = ySize;
+    test_sizes[4] = xSize;
+    test_sizes[5] = ySize;
+    test_sizes[6] = xSize;
+    test_sizes[7] = ySize;
+    test_vector[0] = dev_xResultBuffer[0];
+    test_vector[1] = dev_yResultBuffer[0];
+    test_vector[2] = dev_xResultBuffer[1];
+    test_vector[3] = dev_yResultBuffer[1];
+    test_vector[4] = dev_xResultBuffer[2];
+    test_vector[5] = dev_yResultBuffer[2];
+    test_vector[6] = dev_xResultBuffer[3];
+    test_vector[7] = dev_yResultBuffer[3];
 
-    checkCudaErrors( cudaMalloc(&dev_test_sizes,  sizeof(size_t) * 2) );
-    checkCudaErrors( cudaMalloc(&dev_test_vector, sizeof(dtype*) * 2) );
-    checkCudaErrors( cudaMemcpy(dev_test_sizes,  test_sizes,  sizeof(size_t) * 2, cudaMemcpyHostToDevice) );
-    checkCudaErrors( cudaMemcpy(dev_test_vector, test_vector, sizeof(dtype*) * 2, cudaMemcpyHostToDevice) );
+    STR_COLL_DEF
+    STR_COLL_INIT
+
+#if DEBUG == 2
+    for (int i=0; i<4; i++) {
+      dtype tmpX, tmpY;
+      checkCudaErrors( cudaMemcpy(checkVector, dev_xResultBuffer[i], xSize*sizeof(dtype), cudaMemcpyDeviceToHost) );
+      checkCudaErrors( cudaDeviceSynchronize() );
+      tmpX = checkVector[1];
+      checkCudaErrors( cudaMemcpy(checkVector, dev_yResultBuffer[i], ySize*sizeof(dtype), cudaMemcpyDeviceToHost) );
+      checkCudaErrors( cudaDeviceSynchronize() );
+      tmpY = checkVector[1];
+      STR_COLL_APPEND(sprintf(str_coll.buff, "dev_xResultBuffer[%d][1] = %lf, dev_yResultBuffer[%d][1] = %lf\n",i,tmpX,i,tmpY);)
+    }
+#else
+    STR_COLL_APPEND(sprintf(str_coll.buff, "Without DEBUG==2 the result vectors are not printed\n");)
+#endif
+
+    checkCudaErrors( cudaMalloc(&dev_test_sizes,  sizeof(size_t) * 8) );
+    checkCudaErrors( cudaMalloc(&dev_test_vector, sizeof(dtype*) * 8) );
+    checkCudaErrors( cudaMemcpy(dev_test_sizes,  test_sizes,  sizeof(size_t) * 8, cudaMemcpyHostToDevice) );
+    checkCudaErrors( cudaMemcpy(dev_test_vector, test_vector, sizeof(dtype*) * 8, cudaMemcpyHostToDevice) );
 
     {
       dim3 block_size(BLK_SIZE, 1, 1);
       dim3 grid_size(GRD_SIZE, 1, 1);
-      test_kernel<<<grid_size, block_size>>>(maxSize, 2, dev_test_sizes, dev_test_vector, dev_checkVector);
+      test_kernel<<<grid_size, block_size>>>(maxSize, 8, dev_test_sizes, dev_test_vector, dev_checkVector);
       checkCudaErrors( cudaDeviceSynchronize() );
     }
     checkCudaErrors( cudaMemcpy(checkVector, dev_checkVector, maxSize*sizeof(dtype), cudaMemcpyDeviceToHost) );
     checkCudaErrors( cudaDeviceSynchronize() );
 
     MPI_ALL_PRINT(
+      fprintf(fp, "%s\n", STR_COLL_GIVE);
       fprintf(fp, "xUp = %d, xDown = %d, yUp = %d, yDown = %d\n", xUp, xDown, yUp, yDown);
       fprintf(fp, "extracted tid = %d\n", x);
       fprintf(fp, "checkVector = %6.4f\n", checkVector[x]);
@@ -571,6 +697,7 @@ int main(int argc, char* argv[]) {
     checkCudaErrors( cudaFree(dev_checkVector) );
     checkCudaErrors( cudaFree(dev_test_sizes) );
     free(checkVector);
+    STR_COLL_FREE
   }
   MPI_Barrier(MPI_COMM_WORLD);
   // ---------------------------------------

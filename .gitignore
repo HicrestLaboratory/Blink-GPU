@@ -1,3 +1,4 @@
 *.kdev4
 kdev4/*
 pingpong/launch.sh
+dev_notes.txt
