@@ -25,6 +25,8 @@
 #include <cuda_runtime.h>
 #include <cuda_runtime_api.h>
 
+// #define DEBUG 1
+
 #include "../../include/experiment_utils.h"
 #include "../../include/debug_utils.h"
 #include "../../include/helper_cuda.h"
@@ -141,6 +143,12 @@ int main(int argc, char* argv[]) {
 
   MPI_Comm_rank(MPI_COMM_WORLD, &me);
   MPI_Comm_size(MPI_COMM_WORLD, &world);
+
+  // ------------------------------------------ DBG print ------------------------------------------
+
+  DBG_PRINT(1, MPI_PROCESS_PRINT(MPI_COMM_WORLD, 0, printf("%s\n", COLOUR(AC_RED, CHECKPOINTS)); ) )
+
+  // -----------------------------------------------------------------------------------------------
 
   int pex = -1;
   int pey = -1;
@@ -464,7 +472,7 @@ int main(int argc, char* argv[]) {
   // data domain and we sweep from each of them, processing the top four first
   // and then the bottom four vertices next.
   for (int i = 0; i < (repeats * 2); i++) {
-
+    DBG_CHECK(1)
     // =================================================================================================================
     // Recreate communication pattern of sweep from (0,0) towards (Px,Py)
     for (int k = 0; k < nz; k += kba) {
@@ -515,16 +523,16 @@ int main(int argc, char* argv[]) {
         checkCudaErrors( cudaEventCreate(&xSendEvent, cudaEventDisableTiming | cudaEventInterprocess) );
         checkCudaErrors( cudaIpcGetEventHandle((cudaIpcEventHandle_t*)&xSendEventHandle, xSendEvent) );
       }
-      MPI_Barrier(MPI_COMM_WORLD);
       if (yUp > -1) {
         checkCudaErrors( cudaIpcGetMemHandle((cudaIpcMemHandle_t*)&ySendHandle, dev_ySendBuffer) );
         checkCudaErrors( cudaEventCreate(&ySendEvent, cudaEventDisableTiming | cudaEventInterprocess) );
         checkCudaErrors( cudaIpcGetEventHandle((cudaIpcEventHandle_t*)&ySendEventHandle, ySendEvent) );
       }
-      MPI_Barrier(MPI_COMM_WORLD);
+      checkCudaErrors( cudaDeviceSynchronize() );
       TIMER_STOP(0);
       timeTakenCUDAIPC += TIMER_ELAPSED(0);
       // ---------------------------------------
+
 
       TIMER_START(0);
       if (xUp > -1) {
@@ -538,10 +546,11 @@ int main(int argc, char* argv[]) {
       }
       TIMER_STOP(0);
       timeTakenMPI += TIMER_ELAPSED(0);
+      DBG_CHECK(1)
     }
     // =================================================================================================================
 
-
+    DBG_CHECK(1)
     // =================================================================================================================
     // Recreate communication pattern of sweep from (Px,0) towards (0,Py)
     for (int k = 0; k < nz; k += kba) {
@@ -592,13 +601,12 @@ int main(int argc, char* argv[]) {
         checkCudaErrors( cudaEventCreate(&xSendEvent, cudaEventDisableTiming | cudaEventInterprocess) );
         checkCudaErrors( cudaIpcGetEventHandle((cudaIpcEventHandle_t*)&xSendEventHandle, xSendEvent) );
       }
-      MPI_Barrier(MPI_COMM_WORLD);
       if (yUp > -1) {
         checkCudaErrors( cudaIpcGetMemHandle((cudaIpcMemHandle_t*)&ySendHandle, dev_ySendBuffer) );
         checkCudaErrors( cudaEventCreate(&ySendEvent, cudaEventDisableTiming | cudaEventInterprocess) );
         checkCudaErrors( cudaIpcGetEventHandle((cudaIpcEventHandle_t*)&ySendEventHandle, ySendEvent) );
       }
-      MPI_Barrier(MPI_COMM_WORLD);
+      checkCudaErrors( cudaDeviceSynchronize() );
       TIMER_STOP(0);
       timeTakenCUDAIPC += TIMER_ELAPSED(0);
       // ---------------------------------------
@@ -618,7 +626,7 @@ int main(int argc, char* argv[]) {
     }
     // =================================================================================================================
 
-
+    DBG_CHECK(1)
     // =================================================================================================================
     // Recreate communication pattern of sweep from (Px,Py) towards (0,0)
     for (int k = 0; k < nz; k += kba) {
@@ -669,13 +677,12 @@ int main(int argc, char* argv[]) {
         checkCudaErrors( cudaEventCreate(&xSendEvent, cudaEventDisableTiming | cudaEventInterprocess) );
         checkCudaErrors( cudaIpcGetEventHandle((cudaIpcEventHandle_t*)&xSendEventHandle, xSendEvent) );
       }
-      MPI_Barrier(MPI_COMM_WORLD);
       if (yDown > -1) {
         checkCudaErrors( cudaIpcGetMemHandle((cudaIpcMemHandle_t*)&ySendHandle, dev_ySendBuffer) );
         checkCudaErrors( cudaEventCreate(&ySendEvent, cudaEventDisableTiming | cudaEventInterprocess) );
         checkCudaErrors( cudaIpcGetEventHandle((cudaIpcEventHandle_t*)&ySendEventHandle, ySendEvent) );
       }
-      MPI_Barrier(MPI_COMM_WORLD);
+      checkCudaErrors( cudaDeviceSynchronize() );
       TIMER_STOP(0);
       timeTakenCUDAIPC += TIMER_ELAPSED(0);
       // ---------------------------------------
@@ -695,7 +702,7 @@ int main(int argc, char* argv[]) {
     }
     // =================================================================================================================
 
-
+    DBG_CHECK(1)
     // =================================================================================================================
     // Recreate communication pattern of sweep from (0,Py) towards (Px,0)
     for (int k = 0; k < nz; k += kba) {
@@ -746,13 +753,12 @@ int main(int argc, char* argv[]) {
         checkCudaErrors( cudaEventCreate(&xSendEvent, cudaEventDisableTiming | cudaEventInterprocess) );
         checkCudaErrors( cudaIpcGetEventHandle((cudaIpcEventHandle_t*)&xSendEventHandle, xSendEvent) );
       }
-      MPI_Barrier(MPI_COMM_WORLD);
       if (yDown > -1) {
         checkCudaErrors( cudaIpcGetMemHandle((cudaIpcMemHandle_t*)&ySendHandle, dev_ySendBuffer) );
         checkCudaErrors( cudaEventCreate(&ySendEvent, cudaEventDisableTiming | cudaEventInterprocess) );
         checkCudaErrors( cudaIpcGetEventHandle((cudaIpcEventHandle_t*)&ySendEventHandle, ySendEvent) );
       }
-      MPI_Barrier(MPI_COMM_WORLD);
+      checkCudaErrors( cudaDeviceSynchronize() );
       TIMER_STOP(0);
       timeTakenCUDAIPC += TIMER_ELAPSED(0);
       // ---------------------------------------

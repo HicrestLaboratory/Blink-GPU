@@ -19,20 +19,19 @@
 6. **Tested**: the experiment was tested on each considered architecture.
 
 ## Status of development
-**Last update**: 3/1/2024 19:30
+**Last update**: 4/1/2024 10:15
 
 | Benchmark   | Layout              | MPI + CudaMemcpy | NCCL            | GPUDirect       | Low-level NV-link |
 |-------------|---------------------|------------------|-----------------|-----------------|-------------------|
 | Ping-pong   | IntraNode           | 🟢               | 🟢               | ❌              | 🟢                |
-|             | InterNodes          | 🟢               | 🟢               | ❌              | □                 |
+|             | InterNodes          | 🟢               | 🟢               | ❌              | ❌                |
 | Halo3d      | IntraNode  (2x2x1)  | 🟢               | 🟢               | ❌              | 🟢                |
-|             | InterNodes (2x2x2)  | 🟢               | 🟢               | ❌              | □                 |
+|             | InterNodes (2x2x2)  | 🟢               | 🟢               | ❌              | ❌                |
 | Incast      | IntraNode           | 🟢               | 🟢               | ❌              | 🟢                |
-|             | InterNodes          | 🟢               | 🟢               | ❌              | □                 |
-| Sweep3d     | IntraNode           | 🔵               | 🔵               | ❌              | ▶                 |
-|             | InterNodes          | 🔵               | 🔵               | ❌              | □                 |
-| Others (?)  | ??                  | ❌               | ❌               | ❌              | ❌                |
-|             | ??                  | ❌               | ❌               | ❌              | ❌                |
+|             | InterNodes          | 🟢               | 🟢               | ❌              | ❌                |
+| Sweep3d     | IntraNode           | 🔵               | 🔵               | ❌              | 🔵                |
+|             | InterNodes          | 🔵               | 🔵               | ❌              | ❌                |
+
 
 ### Testing status
 
