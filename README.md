@@ -21,8 +21,8 @@
 ## Status of development
 **Last update**: 4/1/2024 12:30
 
-| Benchmark   | Layout              | MPI + CudaMemcpy | NCCL            | GPUDirect       | Low-level NV-link |
-|-------------|---------------------|------------------|-----------------|-----------------|-------------------|
+| Benchmark   | Layout              | MPI              | NCCL              | GPUDirect       | Low-level NV-link  |
+|-------------|---------------------|------------------|-------------------|-----------------|--------------------|
 | Ping-pong   | IntraNode           | 🟢               | 🟢               | ❌              | 🟢                |
 |             | InterNodes          | 🟢               | 🟢               | ❌              | ❌                |
 | Halo3d      | IntraNode  (2x2x1)  | 🟢               | 🟢               | ❌              | 🟢                |
@@ -31,6 +31,14 @@
 |             | InterNodes          | 🟢               | 🟢               | ❌              | ❌                |
 | Sweep3d     | IntraNode           | 🟢               | 🟢               | ❌              | 🟢                |
 |             | InterNodes          | 🟢               | 🟢               | ❌              | ❌                |
+
+### Short description
+
+Short description regarding the different implementations:
+1. **MPI**: this is the base implementation. The send buffer is first copied from the GPU to the CPU with 'cudaMemcpy', then the CPU send buffer is shared with the other processes with the MPI primitives and at the end, the receive buffer is copied from the CPU to the target GPU.
+2. **NCCL**: this implementation uses the NVIDIA Collective Communications Library. The NCCL primitives can share data between GPUs without using any explicit CPU buffer. It works both for GPUs on the same node and GPUs on different nodes (with different performances).
+3. **GPUDirect**: ...
+4. Low-level **NV-link**: this implementation first uses the NVIDIA InterProcess Communication primitives (IPC) to enable peer access to other GPUs associated with other MPI tasks, then share the IPC pointers with the standard MPI collectives and, in the end, copy the data from the sender to the receiver GPU with a direct cudaMemcpy device to device. 
 
 
 ### Testing status
