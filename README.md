@@ -19,7 +19,7 @@
 6. **Tested**: the experiment was tested on each considered architecture.
 
 ## Status of development
-**Last update**: 4/1/2024 12:30
+**Last update**: 5/1/2024 14:00
 
 | Benchmark   | Layout              | MPI              | NCCL              | GPUDirect       | Low-level NV-link  |
 |-------------|---------------------|------------------|-------------------|-----------------|--------------------|

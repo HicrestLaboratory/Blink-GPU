@@ -417,28 +417,33 @@ int main(int argc, char* argv[]) {
   }
   // ---------------------------------------
 
-  // ---------------------------------------
+  // --------------------- Check Input Init ---------------------
   {
-    float tmp[2][1], *tmp0;
+    DEF_DVC
+    INIT_DVC
+
     srand((unsigned int)time(NULL));
     int x = rand() % (GRD_SIZE*BLK_SIZE);
-    int size = (xSize > ySize) ? xSize : ySize;
-    tmp0 = (dtype*)malloc(sizeof(dtype)*(size));
-    for (int i=0; i<2; i++) tmp[i][0] = 0.0;
-    checkCudaErrors( cudaMemcpy(tmp0, dev_xSendBuffer,   xSize*sizeof(float), cudaMemcpyDeviceToHost) );
-    tmp[0][0] = tmp0[x];
-    checkCudaErrors( cudaMemcpy(tmp0, dev_ySendBuffer,   ySize*sizeof(float), cudaMemcpyDeviceToHost) );
-    tmp[1][0] = tmp0[x];
-    checkCudaErrors( cudaDeviceSynchronize() );
 
-    MPI_ALL_PRINT(
-      fprintf(fp, "extracted tid = %d\n", x);
-      fprintf(fp, "xSendBuffer = %6.4f, ySendBuffer = %6.4f\n", tmp[0][0], tmp[1][0]);
-    )
-    free(tmp0);
+    APPEND_DVC(dev_xSendBuffer, xSize, "dev_xSendBuffer")
+    APPEND_DVC(dev_ySendBuffer, ySize, "dev_ySendBuffer")
+
+    STR_COLL_DEF
+    STR_COLL_INIT
+    STR_COLL_APPEND( sprintf(STR_COLL_BUFF, "extracted tid = %d\n", x); )
+    for (int i=0; i<DVC_LEN; i+=2) {
+      DVC_TOCPU(i)
+      STR_COLL_APPEND( sprintf(STR_COLL_BUFF, "%s = %6.4f, ", DVC_CPUBUFFNAM, DVC_CPUBUFF[x]); )
+      DVC_TOCPU(i+1)
+      STR_COLL_APPEND( sprintf(STR_COLL_BUFF, "%s = %6.4f\n", DVC_CPUBUFFNAM, DVC_CPUBUFF[x]); )
+
+    }
+    MPI_ALL_PRINT( fprintf(fp, "%s\n", STR_COLL_GIVE); )
+    STR_COLL_FREE
+    FREE_DVC
   }
   MPI_Barrier(MPI_COMM_WORLD);
-  // ---------------------------------------
+  // ------------------------------------------------------------
 
   struct timeval start;
   struct timeval end;
@@ -880,83 +885,43 @@ int main(int argc, char* argv[]) {
 
   MPI_Barrier(MPI_COMM_WORLD);
 
-  // ---------------------------------------
+  // ----------------------- Check Output -----------------------
   {
-    size_t test_sizes[8], *dev_test_sizes;
-    dtype *test_vector[8], **dev_test_vector;
+    DEF_DVC
+    INIT_DVC
+
     srand((unsigned int)time(NULL));
     int x = rand() % (GRD_SIZE*BLK_SIZE);
-    int maxSize = (xSize > ySize) ? xSize : ySize;
 
-    dtype *dev_checkVector, *checkVector;
-    checkVector = (dtype*) malloc(sizeof(dtype)*maxSize);
-    checkCudaErrors( cudaMalloc(&dev_checkVector,   sizeof(dtype) * maxSize) );
-    checkCudaErrors( cudaMemset(dev_checkVector, 0, sizeof(dtype) * maxSize) );
-
-    test_sizes[0] = xSize;
-    test_sizes[1] = ySize;
-    test_sizes[2] = xSize;
-    test_sizes[3] = ySize;
-    test_sizes[4] = xSize;
-    test_sizes[5] = ySize;
-    test_sizes[6] = xSize;
-    test_sizes[7] = ySize;
-    test_vector[0] = dev_xResultBuffer[0];
-    test_vector[1] = dev_yResultBuffer[0];
-    test_vector[2] = dev_xResultBuffer[1];
-    test_vector[3] = dev_yResultBuffer[1];
-    test_vector[4] = dev_xResultBuffer[2];
-    test_vector[5] = dev_yResultBuffer[2];
-    test_vector[6] = dev_xResultBuffer[3];
-    test_vector[7] = dev_yResultBuffer[3];
+    APPEND_DVC(dev_xResultBuffer[0], xSize, "dev_xResultBuffer[0]")
+    APPEND_DVC(dev_yResultBuffer[0], ySize, "dev_yResultBuffer[0]")
+    APPEND_DVC(dev_xResultBuffer[1], xSize, "dev_xResultBuffer[1]")
+    APPEND_DVC(dev_yResultBuffer[1], ySize, "dev_yResultBuffer[1]")
+    APPEND_DVC(dev_xResultBuffer[2], xSize, "dev_xResultBuffer[2]")
+    APPEND_DVC(dev_yResultBuffer[2], ySize, "dev_yResultBuffer[2]")
+    APPEND_DVC(dev_xResultBuffer[3], xSize, "dev_xResultBuffer[3]")
+    APPEND_DVC(dev_yResultBuffer[3], ySize, "dev_yResultBuffer[3]")
 
     STR_COLL_DEF
     STR_COLL_INIT
+    STR_COLL_APPEND( sprintf(STR_COLL_BUFF, "extracted tid = %d\n", x); )
+    STR_COLL_APPEND( sprintf(STR_COLL_BUFF, "xUp = %d, xDown = %d, yUp = %d, yDown = %d\n", xUp, xDown, yUp, yDown); )
 
-#if DEBUG == 2
-    for (int i=0; i<4; i++) {
-      dtype tmpX, tmpY;
-      checkCudaErrors( cudaMemcpy(checkVector, dev_xResultBuffer[i], xSize*sizeof(dtype), cudaMemcpyDeviceToHost) );
-      checkCudaErrors( cudaDeviceSynchronize() );
-      tmpX = checkVector[1];
-      checkCudaErrors( cudaMemcpy(checkVector, dev_yResultBuffer[i], ySize*sizeof(dtype), cudaMemcpyDeviceToHost) );
-      checkCudaErrors( cudaDeviceSynchronize() );
-      tmpY = checkVector[1];
-      STR_COLL_APPEND(sprintf(str_coll.buff, "dev_xResultBuffer[%d][1] = %lf, dev_yResultBuffer[%d][1] = %lf\n",i,tmpX,i,tmpY);)
+    for (int i=0; i<DVC_LEN; i+=2) {
+      DVC_TOCPU(i)
+      STR_COLL_APPEND( sprintf(STR_COLL_BUFF, "%s = %6.4f, ", DVC_CPUBUFFNAM, DVC_CPUBUFF[x]); )
+      DVC_TOCPU(i+1)
+      STR_COLL_APPEND( sprintf(STR_COLL_BUFF, "%s = %6.4f\n", DVC_CPUBUFFNAM, DVC_CPUBUFF[x]); )
     }
-#else
-    STR_COLL_APPEND(sprintf(str_coll.buff, "Without DEBUG==2 the result vectors are not printed\n");)
-#endif
 
-    checkCudaErrors( cudaMalloc(&dev_test_sizes,  sizeof(size_t) * 8) );
-    checkCudaErrors( cudaMalloc(&dev_test_vector, sizeof(dtype*) * 8) );
-    checkCudaErrors( cudaMemcpy(dev_test_sizes,  test_sizes,  sizeof(size_t) * 8, cudaMemcpyHostToDevice) );
-    checkCudaErrors( cudaMemcpy(dev_test_vector, test_vector, sizeof(dtype*) * 8, cudaMemcpyHostToDevice) );
+    MPI_ALL_PRINT( fprintf(fp, "%s\n", STR_COLL_GIVE); )
 
-    {
-      dim3 block_size(BLK_SIZE, 1, 1);
-      dim3 grid_size(GRD_SIZE, 1, 1);
-      test_kernel<<<grid_size, block_size>>>(maxSize, 8, dev_test_sizes, dev_test_vector, dev_checkVector);
-      checkCudaErrors( cudaDeviceSynchronize() );
-    }
-    checkCudaErrors( cudaMemcpy(checkVector, dev_checkVector, maxSize*sizeof(dtype), cudaMemcpyDeviceToHost) );
-    checkCudaErrors( cudaDeviceSynchronize() );
-
-    MPI_ALL_PRINT(
-      fprintf(fp, "%s\n", STR_COLL_GIVE);
-      fprintf(fp, "xUp = %d, xDown = %d, yUp = %d, yDown = %d\n", xUp, xDown, yUp, yDown);
-      fprintf(fp, "extracted tid = %d\n", x);
-      fprintf(fp, "checkVector = %6.4f\n", checkVector[x]);
-    )
-
-    checkCudaErrors( cudaFree(dev_test_vector) );
-    checkCudaErrors( cudaFree(dev_checkVector) );
-    checkCudaErrors( cudaFree(dev_test_sizes) );
-    free(checkVector);
     STR_COLL_FREE
+    FREE_DVC
   }
   MPI_Barrier(MPI_COMM_WORLD);
-  // ---------------------------------------
+  MPI_DBG_CHECK(MPI_COMM_WORLD, 1)
+  // ------------------------------------------------------------
 
   const double timeTaken =
       (((double)end.tv_sec) + ((double)end.tv_usec) * 1.0e-6) -

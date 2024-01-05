@@ -1,5 +1,7 @@
 #pragma once
 
+// ========================================== DBG UTILS ===========================================
+
 #define XSTR(S) #S
 #define STR_CONCAT(S1, S2, S3) XSTR(S1) XSTR(S2) XSTR(S3)
 
@@ -22,11 +24,13 @@
       fflush(stdout); \
     }  \
   }
-#define MPI_DBG_CHECK(X) { \
-    if( X == DEBUG ) {  \
-      fprintf(stdout, "%s[%d]: file %s at line %d\n", COLOUR(AC_CYAN, DEBUG_CHECK), gmyid, __FILE__, __LINE__ ); \
-      fflush(stdout); \
-    }  \
+#define MPI_DBG_CHECK(CM, X) {                                                                                          \
+    int inmacro_myid;                                                                                                   \
+    MPI_Comm_rank(CM, &inmacro_myid);                                                                                   \
+    if( X == DEBUG ) {                                                                                                  \
+      fprintf(stdout, "%s[%d]: file %s at line %d\n", COLOUR(AC_CYAN, DEBUG_CHECK), inmacro_myid, __FILE__, __LINE__ ); \
+      fflush(stdout);                                                                                                   \
+    }                                                                                                                   \
   }
 #define DBG_PRINT(X, Y) { \
     if ( X == DEBUG ) {  \
@@ -43,40 +47,42 @@
   }
 #else
 #define DBG_CHECK(X) {  }
-#define MPI_DBG_CHECK(X) {  }
+#define MPI_DBG_CHECK(CM, X) {  }
 #define DBG_PRINT(X, Y) { }
 #define DBG_STOP(X) { }
 #endif
 
-#define MPI_ALL_PRINT(X) \
-  {\
-    int inmacro_myid, inmacro_ntask;  \
-    MPI_Comm_rank(MPI_COMM_WORLD, &inmacro_myid);  \
-	MPI_Comm_size(MPI_COMM_WORLD, &inmacro_ntask);  \
+// ========================================== MPI PRINTS ==========================================
+
+#define MPI_ALL_PRINT(X) {                                                                                                              \
+    int inmacro_myid, inmacro_ntask;                                                                                                    \
+    MPI_Comm_rank(MPI_COMM_WORLD, &inmacro_myid);                                                                                       \
+	MPI_Comm_size(MPI_COMM_WORLD, &inmacro_ntask);                                                                                      \
 	\
-    FILE *fp;\
-    char s[50], s1[50];\
-    sprintf(s, "temp_%d.txt", inmacro_myid);\
-    fp = fopen ( s, "w" );\
-    fclose(fp);\
-    fp = fopen ( s, "a+" );\
-    fprintf(fp, "\t------------------------- Proc %d File %s Line %d -------------------------\n\n", inmacro_myid, __FILE__, __LINE__);\
-    X;\
-    if (inmacro_myid==inmacro_ntask-1) \
-        fprintf(fp, "\t--------------------------------------------------------------------------\n\n");\
-    fclose(fp);\
-    for (int i=0; i<inmacro_ntask; i++) {\
-        if (inmacro_myid == i) {\
-            int error; \
-            sprintf(s1, "cat temp_%d.txt", inmacro_myid);\
-            error = system(s1);\
-            if (error == -1) fprintf(stderr, "Error at line %d of file %s", __LINE__, __FILE__); \
-            sprintf(s1, "rm temp_%d.txt", inmacro_myid);\
-            error = system(s1);\
-            if (error == -1) fprintf(stderr, "Error at line %d of file %s", __LINE__, __FILE__); \
-        }\
-        MPI_Barrier(MPI_COMM_WORLD);\
-    }\
+    FILE *fp;                                                                                                                           \
+    char s[50], s1[50];                                                                                                                 \
+    sprintf(s, "temp_%d.txt", inmacro_myid);                                                                                            \
+    fp = fopen ( s, "w" );                                                                                                              \
+    fclose(fp);                                                                                                                         \
+    fp = fopen ( s, "a+" );                                                                                                             \
+    fprintf(fp, "\t------------------------- Proc %d File %s Line %d -------------------------\n\n", inmacro_myid, __FILE__, __LINE__); \
+    X;                                                                                                                                  \
+    if (inmacro_myid==inmacro_ntask-1)                                                                                                  \
+        fprintf(fp, "\t--------------------------------------------------------------------------\n\n");                                \
+    fclose(fp);                                                                                                                         \
+    \
+    for (int i=0; i<inmacro_ntask; i++) {                                                                                               \
+        if (inmacro_myid == i) {                                                                                                        \
+            int error;                                                                                                                  \
+            sprintf(s1, "cat temp_%d.txt", inmacro_myid);                                                                               \
+            error = system(s1);                                                                                                         \
+            if (error == -1) fprintf(stderr, "Error at line %d of file %s\n", __LINE__, __FILE__);                                      \
+            sprintf(s1, "rm temp_%d.txt", inmacro_myid);                                                                                \
+            error = system(s1);                                                                                                         \
+            if (error == -1) fprintf(stderr, "Error at line %d of file %s\n", __LINE__, __FILE__);                                      \
+        }                                                                                                                               \
+        MPI_Barrier(MPI_COMM_WORLD);                                                                                                    \
+    }                                                                                                                                   \
   }
 
 #define MPI_COMMUNICATOR_PRINT(CM, X)  \
@@ -121,6 +127,8 @@
     }  \
   }
 
+// ======================================= STRING COLLECTOR =======================================
+
 #define STR_COLL_BLK 1024
 
 struct string_collector {
@@ -153,6 +161,7 @@ struct string_collector {
   memset(str_coll.buff, 0, sizeof(char) * STR_COLL_BLK);                                  \
 }
 
+#define STR_COLL_BUFF str_coll.buff
 #define STR_COLL_GIVE str_coll.collector
 
 #define STR_COLL_FREE {       \
@@ -161,6 +170,27 @@ struct string_collector {
     str_coll.size = 0;        \
     str_coll.len = 0;         \
 }
+
+#define MPI_ALL_PRINT2(X) {                                                                                                             \
+    fflush(stdout);                                                                                                                     \
+    MPI_Barrier(MPI_COMM_WORLD);                                                                                                        \
+    int inmacro_myid, inmacro_ntask;                                                                                                    \
+    MPI_Comm_rank(MPI_COMM_WORLD, &inmacro_myid);                                                                                       \
+	MPI_Comm_size(MPI_COMM_WORLD, &inmacro_ntask);                                                                                      \
+                                                                                                                                        \
+    for (int i=0; i<inmacro_ntask; i++) {                                                                                               \
+        if (inmacro_myid == i) {                                                                                                        \
+          printf("\t------------------------- Proc %d File %s Line %d -------------------------\n\n", inmacro_myid, __FILE__, __LINE__);\
+          X                                                                                                                             \
+          if (inmacro_myid==inmacro_ntask-1)                                                                                            \
+            printf("\t--------------------------------------------------------------------------\n\n");                                 \
+          fflush(stdout);                                                                                                               \
+        }                                                                                                                               \
+        MPI_Barrier(MPI_COMM_WORLD);                                                                                                    \
+    }                                                                                                                                   \
+  }
+
+// ================================================================================================
 
 #define OUTOFBOUNDS_NUMBER(FP, P) {                         \
     unsigned long long int i = 0;                           \
@@ -173,6 +203,8 @@ struct string_collector {
     }                                                       \
     fprintf(FP, "The array lenght of %s is %llu\n", #P, i); \
   }
+
+// ==================================== VECTOR & MATRIX PRINT =====================================
 
 #define PRINT_VECTOR( V, LN, NM, FP ) {     \
     fprintf(FP, "%2s: ", NM);               \
@@ -259,6 +291,10 @@ struct string_collector {
     fprintf((FP), "\n\n");                            \
 }
 
+// ================================================================================================
+
+#define CUDA // tmp BUG
+
 #ifdef CUDA
 // This will output the proper CUDA error strings
 // in the event that a CUDA host call returns an error
@@ -273,6 +309,155 @@ inline void __checkCudaResult( CUresult err, const char *file, const int line )
         exit(-1);
     }
 }
+
+#include "helper_cuda.h"
+
+struct dev_vec_collector {
+  size_t len;
+  size_t size;
+
+  size_t max_size;
+  size_t *vec_sizes;
+  float  **vec_ptrs;
+  char   **vec_names;
+
+  float  *cpu_buff;
+  size_t cpu_buff_len;
+  size_t cpu_buff_size;
+  char   *cpu_buff_name;
+
+//   size_t dev_coll_len;
+//   size_t *dev_vec_sizes;
+//   float  **dev_vec_ptrs;
+};
+
+// BUG BUG BUG with realloc
+#define DVC_BLK 10
+
+#define DEF_DVC struct dev_vec_collector dev_vec_coll;
+
+#define INIT_DVC {                                                    \
+  dev_vec_coll.len  = 0;                                              \
+  dev_vec_coll.size = DVC_BLK;                                        \
+                                                                      \
+  dev_vec_coll.max_size  = 0;                                         \
+  dev_vec_coll.vec_sizes = (size_t*) malloc(sizeof(size_t)*DVC_BLK);  \
+  dev_vec_coll.vec_ptrs  = (float**) malloc(sizeof(float*)*DVC_BLK);  \
+  dev_vec_coll.vec_names = (char**)  malloc(sizeof(char*)*DVC_BLK);   \
+                                                                      \
+  dev_vec_coll.cpu_buff      = NULL;                                  \
+  dev_vec_coll.cpu_buff_len  = 0;                                     \
+  dev_vec_coll.cpu_buff_size = 0;                                     \
+  dev_vec_coll.cpu_buff_name = NULL;                                  \
+}
+
+//                                                                       \
+//   dev_vec_coll.dev_coll_len  = 0;                                     \
+//   dev_vec_coll.dev_vec_sizes = NULL;                                  \
+//   dev_vec_coll.dev_vec_ptrs  = NULL;                                  \
+
+#define APPEND_DVC(V, S, N) {                                                                         \
+  if (dev_vec_coll.len == dev_vec_coll.size-1) {                                                      \
+    dev_vec_coll.vec_sizes = (size_t*) realloc(dev_vec_coll.vec_sizes, dev_vec_coll.size + DVC_BLK);  \
+    dev_vec_coll.vec_ptrs  = (float**) realloc(dev_vec_coll.vec_ptrs,  dev_vec_coll.size + DVC_BLK);  \
+    dev_vec_coll.vec_names = (char**)  realloc(dev_vec_coll.vec_names,  dev_vec_coll.size + DVC_BLK); \
+    dev_vec_coll.size += DVC_BLK;                                                                     \
+  }                                                                                                   \
+  dev_vec_coll.vec_ptrs[dev_vec_coll.len]  = V;                                                       \
+  dev_vec_coll.vec_sizes[dev_vec_coll.len] = S;                                                       \
+  dev_vec_coll.vec_names[dev_vec_coll.len] = (char*)N;                                                \
+  if (S > dev_vec_coll.max_size)                                                                      \
+    dev_vec_coll.max_size = S;                                                                        \
+  dev_vec_coll.len++;                                                                                 \
+}
+
+#define DVC_LEN dev_vec_coll.len
+#define DVC_MAXSIZE dev_vec_coll.max_size
+
+#define DVC_TOCPU(I) {                                                                                \
+  if (dev_vec_coll.len > 0 && I < dev_vec_coll.len) {                                                 \
+    if (dev_vec_coll.cpu_buff_size == 0) {                                                            \
+      dev_vec_coll.cpu_buff  = (float*) malloc(sizeof(float)*dev_vec_coll.max_size);                  \
+      dev_vec_coll.cpu_buff_size = dev_vec_coll.max_size;                                             \
+    } else if (dev_vec_coll.cpu_buff_size < dev_vec_coll.max_size) {                                  \
+      dev_vec_coll.cpu_buff  = (float*) realloc(dev_vec_coll.cpu_buff, dev_vec_coll.max_size);        \
+      dev_vec_coll.cpu_buff_size = dev_vec_coll.max_size;                                             \
+    }                                                                                                 \
+                                                                                                      \
+    checkCudaErrors( cudaMemcpy(dev_vec_coll.cpu_buff, dev_vec_coll.vec_ptrs[I], dev_vec_coll.vec_sizes[I]*sizeof(float), cudaMemcpyDeviceToHost) );                                                                        \
+    dev_vec_coll.cpu_buff_len = dev_vec_coll.vec_sizes[I];                                            \
+    dev_vec_coll.cpu_buff_name = dev_vec_coll.vec_names[I];                                           \
+    checkCudaErrors( cudaDeviceSynchronize() );                                                       \
+  } else {                                                                                            \
+    fprintf(stderr, "Error at line %d of file %s invoked by MACRO ...\n", __LINE__, __FILE__);        \
+  }                                                                                                   \
+}
+
+#define DVC_CPUBUFF dev_vec_coll.cpu_buff
+#define DVC_CPUBUFFLEN dev_vec_coll.cpu_buff_len
+#define DVC_CPUBUFFNAM dev_vec_coll.cpu_buff_name
+
+// #define DVC_TOGPU { \
+//   if (dev_vec_coll.dev_coll_len == 0) {\
+//     checkCudaErrors( cudaMalloc(&dev_vec_coll.dev_vec_sizes,  sizeof(size_t) * dev_vec_coll.len) );\
+//     checkCudaErrors( cudaMalloc(&dev_vec_coll.dev_vec_ptrs,   sizeof(float*) * dev_vec_coll.len) );\
+//     dev_vec_coll.dev_coll_len = dev_vec_coll.len;\
+//   } else if (dev_vec_coll.dev_coll_len < dev_vec_coll.len) {\
+//     checkCudaErrors( cudaFree(dev_vec_coll.dev_vec_sizes) );  \
+//     checkCudaErrors( cudaFree(dev_vec_coll.dev_vec_ptrs) );   \
+//     checkCudaErrors( cudaMalloc(&dev_vec_coll.dev_vec_sizes,  sizeof(size_t) * dev_vec_coll.len) );\
+//     checkCudaErrors( cudaMalloc(&dev_vec_coll.dev_vec_ptrs,   sizeof(float*) * dev_vec_coll.len) );\
+//     dev_vec_coll.dev_coll_len = dev_vec_coll.len;\
+//   }\
+// \
+//   checkCudaErrors( cudaMemcpy(dev_vec_coll.dev_vec_sizes,  dev_vec_coll.vec_sizes,  sizeof(size_t) * dev_vec_coll.len, cudaMemcpyHostToDevice) );\
+//   checkCudaErrors( cudaMemcpy(dev_vec_coll.dev_vec_ptrs, dev_vec_coll.vec_ptrs,   sizeof(float*) * dev_vec_coll.len, cudaMemcpyHostToDevice) );\
+// }
+
+// #define DVC_GPUCOLL dev_vec_coll.dev_vec_ptrs
+// #define DVC_GPUSIZES dev_vec_coll.dev_vec_sizes
+
+#define FREE_DVC {                    \
+  free(dev_vec_coll.vec_sizes);       \
+  free(dev_vec_coll.vec_names);       \
+  free(dev_vec_coll.vec_ptrs);        \
+  if (dev_vec_coll.cpu_buff_len != 0) \
+    free(dev_vec_coll.cpu_buff);      \
+                                      \
+  dev_vec_coll.len = 0;               \
+  dev_vec_coll.size = 0;              \
+  dev_vec_coll.max_size = 0;          \
+  dev_vec_coll.cpu_buff_len = 0;      \
+  dev_vec_coll.cpu_buff_name = NULL;  \
+}
+
+//   if (dev_vec_coll.dev_coll_len != 0) {                       \
+//     checkCudaErrors( cudaFree(dev_vec_coll.dev_vec_sizes) );  \
+//     checkCudaErrors( cudaFree(dev_vec_coll.dev_vec_ptrs) );   \
+//   }                                                           \
+
+
+// #define PRINT_DEV_VEC_ENTRANCE(CM, N) {
+//   DEF_DVC
+//   INIT_DVC
+//
+//   srand((unsigned int)time(NULL));
+//   int x = rand() % (GRD_SIZE*BLK_SIZE);
+//
+//   APPEND_DVC(dev_xSendBuffer, xSize, "dev_xSendBuffer")
+//   APPEND_DVC(dev_ySendBuffer, ySize, "dev_ySendBuffer")
+//
+//   MPI_COMMUNICATOR_PRINT(CM,
+//     fprintf(fp, "extracted tid = %d\n", x);
+//     for (int i=0; i<N; i++) {
+//       DVC_TOCPU(i)
+//       fprintf(fp, "%s = %6.4f\n", DVC_CPUBUFFNAM, DVC_CPUBUFF[x]);
+//     }
+//   )
+//   FREE_DVC
+//   MPI_Barrier(CM);
+// }
+
 #endif
 
 #ifdef NCCL

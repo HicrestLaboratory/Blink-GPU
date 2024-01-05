@@ -252,24 +252,28 @@ int main(int argc, char* argv[]) {
 
   DBG_CHECK(1)
 
-  // ---------------------------------------
+  // --------------------- Check Input Init ---------------------
   {
-    float *tmp0;
+    DEF_DVC
+    INIT_DVC
+
     srand((unsigned int)time(NULL));
     int x = rand() % (GRD_SIZE*BLK_SIZE);
-    tmp0 = (dtype*)malloc(sizeof(dtype)*(msgSize));
-    for (int i=0; i<(GRD_SIZE*BLK_SIZE); i++) tmp0[i] = 0.0;
-    checkCudaErrors( cudaMemcpy(tmp0, dev_sendBuffer, msgSize*sizeof(dtype), cudaMemcpyDeviceToHost) );
-    checkCudaErrors( cudaDeviceSynchronize() );
 
-    MPI_ALL_PRINT(
-      fprintf(fp, "extracted tid = %d\n", x);
-      fprintf(fp, "dev_sendBuffer = %6.4f\n", tmp0[x]);
-    )
-    free(tmp0);
+    APPEND_DVC(dev_sendBuffer, msgSize, "dev_sendBuffer")
+
+    STR_COLL_DEF
+    STR_COLL_INIT
+    STR_COLL_APPEND( sprintf(STR_COLL_BUFF, "extracted tid = %d\n", x); )
+    DVC_TOCPU(0)
+    STR_COLL_APPEND( sprintf(STR_COLL_BUFF, "%s = %6.4f, ", DVC_CPUBUFFNAM, DVC_CPUBUFF[x]); )
+
+    MPI_ALL_PRINT( fprintf(fp, "%s\n", STR_COLL_GIVE); )
+    STR_COLL_FREE
+    FREE_DVC
   }
   MPI_Barrier(MPI_COMM_WORLD);
-  // ---------------------------------------
+  // ------------------------------------------------------------
 
   INIT_EXPS
   TIMER_DEF(0);
@@ -373,47 +377,29 @@ int main(int argc, char* argv[]) {
 #endif
     }
   }
-  // ---------------------------------------
+
+  // ----------------------- Check Output -----------------------
   {
-    size_t test_sizes[1], *dev_test_sizes;
-    dtype *test_vector[1], **dev_test_vector;
+    DEF_DVC
+    INIT_DVC
+
     srand((unsigned int)time(NULL));
     int x = rand() % (GRD_SIZE*BLK_SIZE);
 
-    dtype *dev_checkVector, *checkVector;
-    checkVector = (dtype*) malloc(sizeof(dtype)*msgSize);
-    checkCudaErrors( cudaMalloc(&dev_checkVector,   sizeof(dtype) * msgSize) );
-    checkCudaErrors( cudaMemset(dev_checkVector, 0, sizeof(dtype) * msgSize) );
+    APPEND_DVC(dev_recvBuffer, msgSize, "dev_recvBuffer")
 
-    test_sizes[0] = msgSize;
-    test_vector[0] = dev_recvBuffer;
-
-    checkCudaErrors( cudaMalloc(&dev_test_sizes,  sizeof(size_t)) );
-    checkCudaErrors( cudaMalloc(&dev_test_vector, sizeof(dtype*)) );
-    checkCudaErrors( cudaMemcpy(dev_test_sizes,  test_sizes,  sizeof(size_t), cudaMemcpyHostToDevice) );
-    checkCudaErrors( cudaMemcpy(dev_test_vector, test_vector, sizeof(dtype*), cudaMemcpyHostToDevice) );
-
-    {
-      dim3 block_size(BLK_SIZE, 1, 1);
-      dim3 grid_size(GRD_SIZE, 1, 1);
-      test_kernel<<<grid_size, block_size>>>(msgSize, 1, dev_test_sizes, dev_test_vector, dev_checkVector);
-      checkCudaErrors( cudaDeviceSynchronize() );
-    }
-    checkCudaErrors( cudaMemcpy(checkVector, dev_checkVector, msgSize*sizeof(dtype), cudaMemcpyDeviceToHost) );
-    checkCudaErrors( cudaDeviceSynchronize() );
-
-    MPI_ALL_PRINT(
-      fprintf(fp, "extracted tid = %d\n", x);
-      fprintf(fp, "checkVector = %6.4f\n", checkVector[x]);
-    )
-
-    checkCudaErrors( cudaFree(dev_test_vector) );
-    checkCudaErrors( cudaFree(dev_checkVector) );
-    checkCudaErrors( cudaFree(dev_test_sizes) );
-    free(checkVector);
+    STR_COLL_DEF
+    STR_COLL_INIT
+    DVC_TOCPU(0)
+    STR_COLL_APPEND( sprintf(STR_COLL_BUFF, "extracted tid = %d\n", x); )
+    STR_COLL_APPEND( sprintf(STR_COLL_BUFF, "%s = %6.4f, ", DVC_CPUBUFFNAM, DVC_CPUBUFF[x]); )
+    MPI_ALL_PRINT( fprintf(fp, "%s\n", STR_COLL_GIVE); )
+    STR_COLL_FREE
+    FREE_DVC
   }
   MPI_Barrier(MPI_COMM_WORLD);
-  // ---------------------------------------
+  MPI_DBG_CHECK(MPI_COMM_WORLD, 1)
+  // ------------------------------------------------------------
 
   free(sendBuffer);
   free(recvBuffer);
