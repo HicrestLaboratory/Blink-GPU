@@ -1,0 +1,91 @@
+# ----------------- Path -----------------
+CUDA_HOME=/cm/shared/apps/nvidia/hpc_sdk/Linux_aarch64/23.11/cuda
+MPI_HOME=/cm/shared/apps/nvidia/hpc_sdk/Linux_aarch64/23.11/comm_libs/12.3/hpcx/hpcx-2.16/ompi
+NCCL_HOME=/cm/shared/apps/nvidia/hpc_sdk/Linux_aarch64/23.11/comm_libs/12.3/nccl
+# ---------------- Common ----------------
+CC=nvcc
+CFLAGS=-O3 -std=c++14
+LIBS=
+INCL=-I../include
+LIBFLAGS=
+DBGFLAGS=-g -G
+# ----------- Shared libraries -----------
+MPI=-L$(MPI_HOME)/lib -I$(MPI_HOME)/include -lmpi
+CUDA=-L$(CUDA_HOME)/lib64 -L$(CUDA_HOME)/compact -I$(CUDA_HOME)/include -lcudart -lcuda
+NCCL=-L$(NCCL_HOME)/lib -I$(NCCL_HOME)/include -lnccl
+# ----------------------------------------
+
+
+# =====================================================================================
+
+
+# -------------- Experiment --------------
+NAME=pingpong
+# --------------- Folders ----------------
+BINFOLDER=bin
+OUTFOLDER=out
+SOUTFOLDER=sout
+# ------------ Module loading ------------
+SHELL:=/bin/bash
+NCCL_MODULES=load_nccl_modules.sh
+NVLINK_MODULES=load_nvlink_modules.sh
+BASELINE_MODULES=load_baseline_modules.sh
+# ----------------------------------------
+
+
+# =====================================================================================
+
+
+
+all: $(BINFOLDER)/$(NAME)_baseline $(BINFOLDER)/$(NAME)_nccl $(BINFOLDER)/$(NAME)_nvlink
+
+
+# --------------- Baseline ---------------
+$(BASELINE_MODULES):
+	@echo "module purge" > $@
+	@echo "module unload gcc/13.1.0" > $@
+	@echo "module load gcc/12.3.0" > $@
+	@echo "module load openmpi/4.1.5" > $@
+	@echo "module load nvhpc/23.11" >> $@
+
+$(BINFOLDER)/$(NAME)_baseline: baseline/$(NAME)_baseline.cu $(BASELINE_MODULES)
+	mkdir -p $(BINFOLDER) $(OUTFOLDER) $(SOUTFOLDER)
+	source $(BASELINE_MODULES) ; $(CC) $(CFLAGS) -o $@ $< $(INCL) $(LIBS) $(LIBFLAGS) $(MPI) $(CUDA) -lstdc++ -lm -Wno-deprecated-gpu-targets $(DBGFLAGS)
+	rm $(BASELINE_MODULES)
+# ----------------------------------------
+
+
+# ----------------- Nccl -----------------
+$(NCCL_MODULES):
+	@echo "module purge" > $@
+	@echo "module unload gcc/13.1.0" > $@
+	@echo "module load gcc/12.3.0" > $@
+	@echo "module load openmpi/4.1.5" > $@
+	@echo "module load nvhpc/23.11" >> $@
+
+$(BINFOLDER)/$(NAME)_nccl: nccl/$(NAME)_nccl.cu $(NCCL_MODULES)
+	mkdir -p $(BINFOLDER) $(OUTFOLDER) $(SOUTFOLDER)
+	source $(NCCL_MODULES) ; $(CC) $(CFLAGS) -o $@ $< $(INCL) $(LIBS) $(LIBFLAGS) $(MPI) $(CUDA) $(NCCL) -lstdc++ -lm -Wno-deprecated-gpu-targets $(DBGFLAGS)
+	rm $(NCCL_MODULES)
+# ----------------------------------------
+
+# ---------------- NVLink ----------------
+$(NVLINK_MODULES):
+	@echo "module purge" > $@
+	@echo "module unload gcc/13.1.0" > $@
+	@echo "module load gcc/12.3.0" > $@
+	@echo "module load openmpi/4.1.5" > $@
+	@echo "module load nvhpc/23.11" >> $@
+
+helper_multiprocess.o: ../include/helper_multiprocess.cpp $(NVLINK_MODULES)
+	source $(NVLINK_MODULES) ; $(CC) $(INCL) --threads 0 -o $@ -c $<
+
+$(BINFOLDER)/$(NAME)_nvlink: nvlink/$(NAME)_nvlink.cu $(NVLINK_MODULES) helper_multiprocess.o
+	mkdir -p $(BINFOLDER) $(OUTFOLDER) $(SOUTFOLDER)
+	source $(NVLINK_MODULES) ; $(CC) $(CFLAGS) helper_multiprocess.o -o $@ $< $(INCL) $(LIBS) $(LIBFLAGS) $(MPI) $(CUDA) -lstdc++ -lm -Wno-deprecated-gpu-targets $(DBGFLAGS)
+	rm $(NVLINK_MODULES)
+	rm helper_multiprocess.o
+# ----------------------------------------
+
+clean:
+	rm -r $(BINFOLDER)/*
