@@ -4,9 +4,10 @@
 #SBATCH --output=sout/PingPong_%j.out
 #SBATCH --error=sout/PingPong_%j.err
 
-#SBATCH --nodes=2
-#SBATCH --ntasks-per-node=72
-#SBATCH --partition=cg1-cpu480gb-gpu96gb
+#SBATCH --nodes=1
+#SBATCH --gres=gpu:4
+#SBATCH --ntasks-per-node=288
+#SBATCH --partition=cg4-cpu4x120gb-gpu4x80gb
 #SBATCH --exclusive
 
 # Currently Loaded Modulefiles:
@@ -35,7 +36,7 @@ do
 	binaryFile=$(echo "$binaryPath" | sed 's|.*/||')
 	echo "binaryFile --> $binaryFile"
 	start_time="$(date -u +%s)"
-	exitcode=$(mpirun -np 2 "${binaryPath}" > "${outfolder}/${binaryFile}_cg1_${explayout}.out" 2> "${outfolder}/${binaryFile}_cg1_${explayout}.err")
+	exitcode=$(mpirun -np 4 "${binaryPath}" > "${outfolder}/${binaryFile}_cg1_${explayout}.out" 2> "${outfolder}/${binaryFile}_cg1_${explayout}.err")
 	end_time="$(date -u +%s)"
 
 	echo " exitcode:    $exitcode"

@@ -17,20 +17,26 @@ module load openmpi/4.1.5
 module load nvhpc-hpcx-cuda12/23.11
 
 
-mainfolder=/home/lpichetti/MPI_GPU_banch/pingpong
-binfolder=${mainfolder}/bin
-outfolder=${mainfolder}/out
+mainfolder="/home/lpichetti/MPI_GPU_banch/pingpong"
+binfolder="${mainfolder}/bin"
+outfolder="${mainfolder}/out"
+explayout="intraNode"
+
+mkdir -p "${outfolder}"
+mkdir -p "${mainfolder}/sout"
 
 echo " ------ PingPong ------ "
 echo "     myfolder: $mainfolder"
 echo "     binfolder: $binfolder"
+echo "     outfolder: $outfolder"
+echo "     explayout: $explayout"
 
 for binaryPath in ${binfolder}/*
 do
 	binaryFile=$(echo "$binaryPath" | sed 's|.*/||')
-	echo "binaryFile= --> $binaryFile"
+	echo "binaryFile --> $binaryFile"
 	start_time="$(date -u +%s)"
-	exitcode=$(mpirun -np 2 ${binaryPath} > ${outfolder}/${binaryFile}_c2.out 2> ${outfolder}/${binaryFile}_c2.err)
+	exitcode=$(mpirun -np 2 "${binaryPath}" > "${outfolder}/${binaryFile}_c2_${explayout}.out" 2> "${outfolder}/${binaryFile}_c2_${explayout}.err")
 	end_time="$(date -u +%s)"
 
 	echo " exitcode:    $exitcode"

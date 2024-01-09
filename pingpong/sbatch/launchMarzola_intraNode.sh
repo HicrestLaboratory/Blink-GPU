@@ -1,24 +1,21 @@
 #!/bin/bash
 
-#SBATCH --job-name=PingPongInterNodes
-#SBATCH --output=sout/PingPongInterNodes_%j.out
-#SBATCH --error=sout/PingPongInterNodes_%j.err
+#SBATCH --job-name=PingPongIntraNode
+#SBATCH --output=sout/PingPongIntraNode_%j.out
+#SBATCH --error=sout/PingPongIntraNode_%j.err
 
-#SBATCH --partition=boost_usr_prod
-#SBATCH --account=IscrC_SHARP_0
+#SBATCH --partition=short
 #SBATCH --time=00:05:00
-#SBATCH --qos=boost_qos_dbg
 
-#SBATCH --nodes=2
-#SBATCH --gres=gpu:4
-#SBATCH --ntasks-per-node=4
-#SBATCH --cpus-per-task=8
-#SBATCH --mem=494000MB
+#SBATCH --nodes=1
+#SBATCH --gres=gpu:2
+#SBATCH --ntasks-per-node=2
+#SBATCH --cpus-per-task=1
 
-mainfolder="/leonardo/home/userexternal/lpichett/MPI_GPU_banch/pingpong"
-binfolder=${mainfolder}/bin
-outfolder=${mainfolder}/out
-explayout="interNodes"
+mainfolder="/home/lorenzo.pichetti/MPI_GPU_banch/pingpong"
+binfolder="${mainfolder}/bin"
+outfolder="${mainfolder}/out"
+explayout="intraNode"
 
 echo " ------ PingPong ------ "
 echo "     myfolder: $mainfolder"
