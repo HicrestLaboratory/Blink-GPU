@@ -1,0 +1,100 @@
+# ----------------- Path -----------------
+CUDA_HOME=/usr/local/cuda-12.1
+MPI_HOME=/opt/shares/openmpi-4.1.5
+MPI_CUDA_HOME=/opt/shares/openmpi-4.1.5-cudaaware
+NCCL_HOME=/opt/shares/nvhpc_2023_2311/Linux_x86_64/23.11/comm_libs/nccl
+# ---------------- Common ----------------
+CC=nvcc
+CFLAGS=-O3 -std=c++14
+LIBS=
+INCL=
+LIBFLAGS=
+DBGFLAGS=
+# ----------- Shared libraries -----------
+MPI=-L$(MPI_HOME)/lib -I$(MPI_HOME)/include -lmpi
+MPI_CUDA=-L$(MPI_CUDA_HOME)/lib -I$(MPI_CUDA_HOME)/include -lmpi
+CUDA=-L$(CUDA_HOME)/lib64 -L$(CUDA_HOME)/compact -I$(CUDA_HOME)/include -lcudart -lcuda
+NCCL=-L$(NCCL_HOME)/lib -I$(NCCL_HOME)/include -lnccl
+# ----------------------------------------
+
+
+# =====================================================================================
+
+
+# -------------- Experiment --------------
+NAME=test
+# --------------- Folders ----------------
+BINFOLDER=bin
+OUTFOLDER=out
+SOUTFOLDER=sout
+MODULEFOLDER=moduleload
+# ------------ Module loading ------------
+SHELL:=/bin/bash
+NCCL_MODULES="${MODULEFOLDER}/load_nccl_modules.sh"
+NVLINK_MODULES="${MODULEFOLDER}/load_nvlink_modules.sh"
+BASELINE_MODULES="${MODULEFOLDER}/load_baseline_modules.sh"
+CUDA_AWARE_MODULES="${MODULEFOLDER}/load_cuda_aware_modules.sh"
+# ----------------------------------------
+
+
+# =====================================================================================
+
+
+
+all: $(BINFOLDER)/$(NAME) $(BINFOLDER)/$(NAME)-cuda-aware $(BINFOLDER)/$(NAME)-nccl $(BINFOLDER)/$(NAME)-nvlink
+
+
+# --------------- Baseline ---------------
+$(BASELINE_MODULES):
+	mkdir -p ${MODULEFOLDER}
+	@echo "module purge" > $@
+	@echo "module load cuda/12.1" >> $@
+	@echo "module load openmpi/4.1.5" >> $@
+
+$(BINFOLDER)/$(NAME): src/$(NAME).cu $(BASELINE_MODULES)
+	mkdir -p $(BINFOLDER) $(OUTFOLDER) $(SOUTFOLDER)
+	source $(BASELINE_MODULES) && $(CC) $(CFLAGS) -o $@ $< $(INCL) $(LIBS) $(LIBFLAGS) $(MPI) $(CUDA) -lstdc++ -lm -Wno-deprecated-gpu-targets $(DBGFLAGS)
+# ----------------------------------------
+
+
+# -------------- CUDA aware --------------
+$(CUDA_AWARE_MODULES):
+	mkdir -p ${MODULEFOLDER}
+	@echo "module purge" > $@
+	@echo "module load cuda/12.1" >> $@
+	@echo "module load openmpi/4.1.5-cudaaware" >> $@
+
+$(BINFOLDER)/$(NAME)-cuda-aware: src/$(NAME)-cuda-aware.cu $(CUDA_AWARE_MODULES)
+	mkdir -p $(BINFOLDER) $(OUTFOLDER) $(SOUTFOLDER)
+	source $(CUDA_AWARE_MODULES) && $(CC) $(CFLAGS) -o $@ $< $(INCL) $(LIBS) $(LIBFLAGS) $(MPI_CUDA) $(CUDA) -lstdc++ -lm -Wno-deprecated-gpu-targets $(DBGFLAGS)
+# ----------------------------------------
+
+# ----------------- Nccl -----------------
+$(NCCL_MODULES):
+	@echo "module purge" > $@
+	@echo "module load cuda/12.1" >> $@
+	@echo "module load openmpi/4.1.5-cudaaware" >> $@
+	@echo "module load nvidia-hpc-sdk/" >> $@
+
+$(BINFOLDER)/$(NAME)-nccl: src/$(NAME)-nccl.cu $(NCCL_MODULES)
+	mkdir -p $(BINFOLDER) $(OUTFOLDER) $(SOUTFOLDER)
+	source $(NCCL_MODULES) ; $(CC) $(CFLAGS) -o $@ $< $(INCL) $(LIBS) $(LIBFLAGS) $(MPI) $(CUDA) $(NCCL) -lstdc++ -lm -Wno-deprecated-gpu-targets $(DBGFLAGS)
+# ----------------------------------------
+
+# ---------------- NVLink ----------------
+$(NVLINK_MODULES):
+	@echo "module purge" > $@
+	@echo "module load cuda/12.1" >> $@
+	@echo "module load openmpi/4.1.5-cudaaware" >> $@
+
+helper_multiprocess.o: include/helper_multiprocess.cpp $(NVLINK_MODULES)
+	source $(NVLINK_MODULES) ; $(CC) $(INCL) --threads 0 -o $@ -c $<
+
+$(BINFOLDER)/$(NAME)-nvlink: src/$(NAME)-nvlink.cu $(NVLINK_MODULES) helper_multiprocess.o
+	mkdir -p $(BINFOLDER) $(OUTFOLDER) $(SOUTFOLDER)
+	source $(NVLINK_MODULES) ; $(CC) $(CFLAGS) helper_multiprocess.o -o $@ $< $(INCL) $(LIBS) $(LIBFLAGS) $(MPI) $(CUDA) -lstdc++ -lm -Wno-deprecated-gpu-targets $(DBGFLAGS)
+	rm helper_multiprocess.o
+# ----------------------------------------
+
+clean:
+	rm -r $(BINFOLDER)/* ${MODULEFOLDER}/*
