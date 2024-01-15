@@ -11,8 +11,13 @@
 /* Needed for MPIX_Query_cuda_support(), below */
 #include "mpi-ext.h"
 
-#define dtype double
-#define MPI_dtype MPI_DOUBLE
+#define dtype u_int8_t
+#define MPI_dtype MPI_CHAR
+
+#define BUFF_CYCLE 31
+
+#define cktype int32_t
+#define MPI_cktype MPI_INT
 
 // Macro for checking errors in CUDA API calls
 #define cudaErrorCheck(call)                                                              \
@@ -97,6 +102,43 @@ int  assignDeviceToProcess(MPI_Comm *nodeComm, int *nnodes, int *mynodeid)
       return myrank;
 }
 
+// ---------------------------- For GPU reduction -----------------------------
+#include <thrust/transform_reduce.h>
+#include <thrust/functional.h>
+#include <thrust/execution_policy.h>
+
+struct char2int
+{
+  __host__ __device__ cktype operator()(const dtype &x) const
+  {
+    return static_cast<cktype>(x);
+  }
+};
+
+int gpu_host_reduce(dtype* input_vec, int len, cktype* out_scalar) {
+  int result = thrust::transform_reduce(thrust::host,
+                                        input_vec, input_vec + len,
+                                        char2int(),
+                                        0,
+                                        thrust::plus<cktype>());
+
+  *out_scalar = result;
+
+  return 0;
+}
+
+int gpu_device_reduce(dtype* d_input_vec, int len, cktype* out_scalar) {
+  cktype result = thrust::transform_reduce(thrust::device,
+                                        d_input_vec, d_input_vec + len,
+                                        char2int(),
+                                        0,
+                                        thrust::plus<cktype>());
+
+  *out_scalar = result;
+
+  return 0;
+}
+// ----------------------------------------------------------------------------
 
 int main(int argc, char *argv[])
 {
@@ -163,22 +205,21 @@ int main(int argc, char *argv[])
         Loop from 8 B to 1 GB
     --------------------------------------------------------------------------------------------*/
 
-    dtype cpu_checks[28];
+    cktype cpu_checks[BUFF_CYCLE], gpu_checks[BUFF_CYCLE];
     if (rank == 0 || rank == rank2) {
-        for(int i=0; i<=27; i++){
+        for(int i=0; i<BUFF_CYCLE; i++){
 
             long int N = 1 << i;
 
             // Allocate memory for A on CPU
             dtype *A = (dtype*)malloc(N*sizeof(dtype));
             dtype *B = (dtype*)malloc(N*sizeof(dtype));
-            dtype my_cpu_check = 1.0, recv_cpu_check;
+            cktype my_cpu_check = 0, recv_cpu_check, gpu_check = 0;
 
             // Initialize all elements of A to 0.0
             for(int i=0; i<N; i++){
-                A[i] = 1.0 * (rank+1) + i * 0.0001;
-                my_cpu_check += A[i];
-                B[i] = 0.0;
+                A[i] = 1U * (rank+1);
+                B[i] = 0U;
             }
 
             dtype *d_B;
@@ -188,6 +229,7 @@ int main(int argc, char *argv[])
             dtype *d_A;
             cudaErrorCheck( cudaMalloc(&d_A, N*sizeof(dtype)) );
             cudaErrorCheck( cudaMemcpy(d_A, A, N*sizeof(dtype), cudaMemcpyHostToDevice) );
+            gpu_device_reduce(d_A, N, &my_cpu_check);
 
             int tag1 = 10;
             int tag2 = 20;
@@ -217,34 +259,42 @@ int main(int argc, char *argv[])
         stop_time = MPI_Wtime();
             elapsed_time = stop_time - start_time;
 
-            cudaErrorCheck( cudaMemcpy(B, d_B, sizeof(dtype)*N, cudaMemcpyDeviceToHost) );
-            dtype gpu_check = 1.0;
-            for(int i=0; i<N; i++)
-                gpu_check += B[i];
+            gpu_device_reduce(d_B, N, &gpu_check);
             if(rank == 0){
-                MPI_Send(&my_cpu_check,   1, MPI_dtype, rank2, tag1, MPI_COMM_WORLD);
-                MPI_Recv(&recv_cpu_check, 1, MPI_dtype, rank2, tag2, MPI_COMM_WORLD, &stat);
+                MPI_Send(&my_cpu_check,   1, MPI_cktype, rank2, tag1, MPI_COMM_WORLD);
+                MPI_Recv(&recv_cpu_check, 1, MPI_cktype, rank2, tag2, MPI_COMM_WORLD, &stat);
             } else if(rank == rank2){
-                MPI_Recv(&recv_cpu_check, 1, MPI_dtype, 0, tag1, MPI_COMM_WORLD, &stat);
-                MPI_Send(&my_cpu_check,   1, MPI_dtype, 0, tag2, MPI_COMM_WORLD);
+                MPI_Recv(&recv_cpu_check, 1, MPI_cktype, 0, tag1, MPI_COMM_WORLD, &stat);
+                MPI_Send(&my_cpu_check,   1, MPI_cktype, 0, tag2, MPI_COMM_WORLD);
             }
 
+            gpu_checks[i] = gpu_check;
             cpu_checks[i] = recv_cpu_check;
             long int num_B = sizeof(dtype)*N;
             long int B_in_GB = 1 << 30;
             double num_GB = (double)num_B / (double)B_in_GB;
             double avg_time_per_transfer = elapsed_time / (2.0*(double)loop_count);
 
-            if(rank == 0) printf("Transfer size (B): %10li, Transfer Time (s): %15.9f, Bandwidth (GB/s): %15.9f, Error: %lf\n", num_B, avg_time_per_transfer, num_GB/avg_time_per_transfer, fabs(gpu_check - recv_cpu_check) );
+            if(rank == 0) printf("Transfer size (B): %10li, Transfer Time (s): %15.9f, Bandwidth (GB/s): %15.9f, Error: %d\n", num_B, avg_time_per_transfer, num_GB/avg_time_per_transfer, abs(gpu_check - recv_cpu_check) );
             fflush(stdout);
             cudaErrorCheck( cudaFree(d_A) );
+            cudaErrorCheck( cudaFree(d_B) );
             free(A);
+            free(B);
         }
 
         char s[10000000];
-        sprintf(s, "[%d] recv_cpu_check = %lf", rank, cpu_checks[0]);
-        for (int i=0; i<28; i++) {
-            sprintf(s+strlen(s), " %10.5lf", cpu_checks[i]);
+        sprintf(s, "[%d] recv_cpu_check = %u", rank, cpu_checks[0]);
+        for (int i=0; i<BUFF_CYCLE; i++) {
+            sprintf(s+strlen(s), " %10d", cpu_checks[i]);
+        }
+        sprintf(s+strlen(s), " (for Error)\n");
+        printf("%s", s);
+        fflush(stdout);
+
+        sprintf(s, "[%d] gpu_checks = %u", rank, gpu_checks[0]);
+        for (int i=0; i<BUFF_CYCLE; i++) {
+            sprintf(s+strlen(s), " %10d", gpu_checks[i]);
         }
         sprintf(s+strlen(s), " (for Error)\n");
         printf("%s", s);
