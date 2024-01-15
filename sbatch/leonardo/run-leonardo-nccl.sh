@@ -1,8 +1,8 @@
 #!/bin/bash
 
-#SBATCH --job-name=testCudaAware
-#SBATCH --output=sout/testCudaAware_%j.out
-#SBATCH --error=sout/testCudaAware_%j.err
+#SBATCH --job-name=testNccl
+#SBATCH --output=sout/testNccl_%j.out
+#SBATCH --error=sout/testNccl_%j.err
 
 #SBATCH --partition=boost_usr_prod
 #SBATCH --account=IscrC_SHARP_0
@@ -15,5 +15,7 @@
 #SBATCH --cpus-per-task=16
 #SBATCH --mem=494000MB
 
+MODULE_PATH="moduleload/load_nccl_modules.sh"
+
 mkdir -p sout
-srun bin/test-cuda-aware
+source ${MODULE_PATH} && srun bin/test-nccl

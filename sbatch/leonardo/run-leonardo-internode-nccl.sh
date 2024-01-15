@@ -15,5 +15,7 @@
 #SBATCH --cpus-per-task=8
 #SBATCH --mem=494000MB
 
+MODULE_PATH="moduleload/load_nccl_modules.sh"
+
 mkdir -p sout
-srun bin/test-nccl
+source ${MODULE_PATH} && srun bin/test-nccl

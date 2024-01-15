@@ -10,5 +10,7 @@
 #SBATCH --gres=gpu:2
 #SBATCH --partition=short
 
+MODULE_PATH="moduleload/load_nvlink_modules.sh"
+
 mkdir -p sout
-srun bin/test-nvlink
+source ${MODULE_PATH} && srun bin/test-nvlink

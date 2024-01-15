@@ -1,8 +1,8 @@
 #!/bin/bash
 
-#SBATCH --job-name=testInternodeCudaAware
-#SBATCH --output=sout/testInternodeCudaAware_%j.out
-#SBATCH --error=sout/testInternodeCudaAware_%j.err
+#SBATCH --job-name=testInternode
+#SBATCH --output=sout/testInternode_%j.out
+#SBATCH --error=sout/testInternode_%j.err
 
 #SBATCH --partition=boost_usr_prod
 #SBATCH --account=IscrC_SHARP_0
@@ -15,5 +15,7 @@
 #SBATCH --cpus-per-task=8
 #SBATCH --mem=494000MB
 
+MODULE_PATH="moduleload/load_baseline_modules.sh"
+
 mkdir -p sout
-srun bin/test-cuda-aware
+source ${MODULE_PATH} && srun bin/test

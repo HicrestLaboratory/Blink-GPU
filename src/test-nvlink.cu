@@ -415,5 +415,5 @@ int main(int argc, char *argv[])
     PICO_disable_peer_access(num_devices, dev);
 
     MPI_Finalize();
-    return 0;
+    return(0);
 }

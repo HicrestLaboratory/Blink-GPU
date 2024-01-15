@@ -15,5 +15,7 @@
 #SBATCH --cpus-per-task=16
 #SBATCH --mem=494000MB
 
+MODULE_PATH="moduleload/load_baseline_modules.sh"
+
 mkdir -p sout
-srun bin/test
+source ${MODULE_PATH} && srun bin/test

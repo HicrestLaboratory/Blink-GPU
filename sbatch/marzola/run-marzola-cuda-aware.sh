@@ -10,5 +10,7 @@
 #SBATCH --gres=gpu:2
 #SBATCH --partition=short
 
+MODULE_PATH="moduleload/load_cuda_aware_modules.sh"
+
 mkdir -p sout
-srun bin/test-cuda-aware
+source ${MODULE_PATH} && srun bin/test-cuda-aware
