@@ -1,8 +1,8 @@
 #!/bin/bash
 
-#SBATCH --job-name=testInternode
-#SBATCH --output=sout/testInternode_%j.out
-#SBATCH --error=sout/testInternode_%j.err
+#SBATCH --job-name=ppInternodeNvlink
+#SBATCH --output=sout/ppInternodeNvlink_%j.out
+#SBATCH --error=sout/ppInternodeNvlink_%j.err
 
 #SBATCH --partition=boost_usr_prod
 #SBATCH --account=IscrC_SHARP_0
@@ -15,7 +15,7 @@
 #SBATCH --cpus-per-task=8
 #SBATCH --mem=494000MB
 
-MODULE_PATH="moduleload/load_baseline_modules.sh"
+MODULE_PATH="moduleload/load_nvlink_modules.sh"
 
 mkdir -p sout
-source ${MODULE_PATH} && srun bin/test
+source ${MODULE_PATH} && srun bin/pp-nvlink

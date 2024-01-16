@@ -1,8 +1,8 @@
 #!/bin/bash
 
-#SBATCH --job-name=testNccl
-#SBATCH --output=sout/testNccl_%j.out
-#SBATCH --error=sout/testNccl_%j.err
+#SBATCH --job-name=a2aNccl
+#SBATCH --output=sout/a2aNccl_%j.out
+#SBATCH --error=sout/a2aNccl_%j.err
 
 #SBATCH --partition=boost_usr_prod
 #SBATCH --account=IscrC_SHARP_0
@@ -11,11 +11,11 @@
 
 #SBATCH --nodes=1
 #SBATCH --gres=gpu:4
-#SBATCH --ntasks-per-node=2
-#SBATCH --cpus-per-task=16
+#SBATCH --ntasks-per-node=4
+#SBATCH --cpus-per-task=8
 #SBATCH --mem=494000MB
 
 MODULE_PATH="moduleload/load_nccl_modules.sh"
 
 mkdir -p sout
-source ${MODULE_PATH} && srun bin/test-nccl
+source ${MODULE_PATH} && srun bin/a2a-nccl

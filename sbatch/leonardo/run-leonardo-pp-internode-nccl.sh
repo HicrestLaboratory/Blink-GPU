@@ -1,8 +1,8 @@
 #!/bin/bash
 
-#SBATCH --job-name=testInternodeNccl
-#SBATCH --output=sout/testInternodeNccl_%j.out
-#SBATCH --error=sout/testInternodeNccl_%j.err
+#SBATCH --job-name=ppInternodeNccl
+#SBATCH --output=sout/ppInternodeNccl_%j.out
+#SBATCH --error=sout/ppInternodeNccl_%j.err
 
 #SBATCH --partition=boost_usr_prod
 #SBATCH --account=IscrC_SHARP_0
@@ -18,4 +18,4 @@
 MODULE_PATH="moduleload/load_nccl_modules.sh"
 
 mkdir -p sout
-source ${MODULE_PATH} && srun bin/test-nccl
+source ${MODULE_PATH} && srun bin/pp-nccl
