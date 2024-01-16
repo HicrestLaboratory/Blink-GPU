@@ -299,11 +299,18 @@ int main(int argc, char *argv[])
                 ncclGroupStart();
                 if(rank == 0){
                     ncclSend(d_A, N, ncclDtype, rank2, NCCL_COMM_WORLD, NULL);
+                }
+                else if(rank == rank2){
+                    ncclRecv(d_B, N, ncclDtype, 0, NCCL_COMM_WORLD, NULL);
+                }
+                ncclGroupEnd();
+
+                ncclGroupStart();
+                if(rank == 0){
                     ncclRecv(d_B, N, ncclDtype, rank2, NCCL_COMM_WORLD, NULL);
                 }
                 else if(rank == rank2){
                     ncclSend(d_A, N, ncclDtype, 0, NCCL_COMM_WORLD, NULL);
-                    ncclRecv(d_B, N, ncclDtype, 0, NCCL_COMM_WORLD, NULL);
                 }
                 ncclGroupEnd();
             }
