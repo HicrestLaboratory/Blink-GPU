@@ -1,8 +1,8 @@
 #!/bin/bash
 
 #SBATCH --job-name=a2aCudaAware
-#SBATCH --output=sout/a2aCudaAware_%j.out
-#SBATCH --error=sout/a2aCudaAware_%j.err
+#SBATCH --output=sout/leonardo_a2a_CudaAware_%j.out
+#SBATCH --error=sout/leonardo_a2a_CudaAware_%j.err
 
 #SBATCH --partition=boost_usr_prod
 #SBATCH --account=IscrC_SHARP_0

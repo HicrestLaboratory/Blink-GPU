@@ -1,8 +1,8 @@
 #!/bin/bash
 
 #SBATCH --job-name=a2aNvlink
-#SBATCH --output=sout/a2aNvlink_%j.out
-#SBATCH --error=sout/a2aNvlink_%j.err
+#SBATCH --output=sout/leonardo_a2a_Nvlink_%j.out
+#SBATCH --error=sout/leonardo_a2a_Nvlink_%j.err
 
 #SBATCH --partition=boost_usr_prod
 #SBATCH --account=IscrC_SHARP_0

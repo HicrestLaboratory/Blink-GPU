@@ -1,8 +1,8 @@
 #!/bin/bash
 
 #SBATCH --job-name=ppInternodeNvlink
-#SBATCH --output=sout/ppInternodeNvlink_%j.out
-#SBATCH --error=sout/ppInternodeNvlink_%j.err
+#SBATCH --output=sout/leonardo_pp_InternodeNvlink_%j.out
+#SBATCH --error=sout/leonardo_pp_InternodeNvlink_%j.err
 
 #SBATCH --partition=boost_usr_prod
 #SBATCH --account=IscrC_SHARP_0

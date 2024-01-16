@@ -1,8 +1,8 @@
 #!/bin/bash
 
 #SBATCH --job-name=pp
-#SBATCH --output=sout/pp_%j.out
-#SBATCH --error=sout/pp_%j.err
+#SBATCH --output=sout/leonardo_pp_baseline_%j.out
+#SBATCH --error=sout/leonardo_pp_baseline_%j.err
 
 #SBATCH --partition=boost_usr_prod
 #SBATCH --account=IscrC_SHARP_0

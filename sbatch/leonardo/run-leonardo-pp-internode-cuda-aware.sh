@@ -1,8 +1,8 @@
 #!/bin/bash
 
 #SBATCH --job-name=ppInternodeCudaAware
-#SBATCH --output=sout/ppInternodeCudaAware_%j.out
-#SBATCH --error=sout/ppInternodeCudaAware_%j.err
+#SBATCH --output=sout/leonardo_pp_InternodeCudaAware_%j.out
+#SBATCH --error=sout/leonardo_pp_InternodeCudaAware_%j.err
 
 #SBATCH --partition=boost_usr_prod
 #SBATCH --account=IscrC_SHARP_0

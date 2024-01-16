@@ -1,8 +1,8 @@
 #!/bin/bash
 
 #SBATCH --job-name=a2aNccl
-#SBATCH --output=sout/a2aNccl_%j.out
-#SBATCH --error=sout/a2aNccl_%j.err
+#SBATCH --output=sout/leonardo_a2a_Nccl_%j.out
+#SBATCH --error=sout/leonardo_a2a_Nccl_%j.err
 
 #SBATCH --partition=boost_usr_prod
 #SBATCH --account=IscrC_SHARP_0

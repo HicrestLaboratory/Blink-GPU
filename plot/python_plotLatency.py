@@ -3,6 +3,19 @@ import re
 import pandas as pd
 import matplotlib.pyplot as plt
 
+
+def unpack(file_paths):
+    files=[]
+    for file_path in file_paths:
+        file_name = os.path.basename(file_path)
+        machines, experiments, label, _ = file_name.split('_')
+        # linestyle = '-' if "Internode" in label else '--'
+        df = extract_data(file_path)
+        files.append([machines,experiments,label,df])
+        #print(files)
+    return files
+
+
 # Function to extract data from a file
 def extract_data(file_path):
     with open(file_path, 'r') as file:
@@ -14,34 +27,52 @@ def extract_data(file_path):
 
     return pd.DataFrame({'Transfer Size (B)': transfer_sizes, 'Transfer Time (s)': transfer_times})
 
-# Function to split camel case string
-def split_camel_case(s):
-    return re.sub('([a-z0-9])([A-Z])', r'\1 \2', re.sub('([a-z])([0-9])|([0-9])([a-z])', r'\1\3 \2\4', s))
 
-# Function to plot transfer times as a histogram
-def plot_transfer_time_histogram(file_paths):
-    plt.figure(figsize=(12, 6))
 
-    # Extract data from the first file to get the smallest transfer size
-    first_file_path = file_paths[0]
-    first_df = extract_data(first_file_path)
-    smallest_size = first_df.loc[first_df['Transfer Size (B)'].idxmin(), 'Transfer Size (B)']
+# Function to plot performance comparison
+def plot_performance(file_paths):
+    all_machines = []
+    all_experiments = []
+    files = unpack(file_paths)
+    for i in files:
+        if i[0] not in all_machines:
+            all_machines.append(i[0])
+        if i[1] not in all_experiments:
+            all_experiments.append(i[1])
 
-    # Plot transfer times as a histogram for the common smallest transfer size
-    for file_path in file_paths:
-        file_name = os.path.basename(file_path)
-        df = extract_data(file_path)
-        transfer_time = df.loc[df['Transfer Size (B)'] == smallest_size, 'Transfer Time (s)'].iloc[0]
-        label = split_camel_case(file_name.split('_')[0])
-        plt.bar(label, transfer_time)
+    print('all_machines: ' + str(all_machines))
+    print('all_experiments: ' + str(all_experiments))
 
-    plt.xlabel('File')
-    plt.ylabel('Transfer Time (s)')
-    plt.title(f'Transfer Time for Smallest Size ({smallest_size} B) Comparison')
-    plt.xticks(rotation=45, ha='right')  # Rotate x-axis labels
-    plt.tight_layout(rect=[0, 0.1, 1, 0.95])
-    plt.grid(axis='y')
-    plt.show()
+    plots={}
+    for m in all_machines:
+        for e in all_experiments:
+            plots[m+e]=[]
+
+    for f in files:
+        plots[f[0]+f[1]].append([f[2],f[3]])
+
+    for key in plots:
+
+        plt.figure(figsize=(10, 6))
+        for lines in plots[key]:
+            smallest_size = lines[1]['Transfer Size (B)'][0]
+            print('smallest_size: ', smallest_size)
+            transfer_time = lines[1]['Transfer Time (s)'][0]
+            print('transfer_time: ', transfer_time)
+            print('lines[0]: ', lines[0])
+            plt.bar(lines[0], transfer_time)
+        plt.xlabel('File')
+        plt.ylabel('Transfer Time (s)')
+        plt.title(f'Transfer Time for Smallest Size ({smallest_size} B) Comparison')
+        e = 'ping-pong' if 'pp' in key else 'all2all'
+        m = 'Leonardo' if 'leonardo' in key else 'Marzola'
+        plt.title(m + ' ' + e + f' Transfer Time for Smallest Size ({smallest_size} B) Comparison')
+        plt.xticks(rotation=45, ha='right')  # Rotate x-axis labels
+        plt.tight_layout(rect=[0, 0.1, 1, 0.95])
+        plt.grid(axis='y')
+        plt.show()
+
+        plt.show()
 
 # Specify the directory containing the files
 directory_path = 'sout/'
@@ -49,5 +80,5 @@ directory_path = 'sout/'
 # Get a list of file paths in the directory
 file_paths = [os.path.join(directory_path, file) for file in os.listdir(directory_path) if file.endswith('.out')]
 
-# Plot the transfer time histogram for the common smallest transfer size
-plot_transfer_time_histogram(file_paths)
+# Plot performance comparison
+plot_performance(file_paths)
