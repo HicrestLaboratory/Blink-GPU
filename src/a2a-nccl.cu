@@ -17,7 +17,7 @@
 #define MPI_dtype MPI_CHAR
 #define ncclDtype ncclChar
 
-#define BUFF_CYCLE 25
+#define BUFF_CYCLE 29
 
 #define cktype int32_t
 #define MPI_cktype MPI_INT
@@ -296,27 +296,33 @@ int main(int argc, char *argv[])
 
 
         int loop_count = 50;
-        double start_time, stop_time, elapsed_time;
-        start_time = MPI_Wtime();
-    /*
+        double start_time, stop_time, inner_elapsed_time, elapsed_time = 0.0;
 
-    Implemetantion goes here
+        /*
 
-    */
+        Implemetantion goes here
+
+        */
         for(int i=1; i<=loop_count; i++){
+            start_time = MPI_Wtime();
+
             ncclGroupStart();
             for (int r=0; r<size; r++) {
                 ncclSend(d_A + (r*N)*sizeof(dtype), N, ncclDtype, r, NCCL_COMM_WORLD, NULL);
                 ncclRecv(d_B + (r*N)*sizeof(dtype), N, ncclDtype, r, NCCL_COMM_WORLD, NULL);
             }
             ncclGroupEnd();
+
+            cudaErrorCheck( cudaDeviceSynchronize() );
+            stop_time = MPI_Wtime();
+            inner_elapsed_time = stop_time - start_time;
+            if(rank == 0) printf("\t\tCycle: %d, Elapsed Time (s): %15.9f\n", j, inner_elapsed_time);
+            elapsed_time += inner_elapsed_time;
         }
 
 
 
 
-        stop_time = MPI_Wtime();
-        elapsed_time = stop_time - start_time;
 
 
         gpu_device_reduce(d_B, size*N, &gpu_check);
@@ -327,7 +333,7 @@ int main(int argc, char *argv[])
         for (int i=0; i<size; i++)
             cpu_checks[j] += recv_cpu_check[i];
 
-        long int num_B = sizeof(dtype)*N*size;
+        long int num_B = sizeof(dtype)*N*(size-1);
         long int B_in_GB = 1 << 30;
         double num_GB = (double)num_B / (double)B_in_GB;
         double avg_time_per_transfer = elapsed_time / (2.0*(double)loop_count);

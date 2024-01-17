@@ -207,9 +207,9 @@ int main(int argc, char *argv[])
 
     cktype cpu_checks[BUFF_CYCLE], gpu_checks[BUFF_CYCLE];
     if (rank == 0 || rank == rank2) {
-        for(int i=0; i<BUFF_CYCLE; i++){
+        for(int j=0; j<BUFF_CYCLE; j++){
 
-            long int N = 1 << i;
+            long int N = 1 << j;
 
             // Allocate memory for A on CPU
             dtype *A = (dtype*)malloc(N*sizeof(dtype));
@@ -235,14 +235,16 @@ int main(int argc, char *argv[])
             int tag2 = 20;
 
             int loop_count = 50;
-        double start_time, stop_time, elapsed_time;
-            start_time = MPI_Wtime();
-    /*
+            double start_time, stop_time, inner_elapsed_time, elapsed_time = 0.0;
 
-    Implemetantion goes here
+            /*
 
-    */
+            Implemetantion goes here
+
+            */
             for(int i=1; i<=loop_count; i++){
+                start_time = MPI_Wtime();
+
                 if(rank == 0){
                     MPI_Send(d_A, N, MPI_dtype, rank2, tag1, MPI_COMM_WORLD);
                     MPI_Recv(d_B, N, MPI_dtype, rank2, tag2, MPI_COMM_WORLD, &stat);
@@ -251,13 +253,16 @@ int main(int argc, char *argv[])
                     MPI_Recv(d_B, N, MPI_dtype, 0, tag1, MPI_COMM_WORLD, &stat);
                     MPI_Send(d_A, N, MPI_dtype, 0, tag2, MPI_COMM_WORLD);
                 }
+
+                stop_time = MPI_Wtime();
+                inner_elapsed_time = stop_time - start_time;
+                if(rank == 0) printf("\t\tCycle: %d, Elapsed Time (s): %15.9f\n", j, inner_elapsed_time);
+                elapsed_time += inner_elapsed_time;
             }
 
 
 
 
-        stop_time = MPI_Wtime();
-            elapsed_time = stop_time - start_time;
 
             gpu_device_reduce(d_B, N, &gpu_check);
             if(rank == 0){
@@ -268,8 +273,8 @@ int main(int argc, char *argv[])
                 MPI_Send(&my_cpu_check,   1, MPI_cktype, 0, tag2, MPI_COMM_WORLD);
             }
 
-            gpu_checks[i] = gpu_check;
-            cpu_checks[i] = recv_cpu_check;
+            gpu_checks[j] = gpu_check;
+            cpu_checks[j] = recv_cpu_check;
             long int num_B = sizeof(dtype)*N;
             long int B_in_GB = 1 << 30;
             double num_GB = (double)num_B / (double)B_in_GB;
