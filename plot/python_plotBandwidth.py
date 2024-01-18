@@ -28,9 +28,11 @@ def extract_data(file_path):
     return pd.DataFrame({'Transfer Size (B)': transfer_sizes, 'Bandwidth (GB/s)': bandwidths})
 
 
+lable_colors = { 'baseline': 'blue', 'CudaAware': 'red', 'Nccl': 'green', 'Nvlink': 'black', 'Internode': 'blue', 'InternodeCudaAware': 'red', 'InternodeNccl': 'green', 'InternodeNvlink': 'black' }
 
 # Function to plot performance comparison
 def plot_performance(file_paths):
+
     all_machines = []
     all_experiments = []
     files = unpack(file_paths)
@@ -46,17 +48,32 @@ def plot_performance(file_paths):
     plots={}
     for m in all_machines:
         for e in all_experiments:
-            plots[m+e]=[]
+            plots[m+e]={}
 
     for f in files:
-        plots[f[0]+f[1]].append([f[2],f[3]])
+        plots[f[0]+f[1]][f[2]] = f[3]
+
+    line_order = list(lable_colors.keys())
 
     for key in plots:
 
         plt.figure(figsize=(10, 6))
-        for lines in plots[key]:
-            linestyle = '-' if 'Internode' in lines[0] else '--'
-            plt.plot(lines[1]['Transfer Size (B)'], lines[1]['Bandwidth (GB/s)'], label=lines[0], linestyle=linestyle)
+        for line in line_order:
+            if line in plots[key]:
+                print('Key: ', key)
+                print('Line: ', line)
+
+                linestyle = '--' if 'Internode' in line else '-'
+                transfer_size = plots[key][line]['Transfer Size (B)']
+                bandwidth = plots[key][line]['Bandwidth (GB/s)']
+
+                print('transfer_size: ', transfer_size)
+                print('bandwidth: ', bandwidth)
+                print('linestyle: ', linestyle)
+                print('color: ', lable_colors[line])
+
+                plt.plot(transfer_size, bandwidth, label=line, linestyle=linestyle, color=lable_colors[line])
+
         plt.xscale('log', base=2)
         plt.yscale('log')
         plt.xlabel('Transfer Size (B)')
@@ -64,6 +81,8 @@ def plot_performance(file_paths):
         e = 'ping-pong' if 'pp' in key else 'all2all'
         m = 'Leonardo' if 'leonardo' in key else 'Marzola'
         plt.title(m + ' ' + e + ' Performance Comparison')
+        print(line_order)
+        #plt.legend(legend_order)
         plt.legend()
         plt.grid(True)
 
