@@ -5,11 +5,12 @@ MPI_CUDA_HOME=/leonardo/prod/spack/03/install/0.19/linux-rhel8-icelake/nvhpc-23.
 NCCL_HOME=/home/root/opt/nvhpc/Linux_x86_64/23.1/comm_libs/11.8/nccl
 # ---------------- Common ----------------
 CC=nvcc
-CFLAGS=-O3 -std=c++14
+CFLAGS=-std=c++14
+#-O3
 LIBS=
 INCL=-I/leonardo/prod/build/compilers/cuda/11.8/none/BA_WORK/var/cuda-repo-rhel8-11-8-local/usr/src/nvidia-520.61.05/nvidia
 LIBFLAGS=
-DBGFLAGS=
+DBGFLAGS=-g -G
 # ----------- Shared libraries -----------
 MPI=-L$(MPI_HOME)/lib -I$(MPI_HOME)/include -lmpi
 MPI_CUDA=-L$(MPI_CUDA_HOME)/lib -I$(MPI_CUDA_HOME)/include -lmpi
@@ -24,6 +25,7 @@ NCCL=-L$(NCCL_HOME)/lib -I$(NCCL_HOME)/include -lnccl
 # -------------- Experiment --------------
 NAME=pp
 A2ANAME=a2a
+NBPPNAME=nbpp
 # --------------- Folders ----------------
 BINFOLDER=bin
 OUTFOLDER=out
@@ -41,10 +43,10 @@ CUDA_AWARE_MODULES="${MODULEFOLDER}/load_cuda_aware_modules.sh"
 # =====================================================================================
 
 
-all: pingpong a2a
-pingpong: $(BINFOLDER)/$(NAME) $(BINFOLDER)/$(NAME)-cuda-aware $(BINFOLDER)/$(NAME)-nccl $(BINFOLDER)/$(NAME)-nvlink
+all: pp a2a
+pp: $(BINFOLDER)/$(NAME) $(BINFOLDER)/$(NAME)-cuda-aware $(BINFOLDER)/$(NAME)-nccl $(BINFOLDER)/$(NAME)-nvlink
 a2a: $(BINFOLDER)/$(A2ANAME) $(BINFOLDER)/$(A2ANAME)-cuda-aware $(BINFOLDER)/$(A2ANAME)-nccl $(BINFOLDER)/$(A2ANAME)-nvlink
-
+nbpp: $(BINFOLDER)/$(NBPPNAME) $(BINFOLDER)/$(NBPPNAME)-cuda-aware
 
 # --------------- Baseline ---------------
 $(BASELINE_MODULES):
@@ -58,6 +60,10 @@ $(BINFOLDER)/$(NAME): src/$(NAME).cu $(BASELINE_MODULES)
 	source $(BASELINE_MODULES) && $(CC) $(CFLAGS) -o $@ $< $(INCL) $(LIBS) $(LIBFLAGS) $(MPI) $(CUDA) -lstdc++ -lm -Wno-deprecated-gpu-targets $(DBGFLAGS)
 
 $(BINFOLDER)/$(A2ANAME): src/$(A2ANAME).cu $(BASELINE_MODULES)
+	mkdir -p $(BINFOLDER) $(OUTFOLDER) $(SOUTFOLDER)
+	source $(BASELINE_MODULES) && $(CC) $(CFLAGS) -o $@ $< $(INCL) $(LIBS) $(LIBFLAGS) $(MPI) $(CUDA) -lstdc++ -lm -Wno-deprecated-gpu-targets $(DBGFLAGS)
+
+$(BINFOLDER)/$(NBPPNAME): src/$(NBPPNAME).cu $(BASELINE_MODULES)
 	mkdir -p $(BINFOLDER) $(OUTFOLDER) $(SOUTFOLDER)
 	source $(BASELINE_MODULES) && $(CC) $(CFLAGS) -o $@ $< $(INCL) $(LIBS) $(LIBFLAGS) $(MPI) $(CUDA) -lstdc++ -lm -Wno-deprecated-gpu-targets $(DBGFLAGS)
 # ----------------------------------------
@@ -75,6 +81,10 @@ $(BINFOLDER)/$(NAME)-cuda-aware: src/$(NAME)-cuda-aware.cu $(CUDA_AWARE_MODULES)
 	source $(CUDA_AWARE_MODULES) && $(CC) $(CFLAGS) -o $@ $< $(INCL) $(LIBS) $(LIBFLAGS) $(MPI_CUDA) $(CUDA) -lstdc++ -lm -Wno-deprecated-gpu-targets $(DBGFLAGS)
 
 $(BINFOLDER)/$(A2ANAME)-cuda-aware: src/$(A2ANAME)-cuda-aware.cu $(CUDA_AWARE_MODULES)
+	mkdir -p $(BINFOLDER) $(OUTFOLDER) $(SOUTFOLDER)
+	source $(CUDA_AWARE_MODULES) && $(CC) $(CFLAGS) -o $@ $< $(INCL) $(LIBS) $(LIBFLAGS) $(MPI_CUDA) $(CUDA) -lstdc++ -lm -Wno-deprecated-gpu-targets $(DBGFLAGS)
+
+$(BINFOLDER)/$(NBPPNAME)-cuda-aware: src/$(NBPPNAME)-cuda-aware.cu $(CUDA_AWARE_MODULES)
 	mkdir -p $(BINFOLDER) $(OUTFOLDER) $(SOUTFOLDER)
 	source $(CUDA_AWARE_MODULES) && $(CC) $(CFLAGS) -o $@ $< $(INCL) $(LIBS) $(LIBFLAGS) $(MPI_CUDA) $(CUDA) -lstdc++ -lm -Wno-deprecated-gpu-targets $(DBGFLAGS)
 # ----------------------------------------
