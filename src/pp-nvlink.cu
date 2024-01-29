@@ -19,6 +19,8 @@
 #define cktype int32_t
 #define MPI_cktype MPI_INT
 
+#define WARM_UP 5
+
 // Macro for checking errors in CUDA API calls
 #define cudaErrorCheck(call)                                                              \
 do{                                                                                       \
@@ -357,6 +359,11 @@ int main(int argc, char *argv[])
             // Open MemHandle
             cudaErrorCheck( cudaIpcOpenMemHandle((void**)&peerBuffer, *(cudaIpcMemHandle_t*)&recvHandle, cudaIpcMemLazyEnablePeerAccess) );
 
+            long int num_B = sizeof(dtype)*N;
+            long int B_in_GB = 1 << 30;
+            double num_GB = (double)num_B / (double)B_in_GB;
+
+
             for(int i=1; i<=loop_count; i++){
                 start_time = MPI_Wtime();
 
@@ -366,8 +373,8 @@ int main(int argc, char *argv[])
 
                 stop_time = MPI_Wtime();
                 inner_elapsed_time = stop_time - start_time;
-                if(rank == 0) printf("\t\tCycle: %d, Elapsed Time (s): %15.9f\n", j, inner_elapsed_time);
-                elapsed_time += inner_elapsed_time;
+                if(rank == 0) printf("\tTransfer size (B): %10li, Transfer Time (s): %15.9f, Bandwidth (GB/s): %15.9f, Iteration %d\n", num_B, inner_elapsed_time, num_GB/inner_elapsed_time, i);
+                if (i>0) elapsed_time += inner_elapsed_time;
             }
 
             // Close MemHandle
@@ -386,12 +393,9 @@ int main(int argc, char *argv[])
 
             gpu_checks[j] = gpu_check;
             cpu_checks[j] = recv_cpu_check;
-            long int num_B = sizeof(dtype)*N;
-            long int B_in_GB = 1 << 30;
-            double num_GB = (double)num_B / (double)B_in_GB;
             double avg_time_per_transfer = elapsed_time / (2.0*(double)loop_count);
 
-            if(rank == 0) printf("Transfer size (B): %10li, Transfer Time (s): %15.9f, Bandwidth (GB/s): %15.9f, Error: %d\n", num_B, avg_time_per_transfer, num_GB/avg_time_per_transfer, abs(gpu_check - recv_cpu_check) );
+            if(rank == 0) printf("[Average] Transfer size (B): %10li, Transfer Time (s): %15.9f, Bandwidth (GB/s): %15.9f, Error: %d\n", num_B, avg_time_per_transfer, num_GB/avg_time_per_transfer, abs(gpu_check - recv_cpu_check) );
             fflush(stdout);
             cudaErrorCheck( cudaFree(d_A) );
             cudaErrorCheck( cudaFree(d_B) );

@@ -17,9 +17,11 @@ def unpack(file_paths):
 
 
 # Function to extract data from a file
+substring = "[Average]"
 def extract_data(file_path):
     with open(file_path, 'r') as file:
-        data = file.read()
+        #data = file.read()
+        data = '\n'.join(line.strip() for line in file if substring in line)
 
     # Use regular expressions to extract relevant information
     transfer_sizes = [int(match.group(1)) for match in re.finditer(r'Transfer size \(B\):\s+(\d+)', data)]
@@ -27,7 +29,7 @@ def extract_data(file_path):
 
     return pd.DataFrame({'Transfer Size (B)': transfer_sizes, 'Transfer Time (s)': transfer_times})
 
-lable_colors = { 'baseline': 'blue', 'Internode': 'blue', 'CudaAware': 'red','InternodeCudaAware': 'red', 'Nccl': 'green', 'InternodeNccl': 'green', 'Nvlink': 'black', 'InternodeNvlink': 'black' }
+lable_colors = { 'baseline': 'blue', 'Internode': 'blue', 'CudaAware': 'red','InternodeCudaAware': 'red', 'Nccl': 'green', 'InternodeNccl': 'green', 'Nvlink': 'gray', 'InternodeNvlink': 'gray' }
 
 # Function to plot performance comparison
 def plot_performance(file_paths):
