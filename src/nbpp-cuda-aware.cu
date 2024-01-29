@@ -20,6 +20,7 @@
 #define MPI_cktype MPI_INT
 
 #define NSTREAM 2
+#define WARM_UP 5
 
 // Macro for checking errors in CUDA API calls
 #define cudaErrorCheck(call)                                                              \
@@ -265,7 +266,7 @@ int main(int argc, char *argv[])
             Implemetantion goes here
 
             */
-            for(int i=1; i<=loop_count; i++){
+            for(int i=1-(WARM_UP); i<=loop_count; i++){
                 start_time = MPI_Wtime();
 
                 if(rank == 0){

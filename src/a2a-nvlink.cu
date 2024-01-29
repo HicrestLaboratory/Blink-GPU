@@ -351,7 +351,7 @@ int main(int argc, char *argv[])
             else
                 peerBuffer[i] = d_A; // NOTE this is the self send case
 
-        for(int i=1; i<=loop_count; i++){
+        for(int i=1-(WARM_UP); i<=loop_count; i++){
             start_time = MPI_Wtime();
 
             // Memcopy DeviceToDevice
@@ -383,7 +383,9 @@ int main(int argc, char *argv[])
         for (int i=0; i<size; i++)
             cpu_checks[j] += recv_cpu_check[i];
 
-        double avg_time_per_transfer = elapsed_time / (2.0*(double)loop_count);
+        double max_process_time;
+        MPI_Allreduce(&elapsed_time, &max_process_time, 1, MPI_DOUBLE, MPI_MAX, MPI_COMM_WORLD);
+        double avg_time_per_transfer = max_process_time / ((double)loop_count);
 
         if(rank == 0) printf("[Average] Transfer size (B): %10li, Transfer Time (s): %15.9f, Bandwidth (GB/s): %15.9f, Error: %d\n", num_B, avg_time_per_transfer, num_GB/avg_time_per_transfer, abs(gpu_check - recv_cpu_check[j]) );
         fflush(stdout);

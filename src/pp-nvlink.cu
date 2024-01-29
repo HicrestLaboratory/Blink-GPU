@@ -364,7 +364,7 @@ int main(int argc, char *argv[])
             double num_GB = (double)num_B / (double)B_in_GB;
 
 
-            for(int i=1; i<=loop_count; i++){
+            for(int i=1-(WARM_UP); i<=loop_count; i++){
                 start_time = MPI_Wtime();
 
                 // Memcopy DeviceToDevice

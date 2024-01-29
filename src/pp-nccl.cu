@@ -300,7 +300,7 @@ int main(int argc, char *argv[])
             long int B_in_GB = 1 << 30;
             double num_GB = (double)num_B / (double)B_in_GB;
 
-            for(int i=1; i<=loop_count; i++){
+            for(int i=1-(WARM_UP); i<=loop_count; i++){
                 // MPI_Barrier
                 start_time = MPI_Wtime();
 
