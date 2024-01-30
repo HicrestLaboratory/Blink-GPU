@@ -14,7 +14,7 @@
 #define dtype u_int8_t
 #define MPI_dtype MPI_CHAR
 
-#define BUFF_CYCLE 29
+#define BUFF_CYCLE 27
 
 #define cktype int32_t
 #define MPI_cktype MPI_INT
@@ -189,7 +189,6 @@ int main(int argc, char *argv[])
     fflush(stdout);
     MPI_Barrier(MPI_COMM_WORLD);
 
-
 //     if(size != 2){
 //         if(rank == 0){
 //             printf("This program requires exactly 2 MPI ranks, but you are attempting to use %d! Exiting...\n", size);
@@ -248,7 +247,6 @@ int main(int argc, char *argv[])
 
         int loop_count = 50;
         double start_time, stop_time, inner_elapsed_time, elapsed_time = 0.0;
-
         /*
 
         Implemetantion goes here
@@ -261,9 +259,7 @@ int main(int argc, char *argv[])
         for(int i=1-(WARM_UP); i<=loop_count; i++){
             start_time = MPI_Wtime();
 
-            cudaErrorCheck( cudaMemcpy(A, d_A, size*N*sizeof(dtype), cudaMemcpyDeviceToHost) );
-            MPI_Alltoall(A, N, MPI_dtype, B, N, MPI_dtype, MPI_COMM_WORLD);
-            cudaErrorCheck( cudaMemcpy(d_B, B, size*N*sizeof(dtype), cudaMemcpyHostToDevice) );
+            MPI_Alltoall(d_A, N, MPI_dtype, d_B, N, MPI_dtype, MPI_COMM_WORLD);
 
             stop_time = MPI_Wtime();
             inner_elapsed_time = stop_time - start_time;
@@ -288,7 +284,7 @@ int main(int argc, char *argv[])
         MPI_Allreduce(&elapsed_time, &max_process_time, 1, MPI_DOUBLE, MPI_MAX, MPI_COMM_WORLD);
         double avg_time_per_transfer = max_process_time / ((double)loop_count);
 
-        if(rank == 0) printf("[Average] Transfer size (B): %10li, Transfer Time (s): %15.9f, Bandwidth (GB/s): %15.9f, Error: %d\n", num_B, avg_time_per_transfer, num_GB/avg_time_per_transfer, abs(gpu_check - recv_cpu_check[j]) );
+        if(rank == 0) printf("[Average] Transfer size (B): %10li, Transfer Time (s): %15.9f, Bandwidth (GB/s): %15.9f, Error: %d\n", num_B, avg_time_per_transfer, num_GB/avg_time_per_transfer, abs(gpu_check - cpu_checks[j]) );
         fflush(stdout);
 
         cudaErrorCheck( cudaFree(d_A) );

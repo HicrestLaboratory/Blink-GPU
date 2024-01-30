@@ -6,3 +6,5 @@ bin/*
 *.txt
 sout/*
 out/*
+
+sbatch/leonardo/run-leonardo*

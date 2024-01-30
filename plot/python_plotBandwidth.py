@@ -8,10 +8,10 @@ def unpack(file_paths):
     files=[]
     for file_path in file_paths:
         file_name = os.path.basename(file_path)
-        machines, experiments, label, _ = file_name.split('_')
+        machines, experiments, types, topology, _ = file_name.split('_')
         # linestyle = '-' if "Internode" in label else '--'
         df = extract_data(file_path)
-        files.append([machines,experiments,label,df])
+        files.append([machines,experiments,types,topology,df])
         #print(files)
     return files
 
@@ -30,12 +30,14 @@ def extract_data(file_path):
     return pd.DataFrame({'Transfer Size (B)': transfer_sizes, 'Bandwidth (GB/s)': bandwidths})
 
 
-lable_colors = { 'baseline': 'blue', 'CudaAware': 'red', 'Nccl': 'green', 'Nvlink': 'gray', 'Internode': 'blue', 'InternodeCudaAware': 'red', 'InternodeNccl': 'green', 'InternodeNvlink': 'gray' }
+lable_colors = { 'Baseline': 'blue', 'CudaAware': 'red', 'Nccl': 'green', 'Nvlink': 'gray'}
 
 # Function to plot performance comparison
 def plot_performance(file_paths):
 
+    all_types = []
     all_machines = []
+    all_topologyes = []
     all_experiments = []
     files = unpack(file_paths)
     for i in files:
@@ -43,52 +45,61 @@ def plot_performance(file_paths):
             all_machines.append(i[0])
         if i[1] not in all_experiments:
             all_experiments.append(i[1])
+        if i[2] not in all_types:
+            all_types.append(i[2])
+        if i[3] not in all_topologyes:
+            all_topologyes.append(i[3])
 
+    print('all_types: ' + str(all_types))
     print('all_machines: ' + str(all_machines))
+    print('all_topologyes: ' + str(all_topologyes))
     print('all_experiments: ' + str(all_experiments))
 
     plots={}
     for m in all_machines:
         for e in all_experiments:
-            plots[m+e]={}
+            for t in all_topologyes:
+                plots[m+e+t]={}
 
     for f in files:
-        plots[f[0]+f[1]][f[2]] = f[3]
+        plots[f[0]+f[1]+f[3]][f[2]] = f[4]
 
     line_order = list(lable_colors.keys())
 
-    for key in plots:
+    for topology in all_topologyes:
+        for key in plots:
+            if topology in key:
+                plt.figure(figsize=(10, 6))
+                for line in line_order:
+                    if line in plots[key]:
+                        print('Key: ', key)
+                        print('Line: ', line)
 
-        plt.figure(figsize=(10, 6))
-        for line in line_order:
-            if line in plots[key]:
-                print('Key: ', key)
-                print('Line: ', line)
+                        linestyle = '--' if 'multinode' in line else '-'
+                        transfer_size = plots[key][line]['Transfer Size (B)']
+                        bandwidth = plots[key][line]['Bandwidth (GB/s)']
 
-                linestyle = '--' if 'Internode' in line else '-'
-                transfer_size = plots[key][line]['Transfer Size (B)']
-                bandwidth = plots[key][line]['Bandwidth (GB/s)']
+                        print('transfer_size: ', transfer_size)
+                        print('bandwidth: ', bandwidth)
+                        print('linestyle: ', linestyle)
+                        print('color: ', lable_colors[line])
 
-                print('transfer_size: ', transfer_size)
-                print('bandwidth: ', bandwidth)
-                print('linestyle: ', linestyle)
-                print('color: ', lable_colors[line])
+                        plt.plot(transfer_size, bandwidth, label=line, linestyle=linestyle, color=lable_colors[line])
 
-                plt.plot(transfer_size, bandwidth, label=line, linestyle=linestyle, color=lable_colors[line])
+                plt.xscale('log', base=2)
+                plt.yscale('log')
+                plt.xlabel('Transfer Size (B)')
+                plt.ylabel('Bandwidth (GB/s)')
+                e = 'ping-pong' if 'pp' in key else 'all2all'
+                m = 'Leonardo' if 'leonardo' in key else 'Marzola'
+                t = 'SingleNode' if 'singlenode' in key else 'MultiNode'
+                plt.title(m + ' ' + e + ' ' + t + ' Performance Comparison')
+                print(line_order)
+                #plt.legend(legend_order)
+                plt.legend()
+                plt.grid(True)
 
-        plt.xscale('log', base=2)
-        plt.yscale('log')
-        plt.xlabel('Transfer Size (B)')
-        plt.ylabel('Bandwidth (GB/s)')
-        e = 'ping-pong' if 'pp' in key else 'all2all'
-        m = 'Leonardo' if 'leonardo' in key else 'Marzola'
-        plt.title(m + ' ' + e + ' Performance Comparison')
-        print(line_order)
-        #plt.legend(legend_order)
-        plt.legend()
-        plt.grid(True)
-
-        plt.show()
+                plt.show()
 
 # Specify the directory containing the files
 directory_path = 'sout/'

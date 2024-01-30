@@ -1,5 +1,7 @@
 #include <stdio.h>
 #include "mpi.h"
+
+#include <nccl.h>
 #include "cuda.h"
 #include <cuda_runtime.h>
 #include <string.h>
@@ -13,8 +15,9 @@
 
 #define dtype u_int8_t
 #define MPI_dtype MPI_CHAR
+#define ncclDtype ncclChar
 
-#define BUFF_CYCLE 29
+#define BUFF_CYCLE 27
 
 #define cktype int32_t
 #define MPI_cktype MPI_INT
@@ -30,6 +33,15 @@ do{                                                                             
         exit(0);                                                                            \
     }                                                                                     \
 }while(0)
+
+#define NCCLCHECK(cmd) do {                         \
+  ncclResult_t r = cmd;                             \
+  if (r!= ncclSuccess) {                            \
+    printf("Failed, NCCL error %s:%d '%s'\n",       \
+        __FILE__,__LINE__,ncclGetErrorString(r));   \
+    exit(EXIT_FAILURE);                             \
+  }                                                 \
+} while(0)
 
 #define MPI
 
@@ -189,6 +201,7 @@ int main(int argc, char *argv[])
     fflush(stdout);
     MPI_Barrier(MPI_COMM_WORLD);
 
+
 //     if(size != 2){
 //         if(rank == 0){
 //             printf("This program requires exactly 2 MPI ranks, but you are attempting to use %d! Exiting...\n", size);
@@ -208,6 +221,45 @@ int main(int argc, char *argv[])
     int mynodeid = -1, mynodesize = -1;
     MPI_Comm_rank(nodeComm, &mynodeid);
     MPI_Comm_size(nodeComm, &mynodesize);
+
+    /* -------------------------------------------------------------------------------------------
+        NCCL Initialization
+    --------------------------------------------------------------------------------------------*/
+    ncclUniqueId Id;
+    ncclComm_t NCCL_COMM_WORLD, NCCL_COMM_NODE;
+
+    ncclGroupStart();
+    if (mynodeid == 0) { NCCLCHECK( ncclGetUniqueId(&Id) ); }
+    MPI_Bcast(&Id, sizeof(ncclUniqueId), MPI_BYTE, 0, nodeComm);
+    NCCLCHECK( ncclCommInitRank(&NCCL_COMM_NODE, mynodesize, Id, mynodeid) );
+    ncclGroupEnd();
+    MPI_Barrier(MPI_COMM_WORLD);
+
+    ncclGroupStart();
+    if (rank == 0) { NCCLCHECK( ncclGetUniqueId(&Id) ); }
+    MPI_Bcast(&Id, sizeof(ncclUniqueId), MPI_BYTE, 0, MPI_COMM_WORLD);
+    NCCLCHECK( ncclCommInitRank(&NCCL_COMM_WORLD, size, Id, rank) );
+    ncclGroupEnd();
+
+    int nccl_w_rk;
+    int nccl_w_sz;
+    ncclGroupStart();
+    NCCLCHECK( ncclCommCount(NCCL_COMM_WORLD, &nccl_w_sz)   );
+    NCCLCHECK( ncclCommUserRank(NCCL_COMM_WORLD, &nccl_w_rk) );
+    ncclGroupEnd();
+
+    int nccl_n_rk;
+    int nccl_n_sz;
+    ncclGroupStart();
+    NCCLCHECK( ncclCommCount(NCCL_COMM_NODE, &nccl_n_sz)   );
+    NCCLCHECK( ncclCommUserRank(NCCL_COMM_NODE, &nccl_n_rk) );
+    ncclGroupEnd();
+
+    printf("[%d] NCCL_COMM_WORLD: nccl size = %d, nccl rank = %d\n", rank, nccl_w_sz, nccl_w_rk);
+    printf("[%d] NCCL_COMM_NODE:  nccl size = %d, nccl rank = %d\n", rank, nccl_n_sz, nccl_n_rk);
+    fflush(stdout);
+
+    MPI_Barrier(MPI_COMM_WORLD);
 
 
      /* -------------------------------------------------------------------------------------------
@@ -247,6 +299,7 @@ int main(int argc, char *argv[])
 
         int loop_count = 50;
         double start_time, stop_time, inner_elapsed_time, elapsed_time = 0.0;
+
         /*
 
         Implemetantion goes here
@@ -259,8 +312,14 @@ int main(int argc, char *argv[])
         for(int i=1-(WARM_UP); i<=loop_count; i++){
             start_time = MPI_Wtime();
 
-            MPI_Alltoall(d_A, N, MPI_dtype, d_B, N, MPI_dtype, MPI_COMM_WORLD);
+            ncclGroupStart();
+            for (int r=0; r<size; r++) {
+                ncclSend(d_A + (r*N)*sizeof(dtype), N, ncclDtype, r, NCCL_COMM_WORLD, NULL);
+                ncclRecv(d_B + (r*N)*sizeof(dtype), N, ncclDtype, r, NCCL_COMM_WORLD, NULL);
+            }
+            ncclGroupEnd();
 
+            cudaErrorCheck( cudaDeviceSynchronize() );
             stop_time = MPI_Wtime();
             inner_elapsed_time = stop_time - start_time;
             if(rank == 0) printf("\tTransfer size (B): %10li, Transfer Time (s): %15.9f, Bandwidth (GB/s): %15.9f, Iteration %d\n", num_B, inner_elapsed_time, num_GB/inner_elapsed_time, i);
@@ -284,7 +343,7 @@ int main(int argc, char *argv[])
         MPI_Allreduce(&elapsed_time, &max_process_time, 1, MPI_DOUBLE, MPI_MAX, MPI_COMM_WORLD);
         double avg_time_per_transfer = max_process_time / ((double)loop_count);
 
-        if(rank == 0) printf("[Average] Transfer size (B): %10li, Transfer Time (s): %15.9f, Bandwidth (GB/s): %15.9f, Error: %d\n", num_B, avg_time_per_transfer, num_GB/avg_time_per_transfer, abs(gpu_check - recv_cpu_check[j]) );
+        if(rank == 0) printf("[Average] Transfer size (B): %10li, Transfer Time (s): %15.9f, Bandwidth (GB/s): %15.9f, Error: %d\n", num_B, avg_time_per_transfer, num_GB/avg_time_per_transfer, abs(gpu_check - cpu_checks[j]) );
         fflush(stdout);
 
         cudaErrorCheck( cudaFree(d_A) );

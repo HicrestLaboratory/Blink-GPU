@@ -18,4 +18,4 @@
 MODULE_PATH="moduleload/load_nccl_modules.sh"
 
 mkdir -p sout
-source ${MODULE_PATH} && srun bin/pp-nccl
+source ${MODULE_PATH} && export NCCL_P2P_LEVEL=NVL && srun bin/pp-nccl

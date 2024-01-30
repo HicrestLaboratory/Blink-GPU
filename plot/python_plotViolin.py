@@ -35,17 +35,19 @@ def read_data(file_path):
     # Extract experiment name from the file name
     data_name = file_path.split('_')
     mac_name  = data_name[0]
-    exp_type  = data_name[1]
-    exp_name  = data_name[2]
+    exp_name  = data_name[1]
+    exp_type  = data_name[2]
+    exp_topo  = data_name[3]
 
     # Add exp_name as a new column
+    df['mac_name'] = mac_name
     df['exp_name'] = exp_name
     df['exp_type'] = exp_type
-    df['mac_name'] = mac_name
+    df['exp_topo'] = exp_topo
 
     return df
 
-lable_colors = { 'baseline': 'blue', 'Internode': 'blue', 'CudaAware': 'red','InternodeCudaAware': 'red', 'Nccl': 'green', 'InternodeNccl': 'green', 'Nvlink': 'gray', 'InternodeNvlink': 'gray' }
+lable_colors = { 'Baseline': 'blue', 'CudaAware': 'red', 'Nccl': 'green', 'Nvlink': 'gray'}
 
 # Folder path
 folder_path = 'sout'
@@ -57,44 +59,44 @@ files = [file for file in os.listdir(folder_path) if file.endswith('.out')]
 complete_data = pd.concat([read_data(os.path.join(folder_path, file_name)) for file_name in files])
 print(complete_data)
 
-for exp_type in complete_data['exp_type'].unique():
-    all_data = complete_data[complete_data['exp_type'] == exp_type]
+for exp_name in complete_data['exp_name'].unique():
+    exp_data = complete_data[complete_data['exp_name'] == exp_name]
+    for exp_topo in complete_data['exp_topo'].unique():
+        all_data = exp_data[exp_data['exp_topo'] == exp_topo]
 
-    # Identify the baseline avg time
-    baseline_data = {}
-    baseline_avg_time = {}
-    baseline_exp = 'baseline'
+        # Identify the baseline avg time
+        baseline_data = {}
+        baseline_avg_time = {}
+        baseline_exp = 'Baseline'
 
-    for size in all_data['Transfer size (B)'].unique():
-        #baseline_data[size] = all_data[all_data['exp_name'] == baseline_exp]
-        baseline_data[size] = all_data[(all_data['exp_name'] == baseline_exp) & (all_data['Transfer size (B)'] == size)]
-        baseline_avg_time[size] = baseline_data[size]['Transfer Time (s)'].mean()
+        for size in all_data['Transfer size (B)'].unique():
+            baseline_data[size] = all_data[(all_data['exp_type'] == baseline_exp) & (all_data['Transfer size (B)'] == size)]
+            baseline_avg_time[size] = baseline_data[size]['Transfer Time (s)'].mean()
 
-    print('baseline_avg_time[]: ')
-    print(baseline_avg_time)
+        print('baseline_avg_time[]: ')
+        print(baseline_avg_time)
 
-    # Calculate relative times by dividing transfer time by baseline average
-    all_data['Power of Two (B)'] = all_data['Transfer size (B)'].apply(lambda x: int(math.log2(x)) )
-    all_data['Baseline Avg Time'] = all_data['Transfer size (B)'].map(baseline_avg_time)
-    all_data['Relative Time'] = all_data['Transfer Time (s)'] / all_data['Baseline Avg Time']
+        # Calculate relative times by dividing transfer time by baseline average
+        all_data['Power of Two (B)'] = all_data['Transfer size (B)'].apply(lambda x: int(math.log2(x)) )
+        all_data['Baseline Avg Time'] = all_data['Transfer size (B)'].map(baseline_avg_time)
+        all_data['Relative Time'] = all_data['Transfer Time (s)'] / all_data['Baseline Avg Time']
 
 
-    # Set up a color palette for experiments
-    #palette = sns.color_palette("husl", n_colors=len(all_data['exp_name'].unique()))
-    palette = sns.color_palette([lable_colors[exp] for exp in all_data['exp_name'].unique()])
+        # Set up a color palette for experiments
+        palette = sns.color_palette([lable_colors[exp] for exp in all_data['exp_type'].unique()])
 
-    # Plot violin plots for each experiment
-    plt.figure(figsize=(14, 8))
+        # Plot violin plots for each experiment
+        plt.figure(figsize=(14, 8))
 
-    # Plot violin plot with unique color and label in legend
-    ax = sns.violinplot(x='Power of Two (B)', y='Relative Time', hue='exp_name', data=all_data, inner='quartile', palette=palette)
+        # Plot violin plot with unique color and label in legend
+        ax = sns.violinplot(x='Power of Two (B)', y='Relative Time', hue='exp_type', data=all_data, inner='quartile', palette=palette)
 
-    # Set vertical labels on x-axis
-    limit=2
-    plt.ylim(-limit/4, limit)
-    ax.yaxis.grid(True, linestyle='--', alpha=0.7)
-    #plt.xscale('log', base=2)
-    plt.xticks(rotation=90)
-    plt.title('Violin Plot of Transfer Time vs. Transfer Size for %s' % exp_type)
-    plt.legend(title='Experiment Name', bbox_to_anchor=(1, 1), loc='upper left')
-    plt.show()
+        # Set vertical labels on x-axis
+        limit=2
+        plt.ylim(-limit/4, limit)
+        ax.yaxis.grid(True, linestyle='--', alpha=0.7)
+        #plt.xscale('log', base=2)
+        plt.xticks(rotation=90)
+        plt.title('Violin Plot of Transfer Time vs. Transfer Size for %s %s' % (exp_name, exp_topo))
+        plt.legend(title='Experiment Name', bbox_to_anchor=(1, 1), loc='upper left')
+        plt.show()
