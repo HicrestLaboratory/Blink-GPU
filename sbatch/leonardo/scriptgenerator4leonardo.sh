@@ -18,9 +18,10 @@ stencil_script=$(cat << 'EOF'
 #SBATCH --mem=494000MB
 
 MODULE_PATH="moduleload/load_<exp-type>_modules.sh"
+EXPORT_PATH="exportload/load_<exp-type>_<exp-topo>_exports.sh"
 
 mkdir -p sout
-source ${MODULE_PATH} && srun bin/<exp-name>_<exp-type>
+source ${MODULE_PATH} && source ${EXPORT_PATH} && srun bin/<exp-name>_<exp-type>
 EOF
 )
 

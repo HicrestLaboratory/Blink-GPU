@@ -31,12 +31,22 @@ BINFOLDER=bin
 OUTFOLDER=out
 SOUTFOLDER=sout
 MODULEFOLDER=moduleload
+EXPORTFOLDER=exportload
 # ------------ Module loading ------------
 SHELL:=/bin/bash
 NCCL_MODULES="${MODULEFOLDER}/load_Nccl_modules.sh"
 NVLINK_MODULES="${MODULEFOLDER}/load_Nvlink_modules.sh"
 BASELINE_MODULES="${MODULEFOLDER}/load_Baseline_modules.sh"
 CUDA_AWARE_MODULES="${MODULEFOLDER}/load_CudaAware_modules.sh"
+# ------------ Export loading ------------
+NCCL_MN_EXPORTS="${EXPORTFOLDER}/load_Nccl_multinode_exports.sh"
+NCCL_SN_EXPORTS="${EXPORTFOLDER}/load_Nccl_singlenode_exports.sh"
+NVLINK_MN_EXPORTS="${EXPORTFOLDER}/load_Nvlink_multinode_exports.sh"
+NVLINK_SN_EXPORTS="${EXPORTFOLDER}/load_Nvlink_singlenode_exports.sh"
+BASELINE_MN_EXPORTS="${EXPORTFOLDER}/load_Baseline_multinode_exports.sh"
+BASELINE_SN_EXPORTS="${EXPORTFOLDER}/load_Baseline_singlenode_exports.sh"
+CUDA_AWARE_MN_EXPORTS="${EXPORTFOLDER}/load_CudaAware_multinode_exports.sh"
+CUDA_AWARE_SN_EXPORTS="${EXPORTFOLDER}/load_CudaAware_singlenode_exports.sh"
 # ----------------------------------------
 
 
@@ -55,11 +65,19 @@ $(BASELINE_MODULES):
 	@echo "module load nvhpc/23.1" >> $@
 	@echo "module load openmpi/4.1.4--gcc--11.3.0-cuda-11.8" >> $@
 
-$(BINFOLDER)/$(NAME)_Baseline: src/$(NAME)_Baseline.cu $(BASELINE_MODULES)
+$(BASELINE_SN_EXPORTS):
+	mkdir -p ${EXPORTFOLDER}
+	@echo "echo NO exports to load" > $@
+
+$(BASELINE_MN_EXPORTS):
+	mkdir -p ${EXPORTFOLDER}
+	@echo "echo NO exports to load" > $@
+
+$(BINFOLDER)/$(NAME)_Baseline: src/$(NAME)_Baseline.cu $(BASELINE_MODULES) $(BASELINE_SN_EXPORTS) $(BASELINE_MN_EXPORTS)
 	mkdir -p $(BINFOLDER) $(OUTFOLDER) $(SOUTFOLDER)
 	source $(BASELINE_MODULES) && $(CC) $(CFLAGS) -o $@ $< $(INCL) $(LIBS) $(LIBFLAGS) $(MPI) $(CUDA) -lstdc++ -lm -Wno-deprecated-gpu-targets $(DBGFLAGS)
 
-$(BINFOLDER)/$(A2ANAME)_Baseline: src/$(A2ANAME)_Baseline.cu $(BASELINE_MODULES)
+$(BINFOLDER)/$(A2ANAME)_Baseline: src/$(A2ANAME)_Baseline.cu $(BASELINE_MODULES) $(BASELINE_SN_EXPORTS) $(BASELINE_MN_EXPORTS)
 	mkdir -p $(BINFOLDER) $(OUTFOLDER) $(SOUTFOLDER)
 	source $(BASELINE_MODULES) && $(CC) $(CFLAGS) -o $@ $< $(INCL) $(LIBS) $(LIBFLAGS) $(MPI) $(CUDA) -lstdc++ -lm -Wno-deprecated-gpu-targets $(DBGFLAGS)
 
@@ -76,11 +94,19 @@ $(CUDA_AWARE_MODULES):
 	@echo "module load nvhpc/23.1" >> $@
 	@echo "module load openmpi/4.1.4--nvhpc--23.1-cuda-11.8" >> $@
 
-$(BINFOLDER)/$(NAME)_CudaAware: src/$(NAME)_CudaAware.cu $(CUDA_AWARE_MODULES)
+$(CUDA_AWARE_SN_EXPORTS):
+	mkdir -p ${EXPORTFOLDER}
+	@echo "echo NO exports to load" > $@
+
+$(CUDA_AWARE_MN_EXPORTS):
+	mkdir -p ${EXPORTFOLDER}
+	@echo "echo NO exports to load" > $@
+
+$(BINFOLDER)/$(NAME)_CudaAware: src/$(NAME)_CudaAware.cu $(CUDA_AWARE_MODULES) $(CUDA_AWARE_SN_EXPORTS) $(CUDA_AWARE_MN_EXPORTS)
 	mkdir -p $(BINFOLDER) $(OUTFOLDER) $(SOUTFOLDER)
 	source $(CUDA_AWARE_MODULES) && $(CC) $(CFLAGS) -o $@ $< $(INCL) $(LIBS) $(LIBFLAGS) $(MPI_CUDA) $(CUDA) -lstdc++ -lm -Wno-deprecated-gpu-targets $(DBGFLAGS)
 
-$(BINFOLDER)/$(A2ANAME)_CudaAware: src/$(A2ANAME)_CudaAware.cu $(CUDA_AWARE_MODULES)
+$(BINFOLDER)/$(A2ANAME)_CudaAware: src/$(A2ANAME)_CudaAware.cu $(CUDA_AWARE_MODULES) $(CUDA_AWARE_SN_EXPORTS) $(CUDA_AWARE_MN_EXPORTS)
 	mkdir -p $(BINFOLDER) $(OUTFOLDER) $(SOUTFOLDER)
 	source $(CUDA_AWARE_MODULES) && $(CC) $(CFLAGS) -o $@ $< $(INCL) $(LIBS) $(LIBFLAGS) $(MPI_CUDA) $(CUDA) -lstdc++ -lm -Wno-deprecated-gpu-targets $(DBGFLAGS)
 
@@ -91,38 +117,56 @@ $(BINFOLDER)/$(NBPPNAME)_CudaAware: src/$(NBPPNAME)_CudaAware.cu $(CUDA_AWARE_MO
 
 # ----------------- Nccl -----------------
 $(NCCL_MODULES):
+	mkdir -p ${MODULEFOLDER}
 	@echo "module purge" > $@
 	@echo "module load nvhpc/23.1" >> $@
 	@echo "module load openmpi/4.1.4--nvhpc--23.1-cuda-11.8" >> $@
 	@echo "module load nccl/2.14.3-1--gcc--11.3.0-cuda-11.8" >> $@
 
-$(BINFOLDER)/$(NAME)_Nccl: src/$(NAME)_Nccl.cu $(NCCL_MODULES)
+$(NCCL_SN_EXPORTS):
+	mkdir -p ${EXPORTFOLDER}
+	@echo "export NCCL_P2P_LEVEL=NVL" > $@
+
+$(NCCL_MN_EXPORTS):
+	mkdir -p ${EXPORTFOLDER}
+	@echo "export NCCL_P2P_DISABLE=1" > $@
+
+$(BINFOLDER)/$(NAME)_Nccl: src/$(NAME)_Nccl.cu $(NCCL_MODULES) $(NCCL_SN_EXPORTS) $(NCCL_MN_EXPORTS)
 	mkdir -p $(BINFOLDER) $(OUTFOLDER) $(SOUTFOLDER)
 	source $(NCCL_MODULES) ; $(CC) $(CFLAGS) -o $@ $< $(INCL) $(LIBS) $(LIBFLAGS) $(MPI) $(CUDA) $(NCCL) -lstdc++ -lm -Wno-deprecated-gpu-targets $(DBGFLAGS)
 
-$(BINFOLDER)/$(A2ANAME)_Nccl: src/$(A2ANAME)_Nccl.cu $(NCCL_MODULES)
+$(BINFOLDER)/$(A2ANAME)_Nccl: src/$(A2ANAME)_Nccl.cu $(NCCL_MODULES) $(NCCL_SN_EXPORTS) $(NCCL_MN_EXPORTS)
 	mkdir -p $(BINFOLDER) $(OUTFOLDER) $(SOUTFOLDER)
 	source $(NCCL_MODULES) ; $(CC) $(CFLAGS) -o $@ $< $(INCL) $(LIBS) $(LIBFLAGS) $(MPI) $(CUDA) $(NCCL) -lstdc++ -lm -Wno-deprecated-gpu-targets $(DBGFLAGS)
 # ----------------------------------------
 
 # ---------------- NVLink ----------------
 $(NVLINK_MODULES):
+	mkdir -p ${MODULEFOLDER}
 	@echo "module purge" > $@
 	@echo "module load nvhpc/23.1" >> $@
 	@echo "module load openmpi/4.1.4--nvhpc--23.1-cuda-11.8" >> $@
 
+$(NVLINK_SN_EXPORTS):
+	mkdir -p ${EXPORTFOLDER}
+	@echo "echo NO exports to load" > $@
+
+$(NVLINK_MN_EXPORTS):
+	mkdir -p ${EXPORTFOLDER}
+	@echo "echo NO exports to load" > $@
+
 helper_multiprocess.o: include/helper_multiprocess.cpp $(NVLINK_MODULES)
 	source $(NVLINK_MODULES) ; $(CC) $(INCL) --threads 0 -o $@ -c $<
 
-$(BINFOLDER)/$(NAME)_Nvlink: src/$(NAME)_Nvlink.cu $(NVLINK_MODULES) helper_multiprocess.o
+$(BINFOLDER)/$(NAME)_Nvlink: src/$(NAME)_Nvlink.cu $(NVLINK_MODULES) helper_multiprocess.o $(NVLINK_SN_EXPORTS) $(NVLINK_MN_EXPORTS)
 	mkdir -p $(BINFOLDER) $(OUTFOLDER) $(SOUTFOLDER)
 	source $(NVLINK_MODULES) ; $(CC) $(CFLAGS) helper_multiprocess.o -o $@ $< $(INCL) $(LIBS) $(LIBFLAGS) $(MPI) $(CUDA) -lstdc++ -lm -Wno-deprecated-gpu-targets $(DBGFLAGS)
 
-$(BINFOLDER)/$(A2ANAME)_Nvlink: src/$(A2ANAME)_Nvlink.cu $(NVLINK_MODULES) helper_multiprocess.o
+$(BINFOLDER)/$(A2ANAME)_Nvlink: src/$(A2ANAME)_Nvlink.cu $(NVLINK_MODULES) helper_multiprocess.o $(NVLINK_SN_EXPORTS) $(NVLINK_MN_EXPORTS)
 	mkdir -p $(BINFOLDER) $(OUTFOLDER) $(SOUTFOLDER)
 	source $(NVLINK_MODULES) ; $(CC) $(CFLAGS) helper_multiprocess.o -o $@ $< $(INCL) $(LIBS) $(LIBFLAGS) $(MPI) $(CUDA) -lstdc++ -lm -Wno-deprecated-gpu-targets $(DBGFLAGS)
 # ----------------------------------------
 
 clean:
-	rm -r $(BINFOLDER)/* ${MODULEFOLDER}/*
+	rm -r $(BINFOLDER)/* ${MODULEFOLDER}/* ${EXPORTFOLDER}/*
 	rm helper_multiprocess.o

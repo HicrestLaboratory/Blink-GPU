@@ -1,6 +1,7 @@
 *.kdev4
 
 moduleload/*
+exportload/*
 bin/*
 
 *.txt

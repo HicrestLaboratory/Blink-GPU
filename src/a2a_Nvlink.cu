@@ -355,8 +355,8 @@ int main(int argc, char *argv[])
             start_time = MPI_Wtime();
 
             // Memcopy DeviceToDevice
-            for (int i=0; i<size; i++)
-                cudaErrorCheck( cudaMemcpy(d_B + (i*N)*sizeof(dtype), peerBuffer[i] + (i*N)*sizeof(dtype), sizeof(dtype)*N, cudaMemcpyDeviceToDevice) );
+            for (int k=0; k<size; k++)
+                cudaErrorCheck( cudaMemcpy(d_B + (k*N)*sizeof(dtype), peerBuffer[k] + (k*N)*sizeof(dtype), sizeof(dtype)*N, cudaMemcpyDeviceToDevice) );
             cudaErrorCheck( cudaDeviceSynchronize() );
 
             stop_time = MPI_Wtime();
