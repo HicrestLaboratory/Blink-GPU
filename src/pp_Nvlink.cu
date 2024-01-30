@@ -294,6 +294,32 @@ int main(int argc, char *argv[])
 
     int rank2 = size-1;
 
+    // Get the group or processes of the default communicator
+    MPI_Group world_group;
+    MPI_Comm_group(MPI_COMM_WORLD, &world_group);
+
+    // Keep only the processes 0 and 1 in the new group.
+    int ranks[2];
+    ranks[0] = 0;
+    ranks[1] = rank2;
+    MPI_Group pp_group;
+    MPI_Group_incl(world_group, 2, ranks, &pp_group);
+
+    // Create the new communicator from that group of processes.
+    MPI_Comm ppComm;
+    MPI_Comm_create(MPI_COMM_WORLD, pp_group, &ppComm);
+
+    // Do a broadcast only between the processes of the new communicator.
+
+    if(ppComm == MPI_COMM_NULL) {
+        // I am not part of the ppComm.
+        printf("Process %d did not take part to the ppComm.\n", rank);
+    } else {
+        // I am part of the new ppComm.
+        printf("Process %d took part to the ppComm.\n", rank);
+    }
+    MPI_Barrier(MPI_COMM_WORLD);
+
      /* -------------------------------------------------------------------------------------------
         Loop from 8 B to 1 GB
     --------------------------------------------------------------------------------------------*/
@@ -365,6 +391,7 @@ int main(int argc, char *argv[])
 
 
             for(int i=1-(WARM_UP); i<=loop_count; i++){
+                MPI_Barrier(ppComm);
                 start_time = MPI_Wtime();
 
                 // Memcopy DeviceToDevice

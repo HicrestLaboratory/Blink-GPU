@@ -36,7 +36,7 @@ do
     do
         for topo in "${topos[@]}"
         do
-            echo "$name $type $topo"
+#             echo "$name $type $topo"
             out_script_contenent=$(echo "$stencil_script" | sed "s/<exp-name>/$name/g" | sed "s/<exp-type>/$type/g" | sed "s/<exp-topo>/$topo/g")
             tmp_script_contenent=$(echo "$out_script_contenent")
 

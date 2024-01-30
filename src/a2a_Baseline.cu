@@ -259,6 +259,7 @@ int main(int argc, char *argv[])
         double num_GB = (double)num_B / (double)B_in_GB;
 
         for(int i=1-(WARM_UP); i<=loop_count; i++){
+            MPI_Barrier(MPI_COMM_WORLD);
             start_time = MPI_Wtime();
 
             cudaErrorCheck( cudaMemcpy(A, d_A, size*N*sizeof(dtype), cudaMemcpyDeviceToHost) );

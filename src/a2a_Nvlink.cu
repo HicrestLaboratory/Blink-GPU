@@ -352,6 +352,7 @@ int main(int argc, char *argv[])
                 peerBuffer[i] = d_A; // NOTE this is the self send case
 
         for(int i=1-(WARM_UP); i<=loop_count; i++){
+            MPI_Barrier(MPI_COMM_WORLD);
             start_time = MPI_Wtime();
 
             // Memcopy DeviceToDevice
