@@ -58,22 +58,25 @@ struct my_heap_tracker {
 
 struct my_heap_tracker myHeapTracker;
 
-#define HEAP_TRACKER_OPEN {
-  myHeapTracker.len = 0;
-  myHeapTracker.size = HEAP_TRACKER_BLK;
-  myHeapTracker.ptr_list = malloc(sizeof(void*)*HEAP_TRACKER_BLK);
-  myHeapTracker.free_list = malloc(sizeof(size_t*)*HEAP_TRACKER_BLK);
-  myHeapTracker.alloc_list = malloc(sizeof(size_t*)*HEAP_TRACKER_BLK);
-  for (int i=0; i<HEAP_TRACKER_BLK; i++) {
-    myHeapTracker.ptr_list[i] = NULL;
-    myHeapTracker.free_list[i] = 0;
-    myHeapTracker.alloc_list[i] = 0;
-  }
+#define HEAP_TRACKER_OPEN { \
+  myHeapTracker.len = 0; \
+  myHeapTracker.size = HEAP_TRACKER_BLK; \
+  myHeapTracker.ptr_list = malloc(sizeof(void*)*HEAP_TRACKER_BLK); \
+  myHeapTracker.free_list = malloc(sizeof(size_t*)*HEAP_TRACKER_BLK); \
+  myHeapTracker.alloc_list = malloc(sizeof(size_t*)*HEAP_TRACKER_BLK); \
+  for (int i=0; i<HEAP_TRACKER_BLK; i++) { \
+    myHeapTracker.ptr_list[i] = NULL; \
+    myHeapTracker.free_list[i] = 0; \
+    myHeapTracker.alloc_list[i] = 0; \
+  } \
 }
 
 #define MY_MALLOC_CHECK(X) {
   void* p = X;
-  if (p == NULL) fprintf(stderr, "ERROR: malloc at line %d of file %s reeturned a NULL pointer\n", __LINE__, __FILE__);
+  if (p == NULL) {
+    fprintf(stderr, "ERROR: malloc at line %d of file %s reeturned a NULL pointer\n", __LINE__, __FILE__);
+    exit();
+  }
 }
 
 #else
@@ -81,7 +84,7 @@ struct my_heap_tracker myHeapTracker;
 #define MPI_DBG_CHECK(CM, X) {  }
 #define DBG_PRINT(X, Y) { }
 #define DBG_STOP(X) { }
-#define MY_MALLOC_CHECK(X) {}
+#define MY_MALLOC_CHECK(X) X;
 #endif
 
 // ========================================== MPI PRINTS ==========================================
