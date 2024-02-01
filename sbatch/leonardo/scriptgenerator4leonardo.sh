@@ -25,7 +25,7 @@ source ${MODULE_PATH} && source ${EXPORT_PATH} && srun bin/<exp-name>_<exp-type>
 EOF
 )
 
-names=("pp" "a2a")
+names=("pp" "a2a" "hlo")
 types=("Baseline" "CudaAware" "Nccl" "Nvlink")
 topos=("singlenode" "multinode")
 
@@ -36,23 +36,26 @@ do
     do
         for topo in "${topos[@]}"
         do
-#             echo "$name $type $topo"
-            out_script_contenent=$(echo "$stencil_script" | sed "s/<exp-name>/$name/g" | sed "s/<exp-type>/$type/g" | sed "s/<exp-topo>/$topo/g")
-            tmp_script_contenent=$(echo "$out_script_contenent")
-
-            if [[ "$topo" == "multinode" ]]
+            if [[ "$name" != "hlo" || "$type" == "Baseline" ]] # BUG TMP since halo now implemented only in Baseline
             then
-                out_script_contenent=$(echo "$tmp_script_contenent" | sed "s/nodes=1/nodes=2/g")
+
+                out_script_contenent=$(echo "$stencil_script" | sed "s/<exp-name>/$name/g" | sed "s/<exp-type>/$type/g" | sed "s/<exp-topo>/$topo/g")
+                tmp_script_contenent=$(echo "$out_script_contenent")
+
+                if [[ "$topo" == "multinode" ]]
+                then
+                    out_script_contenent=$(echo "$tmp_script_contenent" | sed "s/nodes=1/nodes=2/g")
+                fi
+
+                # Write the new script to a file
+                out_script_file="sbatch/leonardo/run-leonardo-$name-$type-$topo.sh"
+                echo "$out_script_contenent" > "$out_script_file"
+                chmod +x "$out_script_file"
+
+                echo "Generated $out_script_file"
+
+                echo "sbatch $out_script_file" >> "sbatch/leonardo/run-leonardo-$name-all.sh"
             fi
-
-            # Write the new script to a file
-            out_script_file="sbatch/leonardo/run-leonardo-$name-$type-$topo.sh"
-            echo "$out_script_contenent" > "$out_script_file"
-            chmod +x "$out_script_file"
-
-            echo "Generated $out_script_file"
-
-            echo "sbatch $out_script_file" >> "sbatch/leonardo/run-leonardo-$name-all.sh"
         done
     done
     chmod +x "sbatch/leonardo/run-leonardo-$name-all.sh"
