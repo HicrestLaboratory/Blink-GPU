@@ -287,10 +287,10 @@ int main(int argc, char *argv[])
     MPI_Comm_rank(nodeComm, &mynodeid);
     MPI_Comm_size(nodeComm, &mynodesize);
 
-    if (nnodes != 1) {
-        if (0 == rank) printf("The NVLINK version is only implemented for intraNode communication\n");
-        exit(__LINE__);
-    }
+//     if (nnodes != 1) {
+//         if (0 == rank) printf("The NVLINK version is only implemented for intraNode communication\n");
+//         exit(__LINE__);
+//     }
 
     int rank2 = size-1;
 
