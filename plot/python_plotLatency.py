@@ -31,6 +31,10 @@ def extract_data(file_path):
 
 lable_colors = { 'Baseline': 'blue', 'CudaAware': 'red', 'Nccl': 'green', 'Nvlink': 'gray'}
 
+lable_machines = { 'leonardo': 'Leonardo', 'marzola': 'Marzola'}
+lable_topologyes = { 'singlenode': 'Single node', 'multinode': 'Multi nodes'}
+lable_experiments = { '-pp-': 'Ping-pong', '-a2a-': 'AllToAll', '-ar-': 'AllReduce'}
+
 # Function to plot performance comparison
 def plot_performance(file_paths):
 
@@ -58,10 +62,10 @@ def plot_performance(file_paths):
     for m in all_machines:
         for e in all_experiments:
             for t in all_topologyes:
-                plots[m+e+t]={}
+                plots[m+'-'+e+'-'+t]={}
 
     for f in files:
-        plots[f[0]+f[1]+f[3]][f[2]] = f[4]
+        plots[f[0]+'-'+f[1]+'-'+f[3]][f[2]] = f[4]
 
     bar_order = list(lable_colors.keys())
 
@@ -88,9 +92,20 @@ def plot_performance(file_paths):
                 plt.xlabel('File')
                 plt.ylabel('Transfer Time (s)')
                 plt.title(f'Transfer Time for Smallest Size ({smallest_size} B) Comparison')
-                e = 'ping-pong' if 'pp' in key else 'all2all'
-                m = 'Leonardo' if 'leonardo' in key else 'Marzola'
-                t = 'SingleNode' if 'singlenode' in key else 'MultiNode'
+
+                #e = 'ping-pong' if 'pp' in key else 'all2all'
+                for k in lable_experiments:
+                    if k in key:
+                        e = lable_experiments[k]
+                #m = 'Leonardo' if 'leonardo' in key else 'Marzola'
+                for k in lable_machines:
+                    if k in key:
+                        m = lable_machines[k]
+                #t = 'SingleNode' if 'singlenode' in key else 'MultiNode'
+                for k in lable_topologyes:
+                    if k in key:
+                        t = lable_topologyes[k]
+
                 plt.title(m + ' ' + e + ' ' + t +  f' Transfer Time for Smallest Size ({smallest_size} B) Comparison')
                 plt.xticks(rotation=45, ha='right')  # Rotate x-axis labels
                 plt.tight_layout(rect=[0, 0.1, 1, 0.95])

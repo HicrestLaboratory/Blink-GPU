@@ -25,7 +25,7 @@ source ${MODULE_PATH} && source ${EXPORT_PATH} && srun bin/<exp-name>_<exp-type>
 EOF
 )
 
-names=("pp" "a2a" "hlo")
+names=("pp" "a2a" "ar" "hlo")
 types=("Baseline" "CudaAware" "Nccl" "Nvlink")
 topos=("singlenode" "multinode")
 
@@ -36,7 +36,7 @@ do
     do
         for topo in "${topos[@]}"
         do
-            if [[ "$name" != "hlo" || "$type" == "Baseline" ]] # BUG TMP since halo now implemented only in Baseline
+            if [[ ("$name" != "hlo" || "$type" == "Baseline") && ("$name" != "ar" || "$type" != "Nvlink") ]] # BUG TMP since halo and ar now implemented only in Baseline
             then
 
                 out_script_contenent=$(echo "$stencil_script" | sed "s/<exp-name>/$name/g" | sed "s/<exp-type>/$type/g" | sed "s/<exp-topo>/$topo/g")
