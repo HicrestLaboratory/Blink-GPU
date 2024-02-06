@@ -90,11 +90,6 @@ def plot_performance(file_paths):
 
                         plt.plot(transfer_size, bandwidth, label=line, linestyle=linestyle, color=lable_colors[line])
 
-                plt.xscale('log', base=2)
-                plt.yscale('log')
-                plt.xlabel('Transfer Size (B)')
-                plt.ylabel('Bandwidth (GB/s)')
-
                 #e = 'ping-pong' if 'pp' in key else 'all2all'
                 for k in lable_experiments:
                     if k in key:
@@ -107,6 +102,21 @@ def plot_performance(file_paths):
                 for k in lable_topologyes:
                     if k in key:
                         t = lable_topologyes[k]
+
+                if m == 'Leonardo':
+                    if t == 'Single node':
+                        if e == 'Ping-pong':
+                            peak = 100
+                        else:
+                            peak = 300
+                    else:
+                        peak = 25
+                plt.axhline(y=peak, color='red', linestyle='--', label='Theoretical peak')
+
+                plt.xscale('log', base=2)
+                plt.yscale('log')
+                plt.xlabel('Transfer Size (B)')
+                plt.ylabel('Bandwidth (GB/s)')
 
                 plt.title(m + ' ' + e + ' ' + t + ' Performance Comparison')
                 print(line_order)
