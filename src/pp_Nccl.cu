@@ -315,20 +315,25 @@ int main(int argc, char *argv[])
             int tag2 = 20;
 
             int loop_count = 50;
-            double start_time, stop_time, inner_elapsed_time, elapsed_time = 0.0;
+            float start_time, stop_time, inner_elapsed_time, elapsed_time = 0.0;
 
             /*
 
             Implemetantion goes here
 
             */
+            cudaEvent_t start, stop;
+            cudaErrorCheck(cudaEventCreate(&start));
+            cudaErrorCheck(cudaEventCreate(&stop));
+
             long int num_B = sizeof(dtype)*N;
             long int B_in_GB = 1 << 30;
             double num_GB = (double)num_B / (double)B_in_GB;
 
             for(int i=1-(WARM_UP); i<=loop_count; i++){
                 MPI_Barrier(ppComm);
-                start_time = MPI_Wtime();
+//                 start_time = MPI_Wtime();
+                cudaErrorCheck(cudaEventRecord(start, NULL));
 
                 ncclGroupStart();
                 if(rank == 0){
@@ -348,9 +353,12 @@ int main(int argc, char *argv[])
                 }
                 ncclGroupEnd();
 
-                cudaErrorCheck( cudaDeviceSynchronize() );
-                stop_time = MPI_Wtime();
-                inner_elapsed_time = stop_time - start_time;
+//                 cudaErrorCheck( cudaDeviceSynchronize() );
+//                 stop_time = MPI_Wtime();
+//                 inner_elapsed_time = stop_time - start_time;
+                cudaErrorCheck(cudaEventRecord(stop, NULL));
+                cudaErrorCheck(cudaEventSynchronize(stop));
+                cudaErrorCheck(cudaEventElapsedTime(&inner_elapsed_time, start, stop));
                 if(rank == 0) printf("\tTransfer size (B): %10li, Transfer Time (s): %15.9f, Bandwidth (GB/s): %15.9f, Iteration %d\n", num_B, inner_elapsed_time, num_GB/inner_elapsed_time, i);
                 if (i>0) elapsed_time += inner_elapsed_time;
             }
