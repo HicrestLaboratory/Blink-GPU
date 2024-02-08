@@ -285,11 +285,15 @@ int main(int argc, char *argv[])
         Loop from 8 B to 1 GB
     --------------------------------------------------------------------------------------------*/
 
+    int loop_count = 50;
+    float start_time, stop_time;
     cktype cpu_checks[BUFF_CYCLE], gpu_checks[BUFF_CYCLE];
+    float inner_elapsed_time[BUFF_CYCLE][loop_count], elapsed_time[BUFF_CYCLE][loop_count];
     if (rank == 0 || rank == rank2) {
         for(int j=0; j<BUFF_CYCLE; j++){
 
             long int N = 1 << j;
+            if (rank == 0) {printf("%i#", j); fflush(stdout);}
 
             // Allocate memory for A on CPU
             dtype *A = (dtype*)malloc(N*sizeof(dtype));
@@ -314,9 +318,6 @@ int main(int argc, char *argv[])
             int tag1 = 10;
             int tag2 = 20;
 
-            int loop_count = 50;
-            float start_time, stop_time, inner_elapsed_time, elapsed_time = 0.0;
-
             /*
 
             Implemetantion goes here
@@ -326,13 +327,8 @@ int main(int argc, char *argv[])
             cudaErrorCheck(cudaEventCreate(&start));
             cudaErrorCheck(cudaEventCreate(&stop));
 
-            long int num_B = sizeof(dtype)*N;
-            long int B_in_GB = 1 << 30;
-            double num_GB = (double)num_B / (double)B_in_GB;
-
             for(int i=1-(WARM_UP); i<=loop_count; i++){
                 MPI_Barrier(ppComm);
-//                 start_time = MPI_Wtime();
                 cudaErrorCheck(cudaEventRecord(start, NULL));
 
                 ncclGroupStart();
@@ -353,16 +349,13 @@ int main(int argc, char *argv[])
                 }
                 ncclGroupEnd();
 
-//                 cudaErrorCheck( cudaDeviceSynchronize() );
-//                 stop_time = MPI_Wtime();
-//                 inner_elapsed_time = stop_time - start_time;
                 cudaErrorCheck(cudaEventRecord(stop, NULL));
                 cudaErrorCheck(cudaEventSynchronize(stop));
-                cudaErrorCheck(cudaEventElapsedTime(&inner_elapsed_time, start, stop));
-                if(rank == 0) printf("\tTransfer size (B): %10li, Transfer Time (s): %15.9f, Bandwidth (GB/s): %15.9f, Iteration %d\n", num_B, inner_elapsed_time, num_GB/inner_elapsed_time, i);
-                if (i>0) elapsed_time += inner_elapsed_time;
-            }
+                if (i>0) {cudaErrorCheck(cudaEventElapsedTime(&(inner_elapsed_time[j][i-1]), start, stop));}
 
+                if (rank == 0) {printf("%%"); fflush(stdout);}
+            }
+            if (rank == 0) {printf("#\n"); fflush(stdout);}
 
 
 
@@ -377,14 +370,29 @@ int main(int argc, char *argv[])
 
             gpu_checks[j] = gpu_check;
             cpu_checks[j] = recv_cpu_check;
-            double avg_time_per_transfer = elapsed_time / (2.0*(double)loop_count);
 
-            if(rank == 0) printf("[Average] Transfer size (B): %10li, Transfer Time (s): %15.9f, Bandwidth (GB/s): %15.9f, Error: %d\n", num_B, avg_time_per_transfer, num_GB/avg_time_per_transfer, abs(gpu_check - recv_cpu_check) );
-            fflush(stdout);
             cudaErrorCheck( cudaFree(d_A) );
             cudaErrorCheck( cudaFree(d_B) );
             free(A);
             free(B);
+        }
+
+        MPI_Allreduce(inner_elapsed_time, elapsed_time, BUFF_CYCLE*loop_count, MPI_FLOAT, MPI_MAX, ppComm);
+        for(int j=0; j<BUFF_CYCLE; j++) {
+            long int N = 1 << j;
+            long int B_in_GB = 1 << 30;
+            long int num_B = sizeof(dtype)*N;
+            double num_GB = (double)num_B / (double)B_in_GB;
+
+            double avg_time_per_transfer[BUFF_CYCLE];
+            for (int i=0; i<loop_count; i++) {
+                avg_time_per_transfer[j] += elapsed_time[j][i];
+                if(rank == 0) printf("\tTransfer size (B): %10li, Transfer Time (s): %15.9f, Bandwidth (GB/s): %15.9f, Iteration %d\n", num_B, inner_elapsed_time[j][i], num_GB/inner_elapsed_time[j][i], i);
+            }
+            avg_time_per_transfer[j] /= (2.0*(double)loop_count);
+
+            if(rank == 0) printf("[Average] Transfer size (B): %10li, Transfer Time (s): %15.9f, Bandwidth (GB/s): %15.9f, Error: %d\n", num_B, avg_time_per_transfer[j], num_GB/avg_time_per_transfer[j], abs(gpu_checks[j] - cpu_checks[j]) );
+            fflush(stdout);
         }
 
         char s[10000000];

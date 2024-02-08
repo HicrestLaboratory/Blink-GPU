@@ -88,7 +88,8 @@ def plot_performance(file_paths):
                         print('linestyle: ', linestyle)
                         print('color: ', lable_colors[line])
 
-                        plt.plot(transfer_size, bandwidth, label=line, linestyle=linestyle, color=lable_colors[line])
+                        if (line != 'Nvlink' or not '-ar-' in key):
+                            plt.plot(transfer_size, bandwidth, label=line, linestyle=linestyle, color=lable_colors[line])
 
                 #e = 'ping-pong' if 'pp' in key else 'all2all'
                 for k in lable_experiments:
