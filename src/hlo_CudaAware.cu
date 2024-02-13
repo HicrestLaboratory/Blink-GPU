@@ -305,10 +305,8 @@ __global__
 void init_kernel(int n, dtype *input, int rank) {
   int tid = blockIdx.x*blockDim.x + threadIdx.x;
 
-  dtype floattid = tid/(dtype)TID_DIGITS;
-  dtype val_coord = rank + floattid;
   if (tid < n)
-      input[tid] = (dtype)val_coord;
+      input[tid] = (dtype)(rank+1);
 
 }
 
@@ -347,6 +345,22 @@ void halo3d_run_axes(int BufferSize, int UpFlag, int DownFlag,
     *timeTakenMPI += TIMER_ELAPSED(0);
 
     // =================================================================================================================
+}
+
+unsigned int check_recv_buffer (int my_rank, char axe,
+                                int UpFlag, dtype *dev_UpBuffer,
+                                int DownFlag, dtype *dev_DownBuffer,
+                                int BufferSize) {
+
+    cktype UpCheck = 0, DownCheck = 0;
+    if (UpFlag>-1) gpu_device_reduce(dev_UpBuffer, BufferSize, &UpCheck);
+    if (DownFlag>-1) gpu_device_reduce(dev_DownBuffer, BufferSize, &DownCheck);
+
+    unsigned int result = 0U;
+    if ( UpFlag>-1 && UpCheck != BufferSize*(UpFlag+1) ) result |= 1U;
+    if ( DownFlag>-1 && DownCheck != BufferSize*(DownFlag+1) ) result |= 2U;
+//     printf("[BufferSize=%d, myRank=%d, axe=%c] UpFlag = %d, UpCheck = %d, DownFlag = %d, DownCheck = %d --> %u\n", BufferSize, my_rank, axe, UpFlag, UpCheck, DownFlag, DownCheck, result);
+    return(result);
 }
 
 // ----------------------------------------------------------------------------
@@ -486,7 +500,7 @@ int main(int argc, char *argv[])
     int loop_count = 50;
     double start_time, stop_time;
     double cuda_timer[3], mpi_timer[3];
-    cktype cpu_checks[BUFF_CYCLE], gpu_checks[BUFF_CYCLE];
+    unsigned int halo_checks[BUFF_CYCLE];
     double inner_elapsed_time[BUFF_CYCLE][loop_count], elapsed_time[BUFF_CYCLE][loop_count];
     for(int j=0; j<BUFF_CYCLE; j++){
 
@@ -495,6 +509,7 @@ int main(int argc, char *argv[])
         xSize = ny * nz * N;
         ySize = nx * nz * N;
         zSize = nx * ny * N;
+        halo_checks[j] = 0U;
 
 //         STR_COLL_DEF
 //         STR_COLL_INIT
@@ -573,6 +588,15 @@ int main(int argc, char *argv[])
             if (i>0) inner_elapsed_time[j][i-1] = stop_time - start_time;
 
             if (rank == 0) {printf("%%"); fflush(stdout);}
+
+            unsigned int xCheck = check_recv_buffer(rank, 'x', xUp, dev_xUpRecvBuffer, xDown, dev_xDownRecvBuffer, xSize);
+            unsigned int yCheck = check_recv_buffer(rank, 'y', yUp, dev_yUpRecvBuffer, yDown, dev_yDownRecvBuffer, ySize);
+            unsigned int zCheck = check_recv_buffer(rank, 'z', zUp, dev_zUpRecvBuffer, zDown, dev_zDownRecvBuffer, zSize);
+            xCheck = xCheck << 4;
+            yCheck = yCheck << 2;
+            halo_checks[j] |= xCheck;
+            halo_checks[j] |= yCheck;
+            halo_checks[j] |= zCheck;
         }
         if (rank == 0) {printf("#\n"); fflush(stdout);}
 
@@ -631,7 +655,7 @@ int main(int argc, char *argv[])
         }
         avg_time_per_transfer[j] /= ((double)loop_count);
 
-        if(rank == 0) printf("[Average] Transfer size (B): %10li, Transfer Time (s): %15.9f, Bandwidth (GB/s): %15.9f, Error: %d\n", num_B, avg_time_per_transfer[j], num_GB/avg_time_per_transfer[j], -1 );
+        if(rank == 0) printf("[Average] Transfer size (B): %10li, Transfer Time (s): %15.9f, Bandwidth (GB/s): %15.9f, Error: %d\n", num_B, avg_time_per_transfer[j], num_GB/avg_time_per_transfer[j], halo_checks[j] );
         fflush(stdout);
     }
 
