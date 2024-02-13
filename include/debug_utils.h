@@ -497,6 +497,37 @@ struct dev_vec_collector {
 
 #endif
 
+int cmpfunc (const void * a, const void * b) {
+   if(*(float*)a == *(float*)b) {return (0);} else {
+   return ( (*(float*)a > *(float*)b) ? 1 : -1 ); }
+}
+
+#define PRINT_STREAM_TIMETABLE(M, N) {                \
+  float in_macro_tmp[N];                              \
+  printf("\nStart:\t");                               \
+  for (int i=0; i<N; i++) in_macro_tmp[i] = M[0][i];  \
+  qsort(in_macro_tmp, N, sizeof(float), cmpfunc);     \
+  for (int i=0; i<N; i++) {                           \
+    int j=0;                                          \
+    while (j<N && in_macro_tmp[i] != M[0][j]) j++;    \
+    printf("%2d (%4.3f) |", j, in_macro_tmp[i]);      \
+  }                                                   \
+  printf("\n");                                       \
+  \
+  printf("Stop: \t");                                 \
+  for (int i=0; i<N; i++) in_macro_tmp[i] = M[1][i];  \
+  qsort(in_macro_tmp, N, sizeof(float), cmpfunc);     \
+  for (int i=0; i<N; i++) {                           \
+    int j=0;                                          \
+    while (j<N && in_macro_tmp[i] != M[1][j]) j++;    \
+    printf("%2d (%4.3f) |", j, in_macro_tmp[i]);      \
+  }                                                   \
+  printf("\n\nTime of each stream:\n");               \
+  for (int i=0; i<N; i++) {                           \
+    printf("\t Stream %d:%4.3f\n",i,M[1][i]-M[0][i]); \
+  }                                                   \
+}
+
 #ifdef NCCL
 
 #define NCCLCHECK(cmd) do {                         \

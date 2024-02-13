@@ -34,7 +34,7 @@ lable_colors = { 'Baseline': 'blue', 'CudaAware': 'red', 'Nccl': 'green', 'Nvlin
 
 lable_machines = { 'leonardo': 'Leonardo', 'marzola': 'Marzola'}
 lable_topologyes = { 'singlenode': 'Single node', 'multinode': 'Multi nodes'}
-lable_experiments = { '-pp-': 'Ping-pong', '-a2a-': 'AllToAll', '-ar-': 'AllReduce', 'hlo': 'Halo'}
+lable_experiments = { '-pp-': 'Ping-pong', '-a2a-': 'AllToAll', '-ar-': 'AllReduce', '-hlo-': 'Halo'}
 
 # Function to plot performance comparison
 def plot_performance(file_paths):

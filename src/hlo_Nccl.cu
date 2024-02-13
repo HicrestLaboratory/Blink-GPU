@@ -324,24 +324,28 @@ void init_kernel(int n, dtype *input, int rank) {
 
 }
 
+#define TAKE_STREAM(SV, AX, SoR, UoD) &(SV[(AX * 3) + (SoR * 2) + UoD])
+
 void halo3d_run_axes(ncclComm_t nccl_comm,
                      int BufferSize, int UpFlag, int DownFlag,
                      dtype *host_UpSendBuffer,   dtype *dev_UpSendBuffer,   dtype *host_UpRecvBuffer,   dtype *dev_UpRecvBuffer,
                      dtype *host_DownSendBuffer, dtype *dev_DownSendBuffer, dtype *host_DownRecvBuffer, dtype *dev_DownRecvBuffer,
-                     float *timeTakenCUDA, float *timeTakenMPI, int tag) {
+                     float *timeTakenCUDA, float *timeTakenMPI, int tag,
+                     cudaStream_t *UpSendStream, cudaStream_t *DownSendStream,
+                     cudaStream_t *UpRecvStream, cudaStream_t *DownRecvStream) {
     // =================================================================================================================
 
     ncclGroupStart();
     if (UpFlag > -1) {
-        ncclRecv(dev_UpRecvBuffer, BufferSize, ncclDtype, UpFlag, nccl_comm, NULL);
-        ncclSend(dev_UpSendBuffer, BufferSize, ncclDtype, UpFlag, nccl_comm, NULL);
+        ncclRecv(dev_UpRecvBuffer, BufferSize, ncclDtype, UpFlag, nccl_comm, *UpRecvStream);
+        ncclSend(dev_UpSendBuffer, BufferSize, ncclDtype, UpFlag, nccl_comm, *UpSendStream);
     }
     ncclGroupEnd();
 
     ncclGroupStart();
     if (DownFlag > -1) {
-        ncclRecv(dev_DownRecvBuffer, BufferSize, ncclDtype, DownFlag, nccl_comm, NULL);
-        ncclSend(dev_DownSendBuffer, BufferSize, ncclDtype, DownFlag, nccl_comm, NULL);
+        ncclRecv(dev_DownRecvBuffer, BufferSize, ncclDtype, DownFlag, nccl_comm, *DownRecvStream);
+        ncclSend(dev_DownSendBuffer, BufferSize, ncclDtype, DownFlag, nccl_comm, *DownSendStream);
     }
     ncclGroupEnd();
 
@@ -419,19 +423,32 @@ int main(int argc, char *argv[])
     --------------------------------------------------------------------------------------------*/
     ncclUniqueId Id;
     ncclComm_t NCCL_COMM_WORLD, NCCL_COMM_NODE;
+    ncclConfig_t ncclConfigW = NCCL_CONFIG_INITIALIZER;
+    ncclConfig_t ncclConfigN = NCCL_CONFIG_INITIALIZER;
+    ncclConfigW.blocking = 0;
+    ncclConfigN.blocking = 0;
+    ncclResult_t ncclState;
 
-    ncclGroupStart();
+//     ncclGroupStart();
     if (mynodeid == 0) { NCCLCHECK( ncclGetUniqueId(&Id) ); }
     MPI_Bcast(&Id, sizeof(ncclUniqueId), MPI_BYTE, 0, nodeComm);
-    NCCLCHECK( ncclCommInitRank(&NCCL_COMM_NODE, mynodesize, Id, mynodeid) );
-    ncclGroupEnd();
+    ncclCommInitRankConfig(&NCCL_COMM_NODE, mynodesize, Id, mynodeid, &ncclConfigN);
+    do {
+        NCCLCHECK(ncclCommGetAsyncError(NCCL_COMM_NODE, &ncclState));
+        // Handle outside events, timeouts, progress, ...
+    } while(ncclState == ncclInProgress);
+//     ncclGroupEnd();
     MPI_Barrier(MPI_COMM_WORLD);
 
-    ncclGroupStart();
+//     ncclGroupStart();
     if (rank == 0) { NCCLCHECK( ncclGetUniqueId(&Id) ); }
     MPI_Bcast(&Id, sizeof(ncclUniqueId), MPI_BYTE, 0, MPI_COMM_WORLD);
-    NCCLCHECK( ncclCommInitRank(&NCCL_COMM_WORLD, size, Id, rank) );
-    ncclGroupEnd();
+    ncclCommInitRankConfig(&NCCL_COMM_WORLD, size, Id, rank, &ncclConfigW);
+    do {
+        NCCLCHECK(ncclCommGetAsyncError(NCCL_COMM_WORLD, &ncclState));
+        // Handle outside events, timeouts, progress, ...
+    } while(ncclState == ncclInProgress);
+//     ncclGroupEnd();
 
     int nccl_w_rk;
     int nccl_w_sz;
@@ -516,13 +533,14 @@ int main(int argc, char *argv[])
     dtype     *zUpSendBuffer,     *zUpRecvBuffer,     *zDownSendBuffer,     *zDownRecvBuffer;
     dtype *dev_zUpSendBuffer, *dev_zUpRecvBuffer, *dev_zDownSendBuffer, *dev_zDownRecvBuffer;
 
-
      /* -------------------------------------------------------------------------------------------
         Loop from 8 B to 1 GB
     --------------------------------------------------------------------------------------------*/
 
     int loop_count = 50;
+    cudaStream_t Streams[12];
     double start_time, stop_time;
+    cudaEvent_t start[12], stop[12];
     float cuda_timer[3], mpi_timer[3];
     cktype cpu_checks[BUFF_CYCLE], gpu_checks[BUFF_CYCLE];
     float inner_elapsed_time[BUFF_CYCLE][loop_count], elapsed_time[BUFF_CYCLE][loop_count];
@@ -576,6 +594,7 @@ int main(int argc, char *argv[])
             MPI_Barrier(MPI_COMM_WORLD);
         }
 
+
         if (rank == 0) {printf("%d#", j); fflush(stdout);}
         cudaErrorCheck( cudaDeviceSynchronize() );
         MPI_Barrier(MPI_COMM_WORLD);
@@ -586,38 +605,100 @@ int main(int argc, char *argv[])
         Implemetantion goes here
 
         */
-        cudaEvent_t start, stop;
-        cudaErrorCheck(cudaEventCreate(&start));
-        cudaErrorCheck(cudaEventCreate(&stop));
 
         for(int i=1-(WARM_UP); i<=loop_count; i++) {
             for (int k=0; k<3; k++) {cuda_timer[k] = 0.0; mpi_timer[k] = 0.0;}
+            for (int k=0; k<12; k++) {
+                cudaErrorCheck(cudaStreamCreate(&Streams[k]));
+                cudaErrorCheck(cudaEventCreate(&(start[k])));
+                cudaErrorCheck(cudaEventCreate(&(stop[k])));
+            }
+            // init streams
             MPI_Barrier(MPI_COMM_WORLD);
-            cudaErrorCheck(cudaEventRecord(start, NULL));
+            for (int k=0; k<12; k++) { cudaErrorCheck(cudaEventRecord(start[k], Streams[k])); }
 
             halo3d_run_axes(NCCL_COMM_WORLD, xSize, xUp, xDown,
                      xUpSendBuffer, dev_xUpSendBuffer, xUpRecvBuffer, dev_xUpRecvBuffer,
                      xDownSendBuffer, dev_xDownSendBuffer, xDownRecvBuffer, dev_xDownRecvBuffer,
-                     &(cuda_timer[0]), &(mpi_timer[0]), 1000);
+                     &(cuda_timer[0]), &(mpi_timer[0]), 1000,
+                     TAKE_STREAM(Streams,0,0,0), TAKE_STREAM(Streams,0,1,0),
+                     TAKE_STREAM(Streams,0,0,1), TAKE_STREAM(Streams,0,1,1));
 
             halo3d_run_axes(NCCL_COMM_WORLD, ySize, yUp, yDown,
                      yUpSendBuffer, dev_yUpSendBuffer, yUpRecvBuffer, dev_yUpRecvBuffer,
                      yDownSendBuffer, dev_yDownSendBuffer, yDownRecvBuffer, dev_yDownRecvBuffer,
-                     &(cuda_timer[1]), &(mpi_timer[1]), 2000);
+                     &(cuda_timer[1]), &(mpi_timer[1]), 2000,
+                     TAKE_STREAM(Streams,1,0,0), TAKE_STREAM(Streams,1,1,0),
+                     TAKE_STREAM(Streams,1,0,1), TAKE_STREAM(Streams,1,1,1));
 
             halo3d_run_axes(NCCL_COMM_WORLD, zSize, zUp, zDown,
                      zUpSendBuffer, dev_zUpSendBuffer, zUpRecvBuffer, dev_zUpRecvBuffer,
                      zDownSendBuffer, dev_zDownSendBuffer, zDownRecvBuffer, dev_zDownRecvBuffer,
-                     &(cuda_timer[2]), &(mpi_timer[2]), 3000);
+                     &(cuda_timer[2]), &(mpi_timer[2]), 3000,
+                     TAKE_STREAM(Streams,2,0,0), TAKE_STREAM(Streams,2,1,0),
+                     TAKE_STREAM(Streams,2,0,1), TAKE_STREAM(Streams,2,1,1));
 
-            cudaErrorCheck(cudaEventRecord(stop, NULL));
-            cudaErrorCheck(cudaEventSynchronize(stop));
-            if (i>0) {cudaErrorCheck(cudaEventElapsedTime(&(inner_elapsed_time[j][i-1]), start, stop));}
+
+            // only for de BUG
+            ncclResult_t ncclState;
+            do {
+                NCCLCHECK(ncclCommGetAsyncError(NCCL_COMM_WORLD, &ncclState));
+                // Handle outside events, timeouts, progress, ...
+            } while(ncclState == ncclInProgress);
+
+            for (int k=0; k<12; k++) { cudaErrorCheck(cudaEventRecord(stop[k], Streams[k])); }
+            for (int k=0; k<12; k++) { cudaErrorCheck(cudaEventSynchronize(stop[k])); }
+            cudaErrorCheck(cudaDeviceSynchronize());
+            MPI_Barrier(MPI_COMM_WORLD);
+
+            if (i>0) {
+                float tmp;
+                int first_start;
+                float time_table[2][12];
+
+                time_table[0][0] = 0.0;
+                cudaErrorCheck(cudaEventElapsedTime(&(tmp), start[0], start[1]));
+                tmp < 0.0 ? first_start = 1 : first_start = 0;
+                time_table[0][1] = tmp;
+                for (int k=2; k<12; k++) {
+                    cudaErrorCheck(cudaEventElapsedTime(&(tmp), start[first_start], start[k]));
+                    if (tmp < 0.0) first_start = k;
+
+                    cudaErrorCheck(cudaEventElapsedTime(&(time_table[0][k]), start[0], start[k]));
+                }
+
+
+                int last_stop;
+                cudaErrorCheck(cudaEventElapsedTime(&(tmp), stop[0], stop[1]));
+                cudaErrorCheck(cudaEventElapsedTime(&(time_table[1][0]), start[0], stop[0]));
+                cudaErrorCheck(cudaEventElapsedTime(&(time_table[1][1]), start[0], stop[1]));
+                tmp > 0.0 ? last_stop = 1 : last_stop = 0;
+                for (int k=2; k<12; k++) {
+                    cudaErrorCheck(cudaEventElapsedTime(&(tmp), stop[last_stop], stop[k]));
+                    if (tmp > 0.0) last_stop = k;
+
+                    cudaErrorCheck(cudaEventElapsedTime(&(time_table[1][k]), start[0], stop[k]));
+                }
+
+                cudaErrorCheck(cudaEventElapsedTime(&(inner_elapsed_time[j][i-1]), start[first_start], stop[first_start]));
+
+                // -------------------- For DE BUG --------------------
+//                 if (rank == 0) {PRINT_STREAM_TIMETABLE(time_table, 12)}
+//
+//                 MPI_Barrier(MPI_COMM_WORLD);
+//                 exit(42);
+                // ----------------------------------------------------
+            }
 
             if (rank == 0) {printf("%%"); fflush(stdout);}
+
+            for (int k=0; k<12; k++) {
+                cudaErrorCheck(cudaStreamDestroy(Streams[k]));
+                cudaErrorCheck(cudaEventDestroy(start[k]));
+                cudaErrorCheck(cudaEventDestroy(stop[k]));
+            }
         }
         if (rank == 0) {printf("#\n"); fflush(stdout);}
-
 
 
 //         int tag1 = 10;

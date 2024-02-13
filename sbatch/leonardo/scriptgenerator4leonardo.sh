@@ -21,7 +21,7 @@ MODULE_PATH="moduleload/load_<exp-type>_modules.sh"
 EXPORT_PATH="exportload/load_<exp-type>_<exp-topo>_exports.sh"
 
 mkdir -p sout
-source ${MODULE_PATH} && source ${EXPORT_PATH} && srun bin/<exp-name>_<exp-type>
+source ${MODULE_PATH} && source ${EXPORT_PATH} && srun bin/<exp-name>_<exp-type> <exp_args>
 EOF
 )
 
@@ -45,6 +45,19 @@ do
                 if [[ "$topo" == "multinode" ]]
                 then
                     out_script_contenent=$(echo "$tmp_script_contenent" | sed "s/nodes=1/nodes=2/g")
+                fi
+
+                tmp_script_contenent=$(echo "$out_script_contenent")
+                if [[ "$name" == "hlo" ]]
+                then
+                    if [[ "$topo" == "singlenode" ]]
+                    then
+                        out_script_contenent=$(echo "$tmp_script_contenent" | sed "s/<exp_args>/-pex 2 -pey 2 -pez 1/g")
+                    else
+                        out_script_contenent=$(echo "$tmp_script_contenent" | sed "s/<exp_args>/-pex 2 -pey 2 -pez 2/g")
+                    fi
+                else
+                    out_script_contenent=$(echo "$tmp_script_contenent" | sed "s/<exp_args>//g")
                 fi
 
                 # Write the new script to a file

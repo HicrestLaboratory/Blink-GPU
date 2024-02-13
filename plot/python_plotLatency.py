@@ -33,7 +33,7 @@ lable_colors = { 'Baseline': 'blue', 'CudaAware': 'red', 'Nccl': 'green', 'Nvlin
 
 lable_machines = { 'leonardo': 'Leonardo', 'marzola': 'Marzola'}
 lable_topologyes = { 'singlenode': 'Single node', 'multinode': 'Multi nodes'}
-lable_experiments = { '-pp-': 'Ping-pong', '-a2a-': 'AllToAll', '-ar-': 'AllReduce'}
+lable_experiments = { '-pp-': 'Ping-pong', '-a2a-': 'AllToAll', '-ar-': 'AllReduce', '-hlo-': 'Halo'}
 
 # Function to plot performance comparison
 def plot_performance(file_paths):
@@ -87,7 +87,8 @@ def plot_performance(file_paths):
                             print('transfer_time: ', transfer_time)
                             print('color: ', lable_colors[bar])
 
-                            plt.bar(bar, transfer_time, color=lable_colors[bar])
+                            if (bar != 'Nvlink' or (not '-ar-' in key and not '-hlo-' in key)):
+                                plt.bar(bar, transfer_time, color=lable_colors[bar])
 
                 plt.xlabel('File')
                 plt.ylabel('Transfer Time (s)')
