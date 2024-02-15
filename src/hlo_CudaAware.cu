@@ -541,8 +541,11 @@ int main(int argc, char *argv[])
 
         // Init send buffers (Recv buffers stay initialized as 0)
         {
+            size_t maxSize = (xSize > ySize) ? xSize : ySize;
+            if (zSize > maxSize) maxSize = zSize;
+            size_t run_time_grid_size = (maxSize % BLK_SIZE == 0) ? (maxSize/BLK_SIZE) : ((maxSize/BLK_SIZE) +1);
             dim3 block_size(BLK_SIZE, 1, 1);
-            dim3 grid_size(GRD_SIZE, 1, 1);
+            dim3 grid_size(run_time_grid_size, 1, 1);
             init_kernel<<<grid_size, block_size>>>(xSize, dev_xUpSendBuffer, rank);
             init_kernel<<<grid_size, block_size>>>(ySize, dev_yUpSendBuffer, rank);
             init_kernel<<<grid_size, block_size>>>(zSize, dev_zUpSendBuffer, rank);

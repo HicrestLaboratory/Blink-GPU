@@ -391,7 +391,7 @@ unsigned int check_recv_buffer (int my_rank, char axe,
     unsigned int result = 0U;
     if ( UpFlag>-1 && UpCheck != BufferSize*(UpFlag+1) ) result |= 1U;
     if ( DownFlag>-1 && DownCheck != BufferSize*(DownFlag+1) ) result |= 2U;
-//     printf("[BufferSize=%d, myRank=%d, axe=%c] UpFlag = %d, UpCheck = %d, DownFlag = %d, DownCheck = %d --> %u\n", BufferSize, my_rank, axe, UpFlag, UpCheck, DownFlag, DownCheck, result);
+
     return(result);
 }
 
@@ -573,8 +573,11 @@ int main(int argc, char *argv[])
 
         // Init send buffers (Recv buffers stay initialized as 0)
         {
+            size_t maxSize = (xSize > ySize) ? xSize : ySize;
+            if (zSize > maxSize) maxSize = zSize;
+            size_t run_time_grid_size = (maxSize % BLK_SIZE == 0) ? (maxSize/BLK_SIZE) : ((maxSize/BLK_SIZE) +1);
             dim3 block_size(BLK_SIZE, 1, 1);
-            dim3 grid_size(GRD_SIZE, 1, 1);
+            dim3 grid_size(run_time_grid_size, 1, 1);
             init_kernel<<<grid_size, block_size>>>(xSize, dev_xUpSendBuffer, rank);
             init_kernel<<<grid_size, block_size>>>(ySize, dev_yUpSendBuffer, rank);
             init_kernel<<<grid_size, block_size>>>(zSize, dev_zUpSendBuffer, rank);
