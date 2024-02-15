@@ -728,20 +728,6 @@ int main(int argc, char *argv[])
         if (rank == 0) {printf("#\n"); fflush(stdout);}
 
 
-//         int tag1 = 10;
-//         int tag2 = 20;
-//         gpu_device_reduce(d_B, N, &gpu_check);
-//         if(rank == 0){
-//             MPI_Send(&my_cpu_check,   1, MPI_cktype, rank2, tag1, MPI_COMM_WORLD);
-//             MPI_Recv(&recv_cpu_check, 1, MPI_cktype, rank2, tag2, MPI_COMM_WORLD, &stat);
-//         } else if(rank == rank2){
-//             MPI_Recv(&recv_cpu_check, 1, MPI_cktype, 0, tag1, MPI_COMM_WORLD, &stat);
-//             MPI_Send(&my_cpu_check,   1, MPI_cktype, 0, tag2, MPI_COMM_WORLD);
-//         }
-//
-//         gpu_checks[j] = gpu_check;
-//         cpu_checks[j] = recv_cpu_check;
-
         // Free x axe
         FREE_HALO3D_BUFFER(xUpSendBuffer, dev_xUpSendBuffer)
         FREE_HALO3D_BUFFER(xUpRecvBuffer, dev_xUpRecvBuffer)
@@ -774,34 +760,17 @@ int main(int argc, char *argv[])
         if (zDown > -1) num_B += nx * ny * N;
         double num_GB = (double)num_B / (double)B_in_GB;
 
-        double avg_time_per_transfer[BUFF_CYCLE];
+        double avg_time_per_transfer = 0.0;
         for (int i=0; i<loop_count; i++) {
             elapsed_time[j][i] *= 0.001;
-            avg_time_per_transfer[j] += elapsed_time[j][i];
+            avg_time_per_transfer += elapsed_time[j][i];
             if(rank == 0) printf("\tTransfer size (B): %10li, Transfer Time (s): %15.9f, Bandwidth (GB/s): %15.9f, Iteration %d\n", num_B, elapsed_time[j][i], num_GB/elapsed_time[j][i], i);
         }
-        avg_time_per_transfer[j] /= ((double)loop_count);
+        avg_time_per_transfer /= ((double)loop_count);
 
-        if(rank == 0) printf("[Average] Transfer size (B): %10li, Transfer Time (s): %15.9f, Bandwidth (GB/s): %15.9f, Error: %u\n", num_B, avg_time_per_transfer[j], num_GB/avg_time_per_transfer[j], halo_checks[j] );
+        if(rank == 0) printf("[Average] Transfer size (B): %10li, Transfer Time (s): %15.9f, Bandwidth (GB/s): %15.9f, Error: %u\n", num_B, avg_time_per_transfer, num_GB/avg_time_per_transfer, halo_checks[j] );
         fflush(stdout);
     }
-
-//     char s[10000000];
-//     sprintf(s, "[%d] recv_cpu_check = %u", rank, cpu_checks[0]);
-//     for (int i=0; i<BUFF_CYCLE; i++) {
-//         sprintf(s+strlen(s), " %10d", cpu_checks[i]);
-//     }
-//     sprintf(s+strlen(s), " (for Error)\n");
-//     printf("%s", s);
-//     fflush(stdout);
-//
-//     sprintf(s, "[%d] gpu_checks = %u", rank, gpu_checks[0]);
-//     for (int i=0; i<BUFF_CYCLE; i++) {
-//         sprintf(s+strlen(s), " %10d", gpu_checks[i]);
-//     }
-//     sprintf(s+strlen(s), " (for Error)\n");
-//     printf("%s", s);
-//     fflush(stdout);
 
     MPI_Finalize();
     return(0);
