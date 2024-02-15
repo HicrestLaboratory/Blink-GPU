@@ -342,7 +342,7 @@ int main(int argc, char *argv[])
             double avg_time_per_transfer[BUFF_CYCLE];
             for (int i=0; i<loop_count; i++) {
                 avg_time_per_transfer[j] += elapsed_time[j][i];
-                if(rank == 0) printf("\tTransfer size (B): %10li, Transfer Time (s): %15.9f, Bandwidth (GB/s): %15.9f, Iteration %d\n", num_B, inner_elapsed_time[j][i], num_GB/inner_elapsed_time[j][i], i);
+                if(rank == 0) printf("\tTransfer size (B): %10li, Transfer Time (s): %15.9f, Bandwidth (GB/s): %15.9f, Iteration %d\n", num_B, elapsed_time[j][i], num_GB/elapsed_time[j][i], i);
             }
             avg_time_per_transfer[j] /= (2.0*(double)loop_count);
 
