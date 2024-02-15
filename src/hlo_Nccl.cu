@@ -348,6 +348,11 @@ void halo3d_run_axes(ncclComm_t nccl_comm,
     ncclGroupEnd();
 
     // =================================================================================================================
+
+    cudaErrorCheck( cudaStreamSynchronize(*UpSendStream) );
+    cudaErrorCheck( cudaStreamSynchronize(*UpRecvStream) );
+    cudaErrorCheck( cudaStreamSynchronize(*DownSendStream) );
+    cudaErrorCheck( cudaStreamSynchronize(*DownRecvStream) );
 }
 
 unsigned int check_recv_buffer (int my_rank, char axe,
@@ -362,7 +367,7 @@ unsigned int check_recv_buffer (int my_rank, char axe,
     unsigned int result = 0U;
     if ( UpFlag>-1 && UpCheck != BufferSize*(UpFlag+1) ) result |= 1U;
     if ( DownFlag>-1 && DownCheck != BufferSize*(DownFlag+1) ) result |= 2U;
-    printf("[BufferSize=%d, myRank=%d, axe=%c] UpFlag = %d, UpCheck = %d, DownFlag = %d, DownCheck = %d --> %u\n", BufferSize, my_rank, axe, UpFlag, UpCheck, DownFlag, DownCheck, result);
+//     printf("[BufferSize=%d, myRank=%d, axe=%c] UpFlag = %d, UpCheck = %d, DownFlag = %d, DownCheck = %d --> %u\n", BufferSize, my_rank, axe, UpFlag, UpCheck, DownFlag, DownCheck, result);
     return(result);
 }
 
@@ -701,7 +706,7 @@ int main(int argc, char *argv[])
                 cudaErrorCheck(cudaEventElapsedTime(&(inner_elapsed_time[j][i-1]), start[first_start], stop[first_start]));
 
                 // -------------------- For DE BUG --------------------
-//                 if (rank == 0) {PRINT_STREAM_TIMETABLE(time_table, 12)}
+//                 if (inner_elapsed_time[j][i-1] > 1000.0) {PRINT_STREAM_TIMETABLE(time_table, 12)}
 //
 //                 MPI_Barrier(MPI_COMM_WORLD);
 //                 exit(42);
