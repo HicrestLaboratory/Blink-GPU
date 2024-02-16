@@ -42,7 +42,13 @@ The source codes are CUDA C codes contained in the "src/" directory; for each co
 
 ### Automatic correctness checks
 
-...
+For checking the correctness of the communication, each communication scheme implements a different check.
+
+Regarding the Ping-pong and the All-to-all communication scheme, after initialising the send buffer with a fixed value, each process computes the sum reduction of the sending buffer and stores them inside "my_cpu_check". Once the benchmarked communication is completed, an analogue communication (a peer-to-peer or an all-to-all) is performed on "my_cpu_check" which will be stored in "recv_cpu_check". Finally, the device received buffer (owned by **TD**) is reduced inside "gpu_check" and the two elements are compared. The number reported as "Error" represents the absolute value of "recv_cpu_check" - "gpu_check".
+
+Regarding the All-reduce communication scheme, the idea is similar, but the MPI operation performed on the "my_cpu_check" is an MPI_Allgather followed by a CPU reduction. In the end, the same reduction is performed on the device received buffer and the values are compared.
+
+Finally, regarding the halo3d, each send buffer is initialized with the process MPI rank +1 on each entry, and, after the communication, is checked that each device received buffer reduction is equal to (source MPI rank+1)\*(message size). Since here up to 3\*2 different receive buffers (3 axes (x/y/z) times 2 directions (Up/Down)), the outputted error value compacts the comparison in a single int between 0 and 63 by using a bitwise or on a 6-bit unsigned int; the first two bits represents the correctness for the x axe, the second the one for y and the third for z.
 
 ## Building the binaries
 
