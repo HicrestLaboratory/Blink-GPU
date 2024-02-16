@@ -28,6 +28,8 @@
 
 #define WARM_UP 5
 
+// #define DEBUG 1
+
 // Macro for checking errors in CUDA API calls
 #define cudaErrorCheck(call)                                                              \
 do{                                                                                       \
@@ -299,6 +301,7 @@ void read_line_parameters (int argc, char *argv[], int myrank,
 #define INIT_HALO3D_BUFFER(HB, DB, DT, SZ) {                \
     int rank; MPI_Comm_rank(MPI_COMM_WORLD, &rank);         \
     HB = (DT*)malloc(sizeof(DT) * SZ);                      \
+    memset(HB, 0, sizeof(DT) * SZ);                         \
     cudaErrorCheck( cudaMalloc(&DB, sizeof(DT) * SZ) );     \
     cudaErrorCheck( cudaMemset(DB, 0, sizeof(DT) * SZ) );   \
     cudaErrorCheck( cudaDeviceSynchronize() );              \
@@ -561,7 +564,7 @@ int main(int argc, char *argv[])
     double start_time, stop_time;
     cudaEvent_t start[12], stop[12];
     float cuda_timer[3], mpi_timer[3];
-    unsigned int halo_checks[BUFF_CYCLE];
+    unsigned int xCheck = 0U, yCheck = 0U, zCheck = 0U, halo_checks[BUFF_CYCLE];
     float inner_elapsed_time[BUFF_CYCLE][loop_count], elapsed_time[BUFF_CYCLE][loop_count];
     for(int j=0; j<BUFF_CYCLE; j++){
 
@@ -711,18 +714,57 @@ int main(int argc, char *argv[])
 //                 MPI_Barrier(MPI_COMM_WORLD);
 //                 exit(42);
                 // ----------------------------------------------------
+
+                xCheck = check_recv_buffer(rank, 'x', xUp, dev_xUpRecvBuffer, xDown, dev_xDownRecvBuffer, xSize);
+                yCheck = check_recv_buffer(rank, 'y', yUp, dev_yUpRecvBuffer, yDown, dev_yDownRecvBuffer, ySize);
+                zCheck = check_recv_buffer(rank, 'z', zUp, dev_zUpRecvBuffer, zDown, dev_zDownRecvBuffer, zSize);
+                xCheck = xCheck << 4;
+                yCheck = yCheck << 2;
+                halo_checks[j] |= xCheck;
+                halo_checks[j] |= yCheck;
+                halo_checks[j] |= zCheck;
             }
 
             if (rank == 0) {printf("%%"); fflush(stdout);}
 
-            unsigned int xCheck = check_recv_buffer(rank, 'x', xUp, dev_xUpRecvBuffer, xDown, dev_xDownRecvBuffer, xSize);
-            unsigned int yCheck = check_recv_buffer(rank, 'y', yUp, dev_yUpRecvBuffer, yDown, dev_yDownRecvBuffer, ySize);
-            unsigned int zCheck = check_recv_buffer(rank, 'z', zUp, dev_zUpRecvBuffer, zDown, dev_zDownRecvBuffer, zSize);
-            xCheck = xCheck << 4;
-            yCheck = yCheck << 2;
-            halo_checks[j] |= xCheck;
-            halo_checks[j] |= yCheck;
-            halo_checks[j] |= zCheck;
+            // -------------------- For DE BUG --------------------
+//             STR_COLL_DEF
+//             STR_COLL_INIT
+//
+//
+//             cudaErrorCheck( cudaMemcpy(xUpSendBuffer, dev_xUpSendBuffer, xSize*sizeof(dtype), cudaMemcpyDeviceToHost) );
+//             cudaErrorCheck( cudaMemcpy(yUpSendBuffer, dev_yUpSendBuffer, ySize*sizeof(dtype), cudaMemcpyDeviceToHost) );
+//             cudaErrorCheck( cudaMemcpy(zUpSendBuffer, dev_zUpSendBuffer, zSize*sizeof(dtype), cudaMemcpyDeviceToHost) );
+//             cudaErrorCheck( cudaMemcpy(xDownSendBuffer, dev_xDownSendBuffer, xSize*sizeof(dtype), cudaMemcpyDeviceToHost) );
+//             cudaErrorCheck( cudaMemcpy(yDownSendBuffer, dev_yDownSendBuffer, ySize*sizeof(dtype), cudaMemcpyDeviceToHost) );
+//             cudaErrorCheck( cudaMemcpy(zDownSendBuffer, dev_zDownSendBuffer, zSize*sizeof(dtype), cudaMemcpyDeviceToHost) );
+//
+//             cudaErrorCheck( cudaMemcpy(xUpRecvBuffer, dev_xUpRecvBuffer, xSize*sizeof(dtype), cudaMemcpyDeviceToHost) );
+//             cudaErrorCheck( cudaMemcpy(yUpRecvBuffer, dev_yUpRecvBuffer, ySize*sizeof(dtype), cudaMemcpyDeviceToHost) );
+//             cudaErrorCheck( cudaMemcpy(zUpRecvBuffer, dev_zUpRecvBuffer, zSize*sizeof(dtype), cudaMemcpyDeviceToHost) );
+//             cudaErrorCheck( cudaMemcpy(xDownRecvBuffer, dev_xDownRecvBuffer, xSize*sizeof(dtype), cudaMemcpyDeviceToHost) );
+//             cudaErrorCheck( cudaMemcpy(yDownRecvBuffer, dev_yDownRecvBuffer, ySize*sizeof(dtype), cudaMemcpyDeviceToHost) );
+//             cudaErrorCheck( cudaMemcpy(zDownRecvBuffer, dev_zDownRecvBuffer, zSize*sizeof(dtype), cudaMemcpyDeviceToHost) );
+//
+//
+//             STR_COLL_APPEND( sprintf(STR_COLL_BUFF, "xUpSendBuffer[0] = %u, xDownSendBuffer[0] = %u\n", xUpSendBuffer[0], xDownSendBuffer[0]); )
+//             STR_COLL_APPEND( sprintf(STR_COLL_BUFF, "yUpSendBuffer[0] = %u, yDownSendBuffer[0] = %u\n", yUpSendBuffer[0], yDownSendBuffer[0]); )
+//             STR_COLL_APPEND( sprintf(STR_COLL_BUFF, "zUpSendBuffer[0] = %u, zDownSendBuffer[0] = %u\n\n", zUpSendBuffer[0], zDownSendBuffer[0]); )
+//
+//             STR_COLL_APPEND( sprintf(STR_COLL_BUFF, "xCheck = %d, yCheck = %d, zCheck = %d\n", xCheck, yCheck, zCheck); )
+//             /*if (xCheck != 0) */{
+//                 STR_COLL_APPEND( sprintf(STR_COLL_BUFF, "xUp = %d: xUpRecvBuffer[0] = %u and xDown = %d: xDownRecvBuffer[0] = %u\n", xUp, xUpRecvBuffer[0], xDown, xDownRecvBuffer[0]); )
+//             }
+//             /*if (yCheck != 0) */{
+//                 STR_COLL_APPEND( sprintf(STR_COLL_BUFF, "yUp = %d: yUpRecvBuffer[0] = %u and yDown = %d: yDownRecvBuffer[0] = %u\n", yUp, yUpRecvBuffer[0], yDown, yDownRecvBuffer[0]); )
+//             }
+//             /*if (zCheck != 0) */{
+//                 STR_COLL_APPEND( sprintf(STR_COLL_BUFF, "zUp = %d: zUpRecvBuffer[0] = %u and zDown = %d: zDownRecvBuffer[0] = %u\n", zUp, zUpRecvBuffer[0], zDown, zDownRecvBuffer[0]); )
+//             }
+//             MPI_ALL_PRINT( fprintf(fp, "%s", STR_COLL_GIVE) )
+//
+//             if (i>=0) {DBG_STOP(1)} else {printf("\n");}
+            // ----------------------------------------------------
 
             for (int k=0; k<12; k++) {
                 cudaErrorCheck(cudaStreamDestroy(Streams[k]));

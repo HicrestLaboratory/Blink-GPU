@@ -25,6 +25,8 @@
 
 #define WARM_UP 5
 
+// #define DEBUG 1
+
 // Macro for checking errors in CUDA API calls
 #define cudaErrorCheck(call)                                                              \
 do{                                                                                       \
@@ -632,6 +634,28 @@ int main(int argc, char *argv[])
             halo_checks[j] |= xCheck;
             halo_checks[j] |= yCheck;
             halo_checks[j] |= zCheck;
+
+            // -------------------- For DE BUG --------------------
+//             STR_COLL_DEF
+//             STR_COLL_INIT
+//             STR_COLL_APPEND( sprintf(STR_COLL_BUFF, "xUpSendBuffer[0] = %u, xDownSendBuffer[0] = %u\n", xUpSendBuffer[0], xDownSendBuffer[0]); )
+//             STR_COLL_APPEND( sprintf(STR_COLL_BUFF, "yUpSendBuffer[0] = %u, yDownSendBuffer[0] = %u\n", yUpSendBuffer[0], yDownSendBuffer[0]); )
+//             STR_COLL_APPEND( sprintf(STR_COLL_BUFF, "zUpSendBuffer[0] = %u, zDownSendBuffer[0] = %u\n\n", zUpSendBuffer[0], zDownSendBuffer[0]); )
+//
+//             STR_COLL_APPEND( sprintf(STR_COLL_BUFF, "xCheck = %d, yCheck = %d, zCheck = %d\n", xCheck, yCheck, zCheck); )
+//             /*if (xCheck != 0) */{
+//                 STR_COLL_APPEND( sprintf(STR_COLL_BUFF, "xUp = %d: xUpRecvBuffer[0] = %u and xDown = %d: xDownRecvBuffer[0] = %u\n", xUp, xUpRecvBuffer[0], xDown, xDownRecvBuffer[0]); )
+//             }
+//             /*if (yCheck != 0) */{
+//                 STR_COLL_APPEND( sprintf(STR_COLL_BUFF, "yUp = %d: yUpRecvBuffer[0] = %u and yDown = %d: yDownRecvBuffer[0] = %u\n", yUp, yUpRecvBuffer[0], yDown, yDownRecvBuffer[0]); )
+//             }
+//             /*if (zCheck != 0) */{
+//                 STR_COLL_APPEND( sprintf(STR_COLL_BUFF, "zUp = %d: zUpRecvBuffer[0] = %u and zDown = %d: zDownRecvBuffer[0] = %u\n", zUp, zUpRecvBuffer[0], zDown, zDownRecvBuffer[0]); )
+//             }
+//             MPI_ALL_PRINT( fprintf(fp, "%s", STR_COLL_GIVE) )
+//
+//             DBG_STOP(1)
+            // ----------------------------------------------------
         }
         if (rank == 0) {printf("#\n"); fflush(stdout);}
 
