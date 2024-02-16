@@ -8,8 +8,8 @@ stencil_script=$(cat << 'EOF'
 
 #SBATCH --partition=boost_usr_prod
 #SBATCH --account=IscrC_SHARP_0
-#SBATCH --qos=boost_qos_dbg
 #SBATCH --time=00:05:00
+#SBATCH --qos=normal
 
 #SBATCH --nodes=1
 #SBATCH --gres=gpu:4
