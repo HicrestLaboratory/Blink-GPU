@@ -216,6 +216,7 @@ int main(int argc, char *argv[])
 
     int loop_count = 50;
     double start_time, stop_time;
+    int my_error[BUFF_CYCLE], error[BUFF_CYCLE];
     cktype cpu_checks[BUFF_CYCLE], gpu_checks[BUFF_CYCLE];
     double inner_elapsed_time[BUFF_CYCLE][loop_count], elapsed_time[BUFF_CYCLE][loop_count];
     for(int j=0; j<BUFF_CYCLE; j++){
@@ -277,6 +278,7 @@ int main(int argc, char *argv[])
         gpu_checks[j] = gpu_check;
         for (int i=0; i<size; i++)
             cpu_checks[j] += recv_cpu_check[i];
+        my_error[j] = abs(gpu_checks[j] - cpu_checks[j]);
 
         cudaErrorCheck( cudaFree(d_A) );
         cudaErrorCheck( cudaFree(d_B) );
@@ -286,6 +288,7 @@ int main(int argc, char *argv[])
         free(B);
     }
 
+    MPI_Allreduce(my_error, error, BUFF_CYCLE, MPI_INT, MPI_MAX, MPI_COMM_WORLD);
     MPI_Allreduce(inner_elapsed_time, elapsed_time, BUFF_CYCLE*loop_count, MPI_DOUBLE, MPI_MAX, MPI_COMM_WORLD);
     for(int j=0; j<BUFF_CYCLE; j++) {
         long int N = 1 << j;
@@ -300,7 +303,7 @@ int main(int argc, char *argv[])
         }
         avg_time_per_transfer /= (2.0*(double)loop_count);
 
-        if(rank == 0) printf("[Average] Transfer size (B): %10li, Transfer Time (s): %15.9f, Bandwidth (GB/s): %15.9f, Error: %d\n", num_B, avg_time_per_transfer, num_GB/avg_time_per_transfer, abs(gpu_checks[j] - cpu_checks[j]) );
+        if(rank == 0) printf("[Average] Transfer size (B): %10li, Transfer Time (s): %15.9f, Bandwidth (GB/s): %15.9f, Error: %d\n", num_B, avg_time_per_transfer, num_GB/avg_time_per_transfer, error[j] );
         fflush(stdout);
     }
 
