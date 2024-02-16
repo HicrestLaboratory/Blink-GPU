@@ -17,7 +17,7 @@
 #define MPI_dtype MPI_UINT8_T
 #define ncclDtype ncclChar
 
-#define BUFF_CYCLE 31
+#define BUFF_CYCLE 28
 
 #define cktype int32_t
 #define MPI_cktype MPI_INT32_T
