@@ -23,7 +23,7 @@ def read_data(file_path):
     my_max = 19
     results = []
     for line in data:
-        if 'Iteration' in line:
+        if 'Iteration ' in line:
             info = extract_info(line)
             if info['Iteration'] > 0 and info['Transfer size (B)'] in range(2**my_min, 2**my_max +1): # for debug
             #if info['Iteration'] > 0:

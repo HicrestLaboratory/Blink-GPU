@@ -88,8 +88,12 @@ def plot_performance(file_paths):
                         print('linestyle: ', linestyle)
                         print('color: ', lable_colors[line])
 
+                        if (len(plots[key][line]['Bandwidth (GB/s)']) > 0):
+                            max_bandwidth = max(plots[key][line]['Bandwidth (GB/s)'])
+                            print('max_bandwidth: ', max_bandwidth)
+
                         if (line != 'Nvlink' or (not '-ar-' in key and not '-hlo-' in key)):
-                            plt.plot(transfer_size, bandwidth, label=line, linestyle=linestyle, color=lable_colors[line])
+                            plt.plot(transfer_size, bandwidth, label="%s (up to %d GB/s)" % (line, max_bandwidth), linestyle=linestyle, color=lable_colors[line])
 
                 #e = 'ping-pong' if 'pp' in key else 'all2all'
                 for k in lable_experiments:
@@ -112,7 +116,7 @@ def plot_performance(file_paths):
                             peak = 300
                     else:
                         peak = 25
-                plt.axhline(y=peak, color='red', linestyle='--', label='Theoretical peak')
+                plt.axhline(y=peak, color='red', linestyle='--', label='Theoretical peak (%s GB/s)' % peak)
 
                 plt.xscale('log', base=2)
                 plt.yscale('log')
