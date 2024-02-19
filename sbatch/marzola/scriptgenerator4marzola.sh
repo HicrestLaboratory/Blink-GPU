@@ -18,13 +18,13 @@ MODULE_PATH="moduleload/load_<exp-type>_modules.sh"
 EXPORT_PATH="exportload/load_<exp-type>_<exp-topo>_exports.sh"
 
 mkdir -p sout
-source ${MODULE_PATH} && source ${EXPORT_PATH} && srun bin/<exp-name>_<exp-type> <exp_args>
+source ${MODULE_PATH} && source ${EXPORT_PATH} && srun --mpi=pmix bin/<exp-name>_<exp-type> <exp_args>
 EOF
 )
 
 names=("pp" "a2a" "ar" "hlo")
 types=("Baseline" "CudaAware" "Nccl" "Nvlink")
-topos=("singlenode")
+topos=("halfnode" "wholenode")
 
 for name in "${names[@]}"
 do
@@ -39,23 +39,22 @@ do
                 out_script_contenent=$(echo "$stencil_script" | sed "s/<exp-name>/$name/g" | sed "s/<exp-type>/$type/g" | sed "s/<exp-topo>/$topo/g")
                 tmp_script_contenent=$(echo "$out_script_contenent")
 
-                if [[ "$topo" == "multinode" ]]
+                if [[ "$topo" != "wholenode" ]]
                 then
-                    out_script_contenent=$(echo "$tmp_script_contenent" | sed "s/nodes=1/nodes=2/g")
-                fi
-                tmp_script_contenent=$(echo "$out_script_contenent")
-
-                if [[ "$name" == "pp" ]]
-                then
-                    out_script_contenent=$(echo "$tmp_script_contenent" | sed "s/<num-proc>/2/g")
+                    if [[ "$name" == "pp" ]]
+                    then
+                        out_script_contenent=$(echo "$tmp_script_contenent" | sed "s/<num-proc>/2/g")
+                    else
+                        out_script_contenent=$(echo "$tmp_script_contenent" | sed "s/<num-proc>/4/g")
+                    fi
                 else
-                    out_script_contenent=$(echo "$tmp_script_contenent" | sed "s/<num-proc>/4/g")
+                    out_script_contenent=$(echo "$tmp_script_contenent" | sed "s/<num-proc>/8/g")
                 fi
                 tmp_script_contenent=$(echo "$out_script_contenent")
 
                 if [[ "$name" == "hlo" ]]
                 then
-                    if [[ "$topo" == "singlenode" ]]
+                    if [[ "$topo" == "halfnode" ]]
                     then
                         out_script_contenent=$(echo "$tmp_script_contenent" | sed "s/<exp_args>/-pex 2 -pey 2 -pez 1/g")
                     else

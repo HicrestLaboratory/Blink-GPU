@@ -411,7 +411,7 @@ int main(int argc, char *argv[])
         fflush(stdout);
     }
 
-    char s[10000000];
+    char *s = (char*)malloc(sizeof(char)*(20*BUFF_CYCLE + 100));
     sprintf(s, "[%d] recv_cpu_check = %u", rank, cpu_checks[0]);
     for (int i=1; i<BUFF_CYCLE; i++) {
         sprintf(s+strlen(s), " %10d", cpu_checks[i]);
