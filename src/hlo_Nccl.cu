@@ -5,6 +5,7 @@
 #include "cuda.h"
 #include <cuda_runtime.h>
 #include <string.h>
+#include <unistd.h>
 
 #if !defined(OPEN_MPI) || !OPEN_MPI
 #error This source code uses an Open MPI-specific extension
@@ -22,6 +23,7 @@
 #define ncclDtype ncclUint8
 
 #define BUFF_CYCLE 24
+#define LOOP_COUNT 50
 
 #define cktype int32_t
 #define MPI_cktype MPI_INT
@@ -376,6 +378,71 @@ unsigned int check_recv_buffer (int my_rank, char axe,
 
 // ----------------------------------------------------------------------------
 
+void read_line_parameters (int argc, char *argv[], int myrank,
+                           int *flag_b, int *flag_l, int *flag_x,
+                           int *loop_count, int *buff_cycle, int *fix_buff_size ) {
+
+    for (int i = 1; i < argc; i++) {
+        if (strcmp(argv[i], "-l") == 0) {
+            if (i == argc) {
+                if (myrank == 0) {
+                    fprintf(stderr, "Error: specified -l without a value.\n");
+                }
+
+                exit(__LINE__);
+            }
+
+            *flag_l = 1;
+            *loop_count = atoi(argv[i + 1]);
+            if (*loop_count <= 0) {
+                fprintf(stderr, "Error: loop_count must be a positive integer.\n");
+                exit(__LINE__);
+            }
+            i++;
+        } else if (strcmp(argv[i], "-b") == 0) {
+            if (i == argc) {
+                if (myrank == 0) {
+                    fprintf(stderr, "Error: specified -b without a value.\n");
+                }
+
+                exit(__LINE__);
+            }
+
+            *flag_b = 1;
+            *buff_cycle = atoi(argv[i + 1]);
+            if (*buff_cycle <= 0) {
+                fprintf(stderr, "Error: buff_cycle must be a positive integer.\n");
+                exit(__LINE__);
+            }
+            i++;
+        } else if (strcmp(argv[i], "-x") == 0) {
+            if (i == argc) {
+                if (myrank == 0) {
+                fprintf(stderr, "Error: specified -x without a value.\n");
+                }
+
+                exit(__LINE__);
+            }
+
+            *flag_x = 1;
+            *fix_buff_size = atoi(argv[i + 1]);
+            if (*fix_buff_size < 0) {
+                fprintf(stderr, "Error: fixed buff_size must be >= 0.\n");
+                exit(__LINE__);
+            }
+
+            i++;
+        } else {
+            if (0 == myrank) {
+                fprintf(stderr, "Unknown option: %s\n", argv[i]);
+            }
+
+            exit(__LINE__);
+        }
+    }
+}
+
+// ----------------------------------------------------------------------------
 
 int main(int argc, char *argv[])
 {
@@ -493,6 +560,33 @@ int main(int argc, char *argv[])
     MPI_Barrier(MPI_COMM_WORLD);
 
     /* -------------------------------------------------------------------------------------------
+        Reading command line inputs
+    --------------------------------------------------------------------------------------------*/
+
+    int opt;
+    int max_j;
+    int flag_b = 0;
+    int flag_l = 0;
+    int flag_x = 0;
+    int loop_count = LOOP_COUNT;
+    int buff_cycle = BUFF_CYCLE;
+    int fix_buff_size = 0;
+
+    // Parse command-line options
+    read_line_parameters(argc, argv, rank,
+                         &flag_b, &flag_l, &flag_x,
+                         &loop_count, &buff_cycle, &fix_buff_size);
+
+    // Print message based on the flags
+    if (flag_b && rank == 0) printf("Flag b was set with argument: %d\n", buff_cycle);
+    if (flag_l && rank == 0) printf("Flag l was set with argument: %d\n", loop_count);
+    if (flag_x && rank == 0) printf("Flag x was set with argument: %d\n", fix_buff_size);
+
+    max_j = (flag_x == 0) ? buff_cycle : (fix_buff_size + 1) ;
+    if (rank == 0) printf("buff_cycle: %d loop_count: %d max_j: %d\n", buff_cycle, loop_count, max_j);
+    if (flag_x > 0 && rank == 0) printf("fix_buff_size is set as %d\n", fix_buff_size);
+
+    /* -------------------------------------------------------------------------------------------
         Halo 3D Initialization
     --------------------------------------------------------------------------------------------*/
 
@@ -559,14 +653,13 @@ int main(int argc, char *argv[])
         Loop from 8 B to 1 GB
     --------------------------------------------------------------------------------------------*/
 
-    int loop_count = 50;
     cudaStream_t Streams[12];
     double start_time, stop_time;
     cudaEvent_t start[12], stop[12];
     float cuda_timer[3], mpi_timer[3];
-    unsigned int xCheck = 0U, yCheck = 0U, zCheck = 0U, halo_checks[BUFF_CYCLE];
-    float inner_elapsed_time[BUFF_CYCLE][loop_count], elapsed_time[BUFF_CYCLE][loop_count];
-    for(int j=0; j<BUFF_CYCLE; j++){
+    unsigned int xCheck = 0U, yCheck = 0U, zCheck = 0U, halo_checks[buff_cycle];
+    float inner_elapsed_time[buff_cycle][loop_count], elapsed_time[buff_cycle][loop_count];
+    for(int j=fix_buff_size; j<max_j; j++){
 
         // Define cycle sizes
         long int N = 1 << j;
@@ -794,8 +887,8 @@ int main(int argc, char *argv[])
         FREE_HALO3D_BUFFER(zDownRecvBuffer, dev_zDownRecvBuffer)
     }
 
-    MPI_Allreduce(inner_elapsed_time, elapsed_time, BUFF_CYCLE*loop_count, MPI_FLOAT, MPI_MAX, MPI_COMM_WORLD);
-    for(int j=0; j<BUFF_CYCLE; j++) {
+    MPI_Allreduce(inner_elapsed_time, elapsed_time, buff_cycle*loop_count, MPI_FLOAT, MPI_MAX, MPI_COMM_WORLD);
+    for(int j=fix_buff_size; j<max_j; j++) {
         long int N = 1 << j;
         long int B_in_GB = 1 << 30;
         long int num_B = 0;
