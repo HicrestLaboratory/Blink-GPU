@@ -118,9 +118,43 @@ int  assignDeviceToProcess(MPI_Comm *nodeComm, int *nnodes, int *mynodeid)
 
 
 // ---------------------------- For GPU reduction -----------------------------
-#include <thrust/transform_reduce.h>
-#include <thrust/functional.h>
-#include <thrust/execution_policy.h>
+// #include <thrust/transform_reduce.h>
+// #include <thrust/functional.h>
+// #include <thrust/execution_policy.h>
+//
+// struct char2int
+// {
+//   __host__ __device__ cktype operator()(const dtype &x) const
+//   {
+//     return static_cast<cktype>(x);
+//   }
+// };
+//
+// int gpu_host_reduce(dtype* input_vec, int len, cktype* out_scalar) {
+//   int result = thrust::transform_reduce(thrust::host,
+//                                         input_vec, input_vec + len,
+//                                         char2int(),
+//                                         0,
+//                                         thrust::plus<cktype>());
+//
+//   *out_scalar = result;
+//
+//   return 0;
+// }
+//
+// int gpu_device_reduce(dtype* d_input_vec, int len, cktype* out_scalar) {
+//   cktype result = thrust::transform_reduce(thrust::device,
+//                                         d_input_vec, d_input_vec + len,
+//                                         char2int(),
+//                                         0,
+//                                         thrust::plus<cktype>());
+//
+//   *out_scalar = result;
+//
+//   return 0;
+// }
+#include <cub/device/device_reduce.cuh>
+#include <cub/iterator/transform_input_iterator.cuh>
 
 struct char2int
 {
@@ -130,26 +164,22 @@ struct char2int
   }
 };
 
-int gpu_host_reduce(dtype* input_vec, int len, cktype* out_scalar) {
-  int result = thrust::transform_reduce(thrust::host,
-                                        input_vec, input_vec + len,
-                                        char2int(),
-                                        0,
-                                        thrust::plus<cktype>());
-
-  *out_scalar = result;
-
-  return 0;
-}
-
 int gpu_device_reduce(dtype* d_input_vec, int len, cktype* out_scalar) {
-  cktype result = thrust::transform_reduce(thrust::device,
-                                        d_input_vec, d_input_vec + len,
-                                        char2int(),
-                                        0,
-                                        thrust::plus<cktype>());
+  cub::TransformInputIterator<dtype, char2int, dtype*> input_iter(d_input_vec, char2int());
 
-  *out_scalar = result;
+  // Allocate temporary storage
+  size_t temp_storage_bytes = 0;
+  void* d_temp_storage = NULL;
+  cub::DeviceReduce::Sum(d_temp_storage, temp_storage_bytes, input_iter, out_scalar, len);
+
+  // Allocate temporary storage buffer
+  cudaMalloc(&d_temp_storage, temp_storage_bytes);
+
+  // Perform reduction
+  cub::DeviceReduce::Sum(d_temp_storage, temp_storage_bytes, input_iter, out_scalar, len);
+
+  // Free temporary storage buffer
+  cudaFree(d_temp_storage);
 
   return 0;
 }
