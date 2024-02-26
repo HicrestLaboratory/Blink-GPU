@@ -536,6 +536,28 @@ int main(int argc, char *argv[])
     int repeats = 100;
     int vars = 1;
 
+    // Set default 3D grid
+    {
+        int M=0, K=0, H=0;
+        int n=0, k=0, h=0;
+        while ( ((size)%(1<<(n+1))) == 0 ) n++;
+
+        k = n/3;
+        h = (n - k)/2;
+
+        printf("n = %d --> k = %d, h = %d\n", n, k, h);
+
+        K = 1 << k;
+        H = 1 << h;
+        M = size / (1 << (k+h));
+
+        printf("size = %d --> %d x %d x %d\n", size, M, H, K);
+
+        pex = M;
+        pey = H;
+        pez = K;
+    }
+
     // Read input parameters
     read_line_parameters(argc, argv, rank, &nx, &ny, &nz, &pex, &pey, &pez, &repeats, &vars, &sleep,
                                            &flag_b, &flag_l, &flag_x, &loop_count, &buff_cycle, &fix_buff_size);
