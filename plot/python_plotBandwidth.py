@@ -115,7 +115,8 @@ def plot_performance(file_paths):
                         else:
                             peak = 300
                     else:
-                        peak = 25
+                        if e == 'Ping-pong':
+                            peak = 12.5 # We can obtain at max one of the NIC entrance (so 12.5 = 25 / 2 (GB/s))
                 plt.axhline(y=peak, color='red', linestyle='--', label='Theoretical peak (%s GB/s)' % peak)
 
                 plt.xscale('log', base=2)
