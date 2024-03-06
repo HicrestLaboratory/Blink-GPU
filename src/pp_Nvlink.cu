@@ -486,8 +486,16 @@ int main(int argc, char *argv[])
                 start_time = MPI_Wtime();
 
                 // Memcopy DeviceToDevice
-                cudaErrorCheck( cudaMemcpy(d_B, peerBuffer, sizeof(dtype)*N, cudaMemcpyDeviceToDevice) );
-                cudaErrorCheck( cudaDeviceSynchronize() );
+                if (rank == 0) {
+                    cudaErrorCheck( cudaMemcpy(d_B, peerBuffer, sizeof(dtype)*N, cudaMemcpyDeviceToDevice) );
+                    cudaErrorCheck( cudaDeviceSynchronize() );
+                }
+                MPI_Barrier(ppComm);
+                if (rank == rank2) {
+                    cudaErrorCheck( cudaMemcpy(d_B, peerBuffer, sizeof(dtype)*N, cudaMemcpyDeviceToDevice) );
+                    cudaErrorCheck( cudaDeviceSynchronize() );
+                }
+                MPI_Barrier(ppComm);
 
                 stop_time = MPI_Wtime();
                 if (i>0) inner_elapsed_time[j][i-1] = stop_time - start_time;
