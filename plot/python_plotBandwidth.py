@@ -34,7 +34,7 @@ lable_colors = { 'Baseline': 'blue', 'CudaAware': 'red', 'Nccl': 'green', 'Nvlin
 
 lable_machines = { 'leonardo': 'Leonardo', 'marzola': 'Marzola'}
 lable_topologyes = { 'singlenode': 'Single node', 'multinode': 'Multi nodes'}
-lable_experiments = { '-pp-': 'Ping-pong', '-a2a-': 'AllToAll', '-ar-': 'AllReduce', '-hlo-': 'Halo'}
+lable_experiments = { '-pp-': 'Ping-pong', '-a2a-': 'AllToAll', '-ar-': 'AllReduce', '-hlo-': 'Halo', '-mpp-': 'Multi-Ping-Pong'}
 
 # Function to plot performance comparison
 def plot_performance(file_paths):
@@ -117,6 +117,8 @@ def plot_performance(file_paths):
                     else:
                         if e == 'Ping-pong':
                             peak = 12.5 # We can obtain at max one of the NIC entrance (so 12.5 = 25 / 2 (GB/s))
+                        if e == 'Multi-Ping-Pong':
+                            peak = 50 # NOTE we suppose to use 4 p2p couples !!!!
                 plt.axhline(y=peak, color='red', linestyle='--', label='Theoretical peak (%s GB/s)' % peak)
 
                 plt.xscale('log', base=2)

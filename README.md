@@ -26,6 +26,7 @@ Depending on the particular experiment (i.e. communication scheme), the **SD** a
 2. All-To-All (**a2a**): all the **N** GPUs involved in the experiments send **N**-1 messages **m1**, **m2**, ..., **m(n-1)** (one to each of the other **N**-1 GPUs).
 3. AllReduce (**ar**): given a message size **k** and a binary operation *Op*(), each GPU *i* owns a message **m(i)** of **k** elements; at the end of the communication each GPUs own the same message **M** = *Op*(**m(0)**, **m(1)**, ...,  **m(N-1)**) (where the operation *Op* is applied to the messages as an element-wise operation over the **k** elements).
 4. Halo3D (**hlo**): The involved processes are divided over a 3D grid in which each process communicates with the adjacent ones; since we have three axes, each process should need to communicate with up to six other processes depending on the selected grid. Different to all the other communication schemes, the Halo3D involves non-blocking communications.
+5. Multi-Peer-To-Peer (**mpp**): a set of multiple GPUs *A_0*, *A_1*, ... *A_k* send the messages **m1_0**, **m1_1**, ... **m1_k** to a disjoint set of GPUs *B_0*, *B_1*, ... *B_k* that, after recived **m1_0**, **m1_1**, ... **m1_k**, they send other messages **m2_0**, **m2_1**, ... **m2_k** to *A_0*, *A_1*, ... *A_k*.
 
 # Repository structure
 
@@ -39,6 +40,20 @@ The source codes are CUDA C codes contained in the "src/" directory; for each co
 ### Base structure
 
 ...
+
+### Command line parameters
+
+All the source files admit several common optional parameters for custumize the execution:
+
+1. With the flag "**-l**" you can custumize the repetition performed for each buffer-size (without setting "*-l*", the default value is *50*).
+2. With the flag "**-b**" you can custumize the maximum buffer-size reached by the buffer cycle (without setting "*-b*", the default value should change between the experiments, but is usually around *30* (where we meen that the maximum buffer has a size of 2^30 B)).
+3. With the flag "**-x**" you can fix a single buffer-size (as for the "*-b*" flag, the value define the 2^x B buffer size).
+
+#### Special line parameters
+
+Reguarding the *Halo3D* experiment, a customized 3D grid should be defined by using the falgs "**-pex**", "**-pey**" and "**-pez**".
+
+Reguarding the *Multi-Peer-To-Peer* experiment, the number of Peer-To-Peer couples (by default as *4*) shoulb be customized with the falg "**-p**".
 
 ### Automatic correctness checks
 
