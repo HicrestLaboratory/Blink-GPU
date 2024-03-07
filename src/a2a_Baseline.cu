@@ -295,6 +295,8 @@ int main(int argc, char *argv[])
     read_line_parameters(argc, argv, rank,
                          &flag_b, &flag_l, &flag_x,
                          &loop_count, &buff_cycle, &fix_buff_size);
+            
+    if(x >= buff_cycle){buff_cycle = x + 1;}
 
     // Print message based on the flags
     if (flag_b && rank == 0) printf("Flag b was set with argument: %d\n", buff_cycle);
