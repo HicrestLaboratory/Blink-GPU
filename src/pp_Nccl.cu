@@ -111,7 +111,7 @@ int  assignDeviceToProcess(MPI_Comm *nodeComm, int *nnodes, int *mynodeid)
      return 0;
 #endif
 
-//      printf ("Assigning device %d  to process on node %s rank %d\n",*myrank,  host_name, rank );
+      printf ("Assigning device %d  to process on node %s rank %d\n", myrank, host_name, rank);
       /* Assign device to MPI process, initialize BLAS and probe device properties */
       //cudaSetDevice(*myrank);
       return myrank;
@@ -494,7 +494,8 @@ int main(int argc, char *argv[])
         }
 
         MPI_Allreduce(my_error, error, buff_cycle, MPI_INT, MPI_MAX, ppComm);
-        MPI_Allreduce(inner_elapsed_time, elapsed_time, buff_cycle*loop_count, MPI_DOUBLE, MPI_MAX, firstsenderComm);
+        //MPI_Allreduce(inner_elapsed_time, elapsed_time, buff_cycle*loop_count, MPI_DOUBLE, MPI_MAX, firstsenderComm);
+        memcpy(elapsed_time, inner_elapsed_time, buff_cycle*loop_count*sizeof(double)); // No need to do allreduce, there is only one rank in firstsenderComm
         for(int j=fix_buff_size; j<max_j; j++) {
             long int N = 1 << j;
             long int B_in_GB = 1 << 30;

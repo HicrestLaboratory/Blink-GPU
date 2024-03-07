@@ -118,7 +118,7 @@ int  assignDeviceToProcess(MPI_Comm *nodeComm, int *nnodes, int *mynodeid)
      return 0;
 #endif
 
-//      printf ("Assigning device %d  to process on node %s rank %d\n",*myrank,  host_name, rank );
+      printf ("Assigning device %d  to process on node %s rank %d\n", myrank, host_name, rank);
       /* Assign device to MPI process, initialize BLAS and probe device properties */
       //cudaSetDevice(*myrank);
       return myrank;
