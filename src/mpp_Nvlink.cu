@@ -634,7 +634,9 @@ int main(int argc, char *argv[])
         }
 
         MPI_Allreduce(my_error, error, buff_cycle, MPI_INT, MPI_MAX, ppComm);
-        MPI_Allreduce(inner_elapsed_time, elapsed_time, buff_cycle*loop_count, MPI_DOUBLE, MPI_MAX, allfirstsenderComm);
+        if(allfirstsenderComm != MPI_COMM_NULL) {
+            MPI_Allreduce(inner_elapsed_time, elapsed_time, buff_cycle*loop_count, MPI_DOUBLE, MPI_MAX, allfirstsenderComm);
+        }
         for(int j=fix_buff_size; j<max_j; j++) {
             long int N = 1 << j;
             long int B_in_GB = 1 << 30;
