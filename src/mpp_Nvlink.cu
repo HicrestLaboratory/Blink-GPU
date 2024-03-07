@@ -285,7 +285,7 @@ void read_line_parameters (int argc, char *argv[], int myrank,
 
             *flag_p = 1;
             *ncouples = atoi(argv[i + 1]);
-            if (*fix_buff_size < 0) {
+            if (*ncouples < 0) {
                 fprintf(stderr, "Error: number of ping-pong couples must be >= 1.\n");
                 exit(__LINE__);
             }
@@ -397,6 +397,8 @@ int main(int argc, char *argv[])
                          &flag_b, &flag_l, &flag_x, &flag_p,
                          &loop_count, &buff_cycle, &fix_buff_size, &ncouples);
     if(flag_x && fix_buff_size >= buff_cycle){buff_cycle = fix_buff_size + 1;}    
+    if(!flag_p){ncouples = size / 2;}
+
     // Print message based on the flags
     if (flag_p && rank == 0) printf("Flag p was set with argument: %d\n", ncouples);
     if (flag_b && rank == 0) printf("Flag b was set with argument: %d\n", buff_cycle);
