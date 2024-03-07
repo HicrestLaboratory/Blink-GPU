@@ -294,6 +294,27 @@ int main(int argc, char *argv[])
         // I am part of the new ppComm.
         printf("Process %d took part to the ppComm.\n", rank);
     }
+
+    // Keep only the first sender processe (i.e. 0) in the new group.
+    int ranks_0[1];
+    ranks_0[0] = 0;
+    MPI_Group firstsender_group;
+    if (rank == 0)
+        MPI_Group_incl(world_group, 1, ranks_0, &firstsender_group);
+    else
+        MPI_Group_incl(world_group, 0, ranks_0, &firstsender_group);
+
+    // Create the new communicator from that group of processes.
+    MPI_Comm firstsenderComm;
+    MPI_Comm_create(MPI_COMM_WORLD, firstsender_group, &firstsenderComm);
+
+    // Do a broadcast only between the processes of the new communicator.
+
+    if(firstsenderComm == MPI_COMM_NULL) {
+        printf("Process %d did not take part to the firstsenderComm.\n", rank);
+    } else {
+        printf("Process %d took part to the firstsenderComm.\n", rank);
+    }
     MPI_Barrier(MPI_COMM_WORLD);
 
     /* -------------------------------------------------------------------------------------------
@@ -410,7 +431,7 @@ int main(int argc, char *argv[])
         }
 
         MPI_Allreduce(my_error, error, buff_cycle, MPI_INT, MPI_MAX, ppComm);
-        MPI_Allreduce(inner_elapsed_time, elapsed_time, buff_cycle*loop_count, MPI_DOUBLE, MPI_MAX, ppComm);
+        MPI_Allreduce(inner_elapsed_time, elapsed_time, buff_cycle*loop_count, MPI_DOUBLE, MPI_MAX, firstsenderComm);
         for(int j=fix_buff_size; j<max_j; j++) {
             long int N = 1 << j;
             long int B_in_GB = 1 << 30;

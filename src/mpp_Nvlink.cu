@@ -436,11 +436,16 @@ int main(int argc, char *argv[])
     int allppComm_rank = -1;
     int tmp_all_peers[2*nodesize];
     int *allpeers = (int*)malloc(sizeof(int)*ncouples*2);
+
+    MPI_Comm allfirstsenderComm;
+    int allfirstsender[ncouples];
+
     for (int i=0; i<2*nodesize; i++) tmp_all_peers[i] = -1;
 
     if ( mynode == 0 || mynode == nnodes-1 ) {
         MPI_Group pp_group;
         MPI_Group all_pp_group;
+        MPI_Group all_firstsender_group;
 
         if ( (rank % nodesize) < ncouples ) {
             my_peer = (mynode == 0) ? (rank + (nnodes-1)*nodesize) : (rank - (nnodes-1)*nodesize);
@@ -472,10 +477,14 @@ int main(int argc, char *argv[])
         fflush(stdout);
 
         MPI_Allgather(&my_peer, 1, MPI_INT, tmp_all_peers, 1, MPI_INT, MPI_COMM_WORLD);
-        for (int i=0, j=0; i<size && j<2*ncouples; i++) {
+        for (int i=0, j=0, k=0; i<size && j<2*ncouples; i++) {
             if (tmp_all_peers[i] != -1) {
                 allpeers[j] = i;
                 j++;
+                if (i < tmp_all_peers[i]) {
+                    allfirstsender[k] = i;
+                    k++;
+                }
             }
         }
         if ( (rank % nodesize) < ncouples )
@@ -493,6 +502,23 @@ int main(int argc, char *argv[])
         } else {
             // I am part of the new ppComm.
             printf("Process %d took part to the allppComm (with rank %d).\n", rank, allppComm_rank);
+        }
+        fflush(stdout);
+
+
+        if ( (rank % nodesize) < ncouples && rank < my_peer)
+            MPI_Group_incl(world_group, ncouples, allfirstsender, &all_firstsender_group);
+        else
+            MPI_Group_incl(world_group, ncouples, allfirstsender, &all_firstsender_group);
+        // Create the new communicator from that group of processes.
+        MPI_Comm_create(MPI_COMM_WORLD, all_firstsender_group, &allfirstsenderComm);
+
+        if(allfirstsenderComm == MPI_COMM_NULL) {
+            // I am not part of the ppComm.
+            printf("Process %d did not take part to the allfirstsenderComm.\n", rank);
+        } else {
+            // I am part of the new ppComm.
+            printf("Process %d took part to the allfirstsenderComm.\n", rank);
         }
         fflush(stdout);
 
@@ -606,7 +632,7 @@ int main(int argc, char *argv[])
         }
 
         MPI_Allreduce(my_error, error, buff_cycle, MPI_INT, MPI_MAX, ppComm);
-        MPI_Allreduce(inner_elapsed_time, elapsed_time, buff_cycle*loop_count, MPI_DOUBLE, MPI_MAX, ppComm);
+        MPI_Allreduce(inner_elapsed_time, elapsed_time, buff_cycle*loop_count, MPI_DOUBLE, MPI_MAX, allfirstsenderComm);
         for(int j=fix_buff_size; j<max_j; j++) {
             long int N = 1 << j;
             long int B_in_GB = 1 << 30;
