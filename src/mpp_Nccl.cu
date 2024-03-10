@@ -363,103 +363,60 @@ int main(int argc, char *argv[])
         MPI Initialize Peer-to-peer communicators
     --------------------------------------------------------------------------------------------*/
 
+    MPI_Comm ppCouples, ppAllCouples, ppFirstSenders;
+    int ppCouples_rank, ppAllCouples_rank, ppFirstSenders_rank;
+    int ppCouples_size, ppAllCouples_size, ppFirstSenders_size;
+    int colour4ppCouples, colour4ppAllCouples , colour4ppFirstSenders;
 
-    int peers[2];
-    MPI_Comm ppComm;
     int my_peer = -1;
+    if ((mynode == 0 || mynode == nnodes-1) && mynodeid < ncouples)
+        my_peer = (mynode == 0) ? (rank + (nnodes-1)*nodesize) : (rank - (nnodes-1)*nodesize);
 
-    MPI_Comm allppComm;
-    int allppComm_rank = -1;
-    int tmp_all_peers[2*nodesize];
-    int *allpeers = (int*)malloc(sizeof(int)*ncouples*2);
-
-    MPI_Comm allfirstsenderComm;
-    int allfirstsender[ncouples];
-
-    for (int i=0; i<2*nodesize; i++) tmp_all_peers[i] = -1;
-
-    if ( mynode == 0 || mynode == nnodes-1 ) {
-        MPI_Group pp_group;
-        MPI_Group all_pp_group;
-        MPI_Group all_firstsender_group;
-
-        if ( (rank % nodesize) < ncouples ) {
-            my_peer = (mynode == 0) ? (rank + (nnodes-1)*nodesize) : (rank - (nnodes-1)*nodesize);
-
-            // Keep only the processes 0 and 1 in the new group.
-            peers[0] = rank;
-            peers[1] = my_peer;
-            tmp_all_peers[rank] = 1;
-        }
-
-        // Get the group or processes of the default communicator
-        MPI_Group world_group;
-        MPI_Comm_group(MPI_COMM_WORLD, &world_group);
-        if ( (rank % nodesize) < ncouples )
-            MPI_Group_incl(world_group, 2, peers, &pp_group);
-        else
-            MPI_Group_incl(world_group, 0, peers, &pp_group);
-
-        // Create the new communicator from that group of processes.
-        MPI_Comm_create(MPI_COMM_WORLD, pp_group, &ppComm);
-
-        if(ppComm == MPI_COMM_NULL) {
-            // I am not part of the ppComm.
-            printf("Process %d did not take part to any ppComm.\n", rank);
-        } else {
-            // I am part of the new ppComm.
-            printf("Process %d took part to a ppComm (%d, %d).\n", rank, peers[0], peers[1]);
-        }
-        fflush(stdout);
-
-        MPI_Allgather(&my_peer, 1, MPI_INT, tmp_all_peers, 1, MPI_INT, MPI_COMM_WORLD);
-        for (int i=0, j=0, k=0; i<size && j<2*ncouples; i++) {
-            if (tmp_all_peers[i] != -1) {
-                allpeers[j] = i;
-                j++;
-                if (i < tmp_all_peers[i]) {
-                    allfirstsender[k] = i;
-                    k++;
-                }
-            }
-        }
-        if ( (rank % nodesize) < ncouples )
-            MPI_Group_incl(world_group, 2*ncouples, allpeers, &all_pp_group);
-        else
-            MPI_Group_incl(world_group, 0, allpeers, &all_pp_group);
-        // Create the new communicator from that group of processes.
-        MPI_Comm_create(MPI_COMM_WORLD, all_pp_group, &allppComm);
-        if(allppComm != MPI_COMM_NULL)
-            MPI_Comm_rank(allppComm, &allppComm_rank);
-
-        if(allppComm == MPI_COMM_NULL) {
-            // I am not part of the ppComm.
-            printf("Process %d did not take part to the allppComm.\n", rank);
-        } else {
-            // I am part of the new ppComm.
-            printf("Process %d took part to the allppComm (with rank %d).\n", rank, allppComm_rank);
-        }
-        fflush(stdout);
-
-
-        if ( (rank % nodesize) < ncouples && rank < my_peer)
-            MPI_Group_incl(world_group, ncouples, allfirstsender, &all_firstsender_group);
-        else
-            MPI_Group_incl(world_group, ncouples, allfirstsender, &all_firstsender_group);
-        // Create the new communicator from that group of processes.
-        MPI_Comm_create(MPI_COMM_WORLD, all_firstsender_group, &allfirstsenderComm);
-
-        if(allfirstsenderComm == MPI_COMM_NULL) {
-            // I am not part of the ppComm.
-            printf("Process %d did not take part to the allfirstsenderComm.\n", rank);
-        } else {
-            // I am part of the new ppComm.
-            printf("Process %d took part to the allfirstsenderComm.\n", rank);
-        }
-        fflush(stdout);
-
+    colour4ppCouples = ((mynode == 0 || mynode == nnodes-1) && mynodeid < ncouples) ? (mynodeid) : (MPI_UNDEFINED);
+    MPI_Comm_split(MPI_COMM_WORLD, colour4ppCouples, rank, &ppCouples);
+    if(ppCouples != MPI_COMM_NULL) {
+        MPI_Comm_rank(ppCouples, &ppCouples_rank);
+        MPI_Comm_size(ppCouples, &ppCouples_size);
+    } else {
+        ppCouples_rank = -1;
+        ppCouples_size = -1;
     }
-    MPI_Barrier(MPI_COMM_WORLD);
+
+    colour4ppAllCouples = ((mynode == 0 || mynode == nnodes-1) && mynodeid < ncouples) ? (1) : (MPI_UNDEFINED);
+    MPI_Comm_split(MPI_COMM_WORLD, colour4ppAllCouples, rank, &ppAllCouples);
+    if(ppAllCouples != MPI_COMM_NULL) {
+        MPI_Comm_rank(ppAllCouples, &ppAllCouples_rank);
+        MPI_Comm_size(ppAllCouples, &ppAllCouples_size);
+    } else {
+        ppAllCouples_rank = -1;
+        ppAllCouples_size = -1;
+    }
+
+    colour4ppFirstSenders = (rank < ncouples) ? (mynodeid) : (MPI_UNDEFINED);
+    MPI_Comm_split(MPI_COMM_WORLD, colour4ppFirstSenders, rank, &ppFirstSenders);
+    if(ppFirstSenders != MPI_COMM_NULL) {
+        MPI_Comm_rank(ppFirstSenders, &ppFirstSenders_rank);
+        MPI_Comm_size(ppFirstSenders, &ppFirstSenders_size);
+    } else {
+        ppFirstSenders_rank = -1;
+        ppFirstSenders_size = -1;
+    }
+
+    if(ppCouples == MPI_COMM_NULL)
+        printf("Process %d did not take part to the ppCouples.\n", rank);
+    else
+        printf("Process %d took part to the ppCouples (with rank %d and size %d).\n", rank, ppCouples_rank, ppCouples_size);
+    fflush(stdout);
+    if(ppAllCouples == MPI_COMM_NULL)
+        printf("Process %d did not take part to the ppAllCouples.\n", rank);
+    else
+        printf("Process %d took part to the ppAllCouples (with rank %d and size %d).\n", rank, ppAllCouples_rank, ppAllCouples_size);
+    fflush(stdout);
+    if(ppFirstSenders == MPI_COMM_NULL)
+        printf("Process %d did not take part to the ppFirstSenders.\n", rank);
+    else
+        printf("Process %d took part to the ppFirstSenders (with rank %d and size %d).\n", rank, ppFirstSenders_rank, ppFirstSenders_size);
+    fflush(stdout);
 
     /* -------------------------------------------------------------------------------------------
         NCCL Initialization
@@ -508,7 +465,7 @@ int main(int argc, char *argv[])
     int my_error[buff_cycle], error[buff_cycle];
     cktype cpu_checks[buff_cycle], gpu_checks[buff_cycle];
     float inner_elapsed_time[buff_cycle][loop_count], elapsed_time[buff_cycle][loop_count];
-    if (ppComm != MPI_COMM_NULL) {
+    if (ppCouples != MPI_COMM_NULL) {
         for(int j=fix_buff_size; j<max_j; j++){
 
             long int N = 1 << j;
@@ -547,7 +504,7 @@ int main(int argc, char *argv[])
             cudaErrorCheck(cudaEventCreate(&stop));
 
             for(int i=1-(WARM_UP); i<=loop_count; i++){
-                MPI_Barrier(allppComm);
+                MPI_Barrier(ppAllCouples);
                 cudaErrorCheck(cudaEventRecord(start, NULL));
 
                 ncclGroupStart();
@@ -595,8 +552,8 @@ int main(int argc, char *argv[])
             free(B);
         }
 
-        MPI_Allreduce(my_error, error, buff_cycle, MPI_INT, MPI_MAX, allppComm);
-        MPI_Allreduce(inner_elapsed_time, elapsed_time, buff_cycle*loop_count, MPI_FLOAT, MPI_MAX, allfirstsenderComm);
+        MPI_Allreduce(my_error, error, buff_cycle, MPI_INT, MPI_MAX, ppAllCouples);
+        MPI_Allreduce(inner_elapsed_time, elapsed_time, buff_cycle*loop_count, MPI_FLOAT, MPI_MAX, ppFirstSenders);
         for(int j=fix_buff_size; j<max_j; j++) {
             long int N = 1 << j;
             long int B_in_GB = 1 << 30;
