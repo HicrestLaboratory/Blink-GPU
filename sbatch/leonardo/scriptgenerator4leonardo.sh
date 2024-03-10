@@ -25,7 +25,7 @@ source ${MODULE_PATH} && source ${EXPORT_PATH} && srun bin/<exp-name>_<exp-type>
 EOF
 )
 
-names=("pp" "a2a" "ar" "hlo" "mpp")
+names=("pp" "a2a" "ar" "hlo" "mpp" "ampp")
 types=("Baseline" "CudaAware" "Nccl" "Nvlink")
 topos=("singlenode" "multinode")
 
@@ -37,6 +37,7 @@ do
         for topo in "${topos[@]}"
         do
             if [[
+                ("$name" != "ampp" || "$topo" != "singlenode") &&
                 ("$topo" != "multinode" || "$type" != "Nvlink") &&
                 ("$name" != "mpp" || "$topo" != "singlenode") &&
                 ("$name" != "hlo" || "$type" != "Nvlink") &&
