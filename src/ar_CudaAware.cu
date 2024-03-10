@@ -100,7 +100,7 @@ int  assignDeviceToProcess(MPI_Comm *nodeComm, int *nnodes, int *mynodeid)
      return 0;
 #endif
 
-//      printf ("Assigning device %d  to process on node %s rank %d\n",*myrank,  host_name, rank );
+      printf ("Assigning device %d  to process on node %s rank %d\n", myrank, host_name, rank);
       /* Assign device to MPI process, initialize BLAS and probe device properties */
       //cudaSetDevice(*myrank);
       return myrank;
@@ -397,7 +397,7 @@ int main(int argc, char *argv[])
     for(int j=fix_buff_size; j<max_j; j++) {
         long int N = 1 << j;
         long int B_in_GB = 1 << 30;
-        long int num_B = sizeof(dtype)*N*((size-1)/size)*2;
+        long int num_B = sizeof(dtype)*N*((size-1)/(float)size)*2;
         double num_GB = (double)num_B / (double)B_in_GB;
 
         double avg_time_per_transfer = 0.0;
@@ -405,7 +405,7 @@ int main(int argc, char *argv[])
             avg_time_per_transfer += elapsed_time[j][i];
             if(rank == 0) printf("\tTransfer size (B): %10li, Transfer Time (s): %15.9f, Bandwidth (GB/s): %15.9f, Iteration %d\n", num_B, elapsed_time[j][i], num_GB/elapsed_time[j][i], i);
         }
-        avg_time_per_transfer /= (2.0*(double)loop_count);
+        avg_time_per_transfer /= ((double)loop_count);
 
         if(rank == 0) printf("[Average] Transfer size (B): %10li, Transfer Time (s): %15.9f, Bandwidth (GB/s): %15.9f, Error: %d\n", num_B, avg_time_per_transfer, num_GB/avg_time_per_transfer, error[j] );
         fflush(stdout);

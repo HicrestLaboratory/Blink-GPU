@@ -112,7 +112,7 @@ int  assignDeviceToProcess(MPI_Comm *nodeComm, int *nnodes, int *mynodeid)
      return 0;
 #endif
 
-//      printf ("Assigning device %d  to process on node %s rank %d\n",*myrank,  host_name, rank );
+      printf ("Assigning device %d  to process on node %s rank %d\n", myrank, host_name, rank);
       /* Assign device to MPI process, initialize BLAS and probe device properties */
       //cudaSetDevice(*myrank);
       return myrank;
@@ -453,7 +453,7 @@ int main(int argc, char *argv[])
     for(int j=fix_buff_size; j<max_j; j++){
         long int N = 1 << j;
         long int B_in_GB = 1 << 30;
-        long int num_B = sizeof(dtype)*N*((size-1)/size)*2;
+        long int num_B = sizeof(dtype)*N*((size-1)/(float)size)*2;
         double num_GB = (double)num_B / (double)B_in_GB;
 
         double avg_time_per_transfer = 0.0;
