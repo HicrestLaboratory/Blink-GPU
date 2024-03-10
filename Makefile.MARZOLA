@@ -79,23 +79,23 @@ $(BASELINE_MN_EXPORTS):
 
 $(BINFOLDER)/$(NAME)_Baseline: src/$(NAME)_Baseline.cu $(BASELINE_MODULES) $(BASELINE_SN_EXPORTS) $(BASELINE_MN_EXPORTS)
 	mkdir -p $(BINFOLDER) $(OUTFOLDER) $(SOUTFOLDER)
-	source $(BASELINE_MODULES) && $(CC) $(CFLAGS) -o $@ $< $(INCL) $(LIBS) $(LIBFLAGS) $(MPI) $(CUDA) -lstdc++ -lm -Wno-deprecated-gpu-targets $(DBGFLAGS)
+	source $(BASELINE_MODULES) && $(CC) $(CFLAGS) -o $@ $< $(INCL) $(LIBS) $(LIBFLAGS) $(MPI) $(CUDA) -lstdc++ -lm -Wno-deprecated-gpu-targets $(DBGFLAGS) -DPINNED
 
 $(BINFOLDER)/$(A2ANAME)_Baseline: src/$(A2ANAME)_Baseline.cu $(BASELINE_MODULES) $(BASELINE_SN_EXPORTS) $(BASELINE_MN_EXPORTS)
 	mkdir -p $(BINFOLDER) $(OUTFOLDER) $(SOUTFOLDER)
-	source $(BASELINE_MODULES) && $(CC) $(CFLAGS) -o $@ $< $(INCL) $(LIBS) $(LIBFLAGS) $(MPI) $(CUDA) -lstdc++ -lm -Wno-deprecated-gpu-targets $(DBGFLAGS)
+	source $(BASELINE_MODULES) && $(CC) $(CFLAGS) -o $@ $< $(INCL) $(LIBS) $(LIBFLAGS) $(MPI) $(CUDA) -lstdc++ -lm -Wno-deprecated-gpu-targets $(DBGFLAGS) -DPINNED
 
 $(BINFOLDER)/$(ARNAME)_Baseline: src/$(ARNAME)_Baseline.cu $(BASELINE_MODULES) $(BASELINE_SN_EXPORTS) $(BASELINE_MN_EXPORTS)
 	mkdir -p $(BINFOLDER) $(OUTFOLDER) $(SOUTFOLDER)
-	source $(BASELINE_MODULES) && $(CC) $(CFLAGS) -o $@ $< $(INCL) $(LIBS) $(LIBFLAGS) $(MPI) $(CUDA) -lstdc++ -lm -Wno-deprecated-gpu-targets $(DBGFLAGS)
+	source $(BASELINE_MODULES) && $(CC) $(CFLAGS) -o $@ $< $(INCL) $(LIBS) $(LIBFLAGS) $(MPI) $(CUDA) -lstdc++ -lm -Wno-deprecated-gpu-targets $(DBGFLAGS) -DPINNED
 
 $(BINFOLDER)/$(HALONAME)_Baseline: src/$(HALONAME)_Baseline.cu $(BASELINE_MODULES) $(BASELINE_SN_EXPORTS) $(BASELINE_MN_EXPORTS)
 	mkdir -p $(BINFOLDER) $(OUTFOLDER) $(SOUTFOLDER)
-	source $(BASELINE_MODULES) && $(CC) $(CFLAGS) -o $@ $< $(INCL) $(LIBS) $(LIBFLAGS) $(MPI) $(CUDA) -lstdc++ -lm -Wno-deprecated-gpu-targets $(DBGFLAGS)
+	source $(BASELINE_MODULES) && $(CC) $(CFLAGS) -o $@ $< $(INCL) $(LIBS) $(LIBFLAGS) $(MPI) $(CUDA) -lstdc++ -lm -Wno-deprecated-gpu-targets $(DBGFLAGS) -DPINNED
 
 $(BINFOLDER)/$(NBPPNAME)_Baseline: src/$(NBPPNAME)_Baseline.cu $(BASELINE_MODULES)
 	mkdir -p $(BINFOLDER) $(OUTFOLDER) $(SOUTFOLDER)
-	source $(BASELINE_MODULES) && $(CC) $(CFLAGS) -o $@ $< $(INCL) $(LIBS) $(LIBFLAGS) $(MPI) $(CUDA) -lstdc++ -lm -Wno-deprecated-gpu-targets $(DBGFLAGS)
+	source $(BASELINE_MODULES) && $(CC) $(CFLAGS) -o $@ $< $(INCL) $(LIBS) $(LIBFLAGS) $(MPI) $(CUDA) -lstdc++ -lm -Wno-deprecated-gpu-targets $(DBGFLAGS) -DPINNED
 # ----------------------------------------
 
 

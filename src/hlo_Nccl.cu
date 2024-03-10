@@ -351,6 +351,20 @@ void read_line_parameters (int argc, char *argv[], int myrank,
 }
 
 // HB --> Host_buffer, DB --> Device_buffer, DT --> data type, SZ --> size
+#ifdef PINNED
+#define INIT_HALO3D_BUFFER(HB, DB, DT, SZ) {                \
+    int rank; MPI_Comm_rank(MPI_COMM_WORLD, &rank);         \
+    cudaHostAlloc(&HB, sizeof(DT) * SZ, cudaHostAllocDefault);                    \
+    cudaErrorCheck( cudaMalloc(&DB, sizeof(DT) * SZ) );     \
+    cudaErrorCheck( cudaMemset(DB, 0, sizeof(DT) * SZ) );   \
+    cudaErrorCheck( cudaDeviceSynchronize() );              \
+}
+
+#define FREE_HALO3D_BUFFER(HB, DB) {                \
+    cudaErrorCheck( cudaFree(DB) );                 \
+    cudaFreeHost(HB);                               \
+}
+#else
 #define INIT_HALO3D_BUFFER(HB, DB, DT, SZ) {                \
     int rank; MPI_Comm_rank(MPI_COMM_WORLD, &rank);         \
     HB = (DT*)malloc(sizeof(DT) * SZ);                      \
@@ -364,6 +378,7 @@ void read_line_parameters (int argc, char *argv[], int myrank,
     cudaErrorCheck( cudaFree(DB) );                 \
     free(HB);                                       \
 }
+#endif
 
 #define BLK_SIZE 256
 #define GRD_SIZE 4

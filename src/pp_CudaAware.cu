@@ -359,9 +359,15 @@ int main(int argc, char *argv[])
             if (rank == 0) {printf("%i#", j); fflush(stdout);}
 
             // Allocate memory for A on CPU
-            dtype *A = (dtype*)malloc(N*sizeof(dtype));
-            dtype *B = (dtype*)malloc(N*sizeof(dtype));
+            dtype *A, *B;
             cktype my_cpu_check = 0, recv_cpu_check, gpu_check = 0;
+#ifdef PINNED
+            cudaHostAlloc(&A, N*sizeof(dtype), cudaHostAllocDefault);
+            cudaHostAlloc(&B, N*sizeof(dtype), cudaHostAllocDefault);
+#else
+            A = (dtype*)malloc(N*sizeof(dtype));
+            B = (dtype*)malloc(N*sizeof(dtype));
+#endif
 
             // Initialize all elements of A to 0.0
             for(int i=0; i<N; i++){
@@ -426,8 +432,13 @@ int main(int argc, char *argv[])
             fflush(stdout);
             cudaErrorCheck( cudaFree(d_A) );
             cudaErrorCheck( cudaFree(d_B) );
+#ifdef PINNED
+            cudaFreeHost(A);
+            cudaFreeHost(B);
+#else
             free(A);
             free(B);
+#endif
         }
 
         MPI_Allreduce(my_error, error, buff_cycle, MPI_INT, MPI_MAX, ppComm);
