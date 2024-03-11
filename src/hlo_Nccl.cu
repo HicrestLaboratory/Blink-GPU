@@ -676,8 +676,10 @@ int main(int argc, char *argv[])
     double start_time, stop_time;
     cudaEvent_t start[12], stop[12];
     float cuda_timer[3], mpi_timer[3];
-    unsigned int xCheck = 0U, yCheck = 0U, zCheck = 0U, halo_checks[buff_cycle];
-    float inner_elapsed_time[buff_cycle][loop_count], elapsed_time[buff_cycle][loop_count];
+    unsigned int xCheck = 0U, yCheck = 0U, zCheck = 0U;
+    float *elapsed_time = (float*)malloc(sizeof(float)*buff_cycle*loop_count);
+    float *inner_elapsed_time = (float*)malloc(sizeof(float)*buff_cycle*loop_count);
+    unsigned int *halo_checks = (unsigned int*)malloc(sizeof(unsigned int)*buff_cycle);
     for(int j=fix_buff_size; j<max_j; j++){
 
         // Define cycle sizes
@@ -818,7 +820,7 @@ int main(int argc, char *argv[])
                     cudaErrorCheck(cudaEventElapsedTime(&(time_table[1][k]), start[0], stop[k]));
                 }
 
-                cudaErrorCheck(cudaEventElapsedTime(&(inner_elapsed_time[j][i-1]), start[first_start], stop[first_start]));
+                cudaErrorCheck(cudaEventElapsedTime(&(inner_elapsed_time[j*buff_cycle+i-1]), start[first_start], stop[first_start]));
 
                 // -------------------- For DE BUG --------------------
 //                 if (inner_elapsed_time[j][i-1] > 1000.0) {PRINT_STREAM_TIMETABLE(time_table, 12)}
@@ -921,9 +923,9 @@ int main(int argc, char *argv[])
 
         double avg_time_per_transfer = 0.0;
         for (int i=0; i<loop_count; i++) {
-            elapsed_time[j][i] *= 0.001;
-            avg_time_per_transfer += elapsed_time[j][i];
-            if(rank == 0) printf("\tTransfer size (B): %10li, Transfer Time (s): %15.9f, Bandwidth (GB/s): %15.9f, Iteration %d\n", num_B, elapsed_time[j][i], num_GB/elapsed_time[j][i], i);
+            elapsed_time[j*buff_cycle+i] *= 0.001;
+            avg_time_per_transfer += elapsed_time[j*buff_cycle+i];
+            if(rank == 0) printf("\tTransfer size (B): %10li, Transfer Time (s): %15.9f, Bandwidth (GB/s): %15.9f, Iteration %d\n", num_B, elapsed_time[j*buff_cycle+i], num_GB/elapsed_time[j*buff_cycle+i], i);
         }
         avg_time_per_transfer /= ((double)loop_count);
 
@@ -931,6 +933,9 @@ int main(int argc, char *argv[])
         fflush(stdout);
     }
 
+    free(halo_checks);
+    free(elapsed_time);
+    free(inner_elapsed_time);
     MPI_Finalize();
     return(0);
 }

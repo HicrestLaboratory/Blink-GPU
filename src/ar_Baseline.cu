@@ -322,9 +322,12 @@ int main(int argc, char *argv[])
     --------------------------------------------------------------------------------------------*/
 
     double start_time, stop_time;
-    int my_error[buff_cycle], error[buff_cycle];
-    cktype cpu_checks[buff_cycle], gpu_checks[buff_cycle];
-    double inner_elapsed_time[buff_cycle][loop_count], elapsed_time[buff_cycle][loop_count];
+    int *error = (int*)malloc(sizeof(int)*buff_cycle);
+    int *my_error = (int*)malloc(sizeof(int)*buff_cycle);
+    cktype *cpu_checks = (cktype*)malloc(sizeof(cktype)*buff_cycle);
+    cktype *gpu_checks = (cktype*)malloc(sizeof(cktype)*buff_cycle);
+    double *elapsed_time = (double*)malloc(sizeof(double)*buff_cycle*loop_count);
+    double *inner_elapsed_time = (double*)malloc(sizeof(double)*buff_cycle*loop_count);
     for(int j=fix_buff_size; j<max_j; j++){
 
         long int N = 1 << j;
@@ -375,7 +378,7 @@ int main(int argc, char *argv[])
             cudaErrorCheck( cudaMemcpy(d_B, B, N*sizeof(dtype), cudaMemcpyHostToDevice) );
 
             stop_time = MPI_Wtime();
-            if (i>0) inner_elapsed_time[j][i-1] = stop_time - start_time;
+            if (i>0) inner_elapsed_time[j*buff_cycle+i-1] = stop_time - start_time;
 
             if (rank == 0) {printf("%%"); fflush(stdout);}
         }
@@ -414,8 +417,8 @@ int main(int argc, char *argv[])
 
         double avg_time_per_transfer = 0.0;
         for (int i=0; i<loop_count; i++) {
-            avg_time_per_transfer += elapsed_time[j][i];
-            if(rank == 0) printf("\tTransfer size (B): %10li, Transfer Time (s): %15.9f, Bandwidth (GB/s): %15.9f, Iteration %d\n", num_B, elapsed_time[j][i], num_GB/elapsed_time[j][i], i);
+            avg_time_per_transfer += elapsed_time[j*buff_cycle+i];
+            if(rank == 0) printf("\tTransfer size (B): %10li, Transfer Time (s): %15.9f, Bandwidth (GB/s): %15.9f, Iteration %d\n", num_B, elapsed_time[j*buff_cycle+i], num_GB/elapsed_time[j*buff_cycle+i], i);
         }
         avg_time_per_transfer /= ((double)loop_count);
 
@@ -440,6 +443,12 @@ int main(int argc, char *argv[])
     printf("%s", s);
     fflush(stdout);
 
+    free(error);
+    free(my_error);
+    free(cpu_checks);
+    free(gpu_checks);
+    free(elapsed_time);
+    free(inner_elapsed_time);
     MPI_Finalize();
     return(0);
 }
