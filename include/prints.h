@@ -31,6 +31,7 @@ void check_cpu_and_gpu_affinity (int dev_id) {
         MPI_Barrier(MPI_COMM_WORLD);
     }
 
+    // Collect device id
     int* all_dev_id = (int *) malloc(sizeof(int)*size);
     all_dev_id[rank] = dev_id;
 
@@ -39,17 +40,34 @@ void check_cpu_and_gpu_affinity (int dev_id) {
         MPI_Bcast(all_dev_id+root_rank, 1, MPI_INT, root_rank, MPI_COMM_WORLD);
     }
     MPI_Barrier(MPI_COMM_WORLD);
+    
+    // Collect node name'
+    int namelen;
+    size_t bytes;
+    char     host_name[MPI_MAX_PROCESSOR_NAME];
+    char (*host_names)[MPI_MAX_PROCESSOR_NAME];
+    bytes = size * sizeof(char[MPI_MAX_PROCESSOR_NAME]);
+    host_names = (char (*)[MPI_MAX_PROCESSOR_NAME]) malloc(bytes);
+
+    MPI_Get_processor_name(host_name,&namelen);
+    host_names = (char (*)[MPI_MAX_PROCESSOR_NAME]) malloc(bytes);
+    strcpy(host_names[rank], host_name);
+    for (int n=0; n<size; n++)
+    {
+        MPI_Bcast(&(host_names[n]), MPI_MAX_PROCESSOR_NAME, MPI_CHAR, n, MPI_COMM_WORLD);
+    }
 
     // Print at node 0
     if (0 == rank) {
         for (int root_rank = 0; root_rank < size; root_rank++){
-            printf("Rank: %d, Node_id: %u, CPU_id: %u, Device_id: %u.\n", root_rank, all_node_id[root_rank], all_cpu_id[root_rank], all_dev_id[root_rank]);
+            printf("Machine name: %s, Rank: %d, Node_id: %u, CPU_id: %u, Device_id: %u.\n",host_names[root_rank], root_rank, all_node_id[root_rank], all_cpu_id[root_rank], all_dev_id[root_rank]);
         }
     }
  
     free(all_cpu_id);
     free(all_node_id);
     free(all_dev_id);
+    free(host_names);
 
     return;
 }
