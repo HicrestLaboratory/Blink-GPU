@@ -332,7 +332,6 @@ int main(int argc, char *argv[])
                          &flag_b, &flag_l, &flag_x, &flag_p,
                          &loop_count, &buff_cycle, &fix_buff_size, &ncouples);
     if(flag_x && fix_buff_size >= buff_cycle){buff_cycle = fix_buff_size + 1;}  
-    if(!flag_p){ncouples = size / 2;}
       
     // Print message based on the flags
     if (flag_p && rank == 0) printf("Flag p was set with argument: %d\n", ncouples);
@@ -354,6 +353,8 @@ int main(int argc, char *argv[])
             }
         }
     }
+
+    if(!flag_p){ncouples = nodesize;}
 
     max_j = (flag_x == 0) ? buff_cycle : (fix_buff_size + 1) ;
     if (rank == 0) printf("buff_cycle: %d loop_count: %d max_j: %d\n", buff_cycle, loop_count, max_j);
@@ -392,7 +393,7 @@ int main(int argc, char *argv[])
         ppAllCouples_size = -1;
     }
 
-    colour4ppFirstSenders = (rank < ncouples) ? (mynodeid) : (MPI_UNDEFINED);
+    colour4ppFirstSenders = (rank < ncouples) ? (mynode) : (MPI_UNDEFINED);
     MPI_Comm_split(MPI_COMM_WORLD, colour4ppFirstSenders, rank, &ppFirstSenders);
     if(ppFirstSenders != MPI_COMM_NULL) {
         MPI_Comm_rank(ppFirstSenders, &ppFirstSenders_rank);
