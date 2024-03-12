@@ -2,6 +2,7 @@
 
 #include "mpi.h"
 #include <nccl.h>
+#include <unistd.h>
 
 #define dtype u_int8_t
 #define MPI_dtype MPI_CHAR // MPI_UINT8_T?

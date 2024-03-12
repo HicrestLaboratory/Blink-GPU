@@ -3,6 +3,7 @@
 #include <nccl.h>
 #include "cuda.h"
 #include <cuda_runtime.h>
+#include <unistd.h>
 
 // Macro for checking errors in CUDA API calls
 #define cudaErrorCheck(call)                                                              \
