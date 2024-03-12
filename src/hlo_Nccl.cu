@@ -7,6 +7,8 @@
 #include <string.h>
 #include <unistd.h>
 
+#include "../include/error.h"
+
 #if !defined(OPEN_MPI) || !OPEN_MPI
 #error This source code uses an Open MPI-specific extension
 #endif
@@ -31,25 +33,6 @@
 #define WARM_UP 5
 
 // #define DEBUG 1
-
-// Macro for checking errors in CUDA API calls
-#define cudaErrorCheck(call)                                                              \
-do{                                                                                       \
-    cudaError_t cuErr = call;                                                             \
-    if(cudaSuccess != cuErr){                                                             \
-        printf("CUDA Error - %s:%d: '%s'\n", __FILE__, __LINE__, cudaGetErrorString(cuErr));\
-        exit(0);                                                                            \
-    }                                                                                     \
-}while(0)
-
-#define NCCLCHECK(cmd) do {                         \
-  ncclResult_t r = cmd;                             \
-  if (r!= ncclSuccess) {                            \
-    printf("Failed, NCCL error %s:%d '%s'\n",       \
-        __FILE__,__LINE__,ncclGetErrorString(r));   \
-    exit(EXIT_FAILURE);                             \
-  }                                                 \
-} while(0)
 
 #define MPI
 
