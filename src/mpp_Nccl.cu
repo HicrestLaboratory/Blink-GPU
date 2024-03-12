@@ -6,6 +6,8 @@
 #include "cuda_runtime.h"
 #include <unistd.h>
 
+#define MPI
+
 #include "../include/error.h"
 #include "../include/type.h"
 #include "../include/gpu_ops.h"
@@ -22,13 +24,6 @@
 #define LOOP_COUNT 50
 
 #define WARM_UP 5
-
-#define MPI
-
-static int stringCmp( const void *a, const void *b) {
-     return strcmp((const char*)a,(const char*)b);
-
-}
 
 void read_line_parameters (int argc, char *argv[], int myrank,
                            int *flag_b, int *flag_l, int *flag_x, int *flag_p,

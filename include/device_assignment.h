@@ -2,7 +2,16 @@
 
 #include <stdio.h>
 #include <string.h>
+#include <unistd.h>
 #include "mpi.h"
+
+// GPU assgined for LUMI
+int GPU_ASSIGN_SEQUENCE[8] = {5, 3, 1, 7, 4, 2, 0, 6};
+
+static int stringCmp( const void *a, const void *b) {
+     return strcmp((const char*)a,(const char*)b);
+
+}
 
 int  assignDeviceToProcess(MPI_Comm *nodeComm, int *nnodes, int *mynodeid)
 {
@@ -67,5 +76,13 @@ int  assignDeviceToProcess(MPI_Comm *nodeComm, int *nnodes, int *mynodeid)
       printf ("Assigning device %d  to process on node %s rank %d\n", myrank, host_name, rank);
       /* Assign device to MPI process, initialize BLAS and probe device properties */
       //cudaSetDevice(*myrank);
+
+#ifdef HIP
+      // The mapping is hard-coded in the code for LUMI, the 4GCDs connnected to the network 
+      // are assigned first, then the 4 GCDs not connected to the network are assgined. The sequence
+      // is the same as NUMA sequence.
+      myrank = GPU_ASSIGN_SEQUENCE[myrank];
+#else
+#endif
       return myrank;
 }
