@@ -5,6 +5,8 @@
 #include <string.h>
 #include <unistd.h>
 
+#define MPI
+
 #include "../include/error.h"
 #include "../include/type.h"
 #include "../include/gpu_ops.h"
@@ -27,13 +29,6 @@
 #define WARM_UP 5
 
 // #define DEBUG 1
-
-#define MPI
-
-static int stringCmp( const void *a, const void *b) {
-     return strcmp((const char*)a,(const char*)b);
-
-}
 
 #include "../include/debug_utils.h"
 
