@@ -6,6 +6,8 @@
 #include <unistd.h>
 
 #include "../include/error.h"
+#include "../include/type.h"
+#include "../include/gpu_ops.h"
 
 #if !defined(OPEN_MPI) || !OPEN_MPI
 #error This source code uses an Open MPI-specific extension
@@ -14,14 +16,8 @@
 /* Needed for MPIX_Query_cuda_support(), below */
 #include "mpi-ext.h"
 
-#define dtype u_int8_t
-#define MPI_dtype MPI_CHAR
-
 #define BUFF_CYCLE 28
 #define LOOP_COUNT 50
-
-#define cktype int32_t
-#define MPI_cktype MPI_INT
 
 #define WARM_UP 5
 
@@ -171,44 +167,6 @@ void PICO_disable_peer_access(int deviceCount, int mydev){
       }
     }
 }
-
-// ---------------------------- For GPU reduction -----------------------------
-#include <thrust/transform_reduce.h>
-#include <thrust/functional.h>
-#include <thrust/execution_policy.h>
-
-struct char2int
-{
-  __host__ __device__ cktype operator()(const dtype &x) const
-  {
-    return static_cast<cktype>(x);
-  }
-};
-
-int gpu_host_reduce(dtype* input_vec, int len, cktype* out_scalar) {
-  int result = thrust::transform_reduce(thrust::host,
-                                        input_vec, input_vec + len,
-                                        char2int(),
-                                        0,
-                                        thrust::plus<cktype>());
-
-  *out_scalar = result;
-
-  return 0;
-}
-
-int gpu_device_reduce(dtype* d_input_vec, int len, cktype* out_scalar) {
-  cktype result = thrust::transform_reduce(thrust::device,
-                                        d_input_vec, d_input_vec + len,
-                                        char2int(),
-                                        0,
-                                        thrust::plus<cktype>());
-
-  *out_scalar = result;
-
-  return 0;
-}
-// ----------------------------------------------------------------------------
 
 void read_line_parameters (int argc, char *argv[], int myrank,
                            int *flag_b, int *flag_l, int *flag_x,
