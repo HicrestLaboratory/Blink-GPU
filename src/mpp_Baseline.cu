@@ -10,6 +10,7 @@
 #include "../include/gpu_ops.h"
 #include "../include/device_assignment.h"
 
+
 #if !defined(OPEN_MPI) || !OPEN_MPI
 #error This source code uses an Open MPI-specific extension
 #endif
