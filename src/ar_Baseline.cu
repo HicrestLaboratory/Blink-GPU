@@ -330,7 +330,7 @@ int main(int argc, char *argv[])
     double *inner_elapsed_time = (double*)malloc(sizeof(double)*buff_cycle*loop_count);
     for(int j=fix_buff_size; j<max_j; j++){
 
-        long int N = 1 << j;
+        uint64_t N = 1 << j;
         if (rank == 0) {printf("%i#", j); fflush(stdout);}
 
         // Allocate memory for A on CPU
@@ -410,9 +410,9 @@ int main(int argc, char *argv[])
     MPI_Allreduce(my_error, error, buff_cycle, MPI_INT, MPI_MAX, MPI_COMM_WORLD);
     MPI_Allreduce(inner_elapsed_time, elapsed_time, buff_cycle*loop_count, MPI_DOUBLE, MPI_MAX, MPI_COMM_WORLD);
     for(int j=fix_buff_size; j<max_j; j++) {
-        long int N = 1 << j;
-        long int B_in_GB = 1 << 30;
-        long int num_B = sizeof(dtype)*N*((size-1)/(float)size)*2;
+        uint64_t N = 1 << j;
+        uint64_t B_in_GB = 1 << 30;
+        uint64_t num_B = sizeof(dtype)*N*((size-1)/(float)size)*2;
         double num_GB = (double)num_B / (double)B_in_GB;
 
         double avg_time_per_transfer = 0.0;

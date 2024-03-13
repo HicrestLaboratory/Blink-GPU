@@ -683,7 +683,7 @@ int main(int argc, char *argv[])
     for(int j=fix_buff_size; j<max_j; j++){
 
         // Define cycle sizes
-        long int N = 1 << j;
+        uint64_t N = 1 << j;
         xSize = ny * nz * N;
         ySize = nx * nz * N;
         zSize = nx * ny * N;
@@ -910,9 +910,9 @@ int main(int argc, char *argv[])
 
     MPI_Allreduce(inner_elapsed_time, elapsed_time, buff_cycle*loop_count, MPI_FLOAT, MPI_MAX, MPI_COMM_WORLD);
     for(int j=fix_buff_size; j<max_j; j++) {
-        long int N = 1 << j;
-        long int B_in_GB = 1 << 30;
-        long int num_B = 0;
+        uint64_t N = 1 << j;
+        uint64_t B_in_GB = 1 << 30;
+        uint64_t num_B = 0;
         if (xUp > -1) num_B += ny * nz * N;
         if (yUp > -1) num_B += nx * nz * N;
         if (zUp > -1) num_B += nx * ny * N;
