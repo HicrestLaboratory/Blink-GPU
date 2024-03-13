@@ -12,6 +12,7 @@
 #include "../include/type.h"
 #include "../include/gpu_ops.h"
 #include "../include/device_assignment.h"
+#include "../include/cmd_util.h"
 
 #if !defined(OPEN_MPI) || !OPEN_MPI
 #error This source code uses an Open MPI-specific extension
