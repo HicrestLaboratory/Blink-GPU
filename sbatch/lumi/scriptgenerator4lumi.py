@@ -33,6 +33,9 @@ nodes_tasks = [(2, 4)]
 
 
 args = ""
+f_run_all_name = 'sbatch/lumi/run-lumi-all.sh'
+f_run_all = open(f_run_all_name, 'w')
+
 for cur_name in names:
     for cur_type in types:
         for cur_nodes, cur_ntasks_per_node in nodes_tasks:
@@ -57,8 +60,13 @@ for cur_name in names:
             f.write("srun bin/{}_{} {}\n\n".format(cur_name, cur_type, args))
             f.close()
             
+            f_run_all.write("sbatch {}\n".format(sbatch_fname))
             # a+x
             st = os.stat(sbatch_fname)
             os.chmod(sbatch_fname, st.st_mode | stat.S_IEXEC)
+
+f_run_all.close()
+st = os.stat(f_run_all_name)
+os.chmod(f_run_all_name, st.st_mode | stat.S_IEXEC)
             
         

@@ -20,9 +20,11 @@ do
         sed -i 's/cuda/hip/g' src/${cur_name}.cpp
         sed -i 's/<nccl.h>/<rccl.h>/g' src/${cur_name}.cpp
         sed -i 's/ncclGetUniqueId(&Id)/ncclSuccess/g' src/${cur_name}.cpp
+        sed -i 's/hipHostAlloc(/hipHostAlloc((void **)/g' src/${cur_name}.cpp
+        sed -i 's/hipHostAllocDefault/0/g' src/${cur_name}.cpp
 
-        CC -xhip -DHIP -DOPEN_MPI -lrccl src/${cur_name}.cpp -o bin/${cur_name}  #-DPINNED 
+        CC -xhip -DHIP -DOPEN_MPI -DPINNED -lrccl src/${cur_name}.cpp -o bin/${cur_name}  #
 
-        rm src/${cur_name}.cpp
+        # rm src/${cur_name}.cpp
     done
 done
