@@ -6,6 +6,7 @@
 #include <cuda_runtime.h>
 #include <string.h>
 #include <unistd.h>
+#include <inttypes.h>
 
 #define MPI
 
@@ -26,6 +27,7 @@
 #define LOOP_COUNT 50
 
 #define WARM_UP 5
+#define SZTYPE uint64_t
 
 int main(int argc, char *argv[])
 {
@@ -174,36 +176,59 @@ int main(int argc, char *argv[])
     float *inner_elapsed_time = (float*)malloc(sizeof(float)*buff_cycle*loop_count);
     for(int j=fix_buff_size; j<max_j; j++){
 
-        uint64_t N = 1 << j;
+        SZTYPE N, M;
+        if (j < 31) {
+            N = 1 << j;
+            M = 1;
+        } else {
+            N = 1 << 30;
+            M = 1 << (j - 30);
+        }
 
         // Allocate memory for A on CPU
         dtype *A, *B;
 #ifdef PINNED
-        cudaHostAlloc(&A, N*sizeof(dtype), cudaHostAllocDefault);
-        cudaHostAlloc(&B, N*sizeof(dtype), cudaHostAllocDefault);
+        cudaHostAlloc(&A, N*M*sizeof(dtype), cudaHostAllocDefault);
+        cudaHostAlloc(&B, N*M*sizeof(dtype), cudaHostAllocDefault);
 #else
-        A = (dtype*)malloc(N*sizeof(dtype));
-        B = (dtype*)malloc(N*sizeof(dtype));
+        A = (dtype*)malloc(N*M*sizeof(dtype));
+        B = (dtype*)malloc(N*M*sizeof(dtype));
 #endif
+        int errorflag = 0;
+        if (A == NULL || B == NULL) {
+            fprintf(stderr, "[%d] Error while allocating buffers at line %d (%lu Bytes requested)\n", rank, __LINE__, N*M*sizeof(dtype));
+            fflush(stderr);
+            errorflag = __LINE__;
+
+        }
+        MPI_Barrier(MPI_COMM_WORLD);
+        if (errorflag != 0) MPI_Abort(MPI_COMM_WORLD, errorflag);
+        MPI_Barrier(MPI_COMM_WORLD);
+
+        if (rank == 0) printf("Buffers of size %" PRIu64 " B succesfuly allocated by all ranks\n", N*M*sizeof(dtype));
+        fflush(stdout);
+        MPI_Barrier(MPI_COMM_WORLD);
+
+
         cktype *my_cpu_check = (cktype*)malloc(sizeof(cktype));
         cktype *recv_cpu_check = (cktype*)malloc(sizeof(cktype)*size), gpu_check = 0;
         *my_cpu_check = 0U;
 
         // Initialize all elements of A to 0.0
-        for(int i=0; i<N; i++) {
+        for(SZTYPE i=0; i<N*M; i++) {
             A[i] = 1U * (rank+1);
         }
         *B = 0U;
 
         dtype *d_B;
-        cudaErrorCheck( cudaMalloc(&d_B, N*sizeof(dtype)) );
-        cudaErrorCheck( cudaMemcpy(d_B, B, N*sizeof(dtype), cudaMemcpyHostToDevice) );
+        cudaErrorCheck( cudaMalloc(&d_B, N*M*sizeof(dtype)) );
+        cudaErrorCheck( cudaMemcpy(d_B, B, N*M*sizeof(dtype), cudaMemcpyHostToDevice) );
 
         dtype *d_A;
-        cudaErrorCheck( cudaMalloc(&d_A, N*sizeof(dtype)) );
-        cudaErrorCheck( cudaMemcpy(d_A, A, N*sizeof(dtype), cudaMemcpyHostToDevice) );
+        cudaErrorCheck( cudaMalloc(&d_A, N*M*sizeof(dtype)) );
+        cudaErrorCheck( cudaMemcpy(d_A, A, N*M*sizeof(dtype), cudaMemcpyHostToDevice) );
 
-        gpu_device_reduce_max(d_A, N, my_cpu_check);
+        gpu_device_reduce_max(d_A, N*M, my_cpu_check);
 
 
         /*
@@ -220,7 +245,7 @@ int main(int argc, char *argv[])
             MPI_Barrier(MPI_COMM_WORLD);
             cudaErrorCheck(cudaEventRecord(start, NULL));
 
-            ncclAllReduce(d_A, d_B, N, ncclDtype, ncclMax, NCCL_COMM_WORLD, NULL);
+            ncclAllReduce(d_A, d_B, N*M, ncclDtype, ncclMax, NCCL_COMM_WORLD, NULL);
 
             cudaErrorCheck(cudaEventRecord(stop, NULL));
             cudaErrorCheck(cudaEventSynchronize(stop));
@@ -232,7 +257,7 @@ int main(int argc, char *argv[])
 
 
 
-        gpu_device_reduce_max(d_B, N, &gpu_check);
+        gpu_device_reduce_max(d_B, N*M, &gpu_check);
         MPI_Allgather(my_cpu_check, 1, MPI_cktype, recv_cpu_check, 1, MPI_cktype, MPI_COMM_WORLD);
 
         cpu_checks[j] = 0;
@@ -257,20 +282,36 @@ int main(int argc, char *argv[])
     MPI_Allreduce(my_error, error, buff_cycle, MPI_INT, MPI_MAX, MPI_COMM_WORLD);
     MPI_Allreduce(inner_elapsed_time, elapsed_time, buff_cycle*loop_count, MPI_FLOAT, MPI_MAX, MPI_COMM_WORLD);
     for(int j=fix_buff_size; j<max_j; j++){
-        uint64_t N = 1 << j;
-        uint64_t B_in_GB = 1 << 30;
-        uint64_t num_B = sizeof(dtype)*N*((size-1)/(float)size)*2;
-        double num_GB = (double)num_B / (double)B_in_GB;
+        SZTYPE N, M;
+        if (j < 31) {
+            N = 1 << j;
+            M = 1;
+        } else {
+            N = 1 << 30;
+            M = 1 << (j - 30);
+        }
+
+        SZTYPE num_B, int_num_GB;
+        double num_GB;
+
+        if (j < 31) {
+            SZTYPE B_in_GB = 1 << 30;
+            num_B = sizeof(dtype)*N*((size-1)/(float)size)*2;
+            num_GB = (double)num_B / (double)B_in_GB;
+        } else {
+            num_B = N*((size-1)/(float)size)*2*M*sizeof(dtype);
+            num_GB = sizeof(dtype)*M*((size-1)/(float)size)*2;
+        }
 
         double avg_time_per_transfer = 0.0;
         for (int i=0; i<loop_count; i++) {
             elapsed_time[j*buff_cycle+i] *= 0.001;
             avg_time_per_transfer += elapsed_time[j*buff_cycle+i];
-            if(rank == 0) printf("\tTransfer size (B): %10li, Transfer Time (s): %15.9f, Bandwidth (GB/s): %15.9f, Iteration %d\n", num_B, elapsed_time[j*buff_cycle+i], num_GB/elapsed_time[j*buff_cycle+i], i);
+            if(rank == 0) printf("\tTransfer size (B): %10" PRIu64 ", Transfer Time (s): %15.9f, Bandwidth (GB/s): %15.9f, Iteration %d\n", num_B, elapsed_time[j*buff_cycle+i], num_GB/elapsed_time[j*buff_cycle+i], i);
         }
         avg_time_per_transfer /= ((double)loop_count);
 
-        if(rank == 0) printf("[Average] Transfer size (B): %10li, Transfer Time (s): %15.9f, Bandwidth (GB/s): %15.9f, Error: %d\n", num_B, avg_time_per_transfer, num_GB/avg_time_per_transfer, error[j] );
+        if(rank == 0) printf("[Average] Transfer size (B): %10" PRIu64 ", Transfer Time (s): %15.9f, Bandwidth (GB/s): %15.9f, Error: %d\n", num_B, avg_time_per_transfer, num_GB/avg_time_per_transfer, error[j] );
     }
     fflush(stdout);
     MPI_Barrier(MPI_COMM_WORLD);
