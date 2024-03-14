@@ -5,6 +5,12 @@
 #include <unistd.h>
 #include "mpi.h"
 
+#ifdef HIP
+#include <stdlib.h>
+#include <vector>
+#include <sstream>
+#endif
+
 // GPU assgined for LUMI
 int GPU_ASSIGN_SEQUENCE[8] = {5, 3, 7, 1, 4, 2, 6, 0};
 
@@ -81,7 +87,33 @@ int  assignDeviceToProcess(MPI_Comm *nodeComm, int *nnodes, int *mynodeid)
       // The mapping is hard-coded in the code for LUMI, the 4GCDs connnected to the network 
       // are assigned first, then the 4 GCDs not connected to the network are assgined. The sequence
       // is the same as NUMA sequence.
-      myrank = GPU_ASSIGN_SEQUENCE[myrank];
+
+      // we first check if the GPU senquence is defined
+      const char * GPU_ENV_NAME = "USER_HIP_GPU_MAP";
+      const char * gpu_env = getenv(GPU_ENV_NAME);
+      int gpu_sequence[gpu_per_node];
+
+      if (NULL != gpu_env) {
+	  // scan GPU id, I will just use the c++ function
+	  std::string gpu_env_s = gpu_env;
+	  std::vector<std::string> v;	      
+	  std::stringstream ss(gpu_env_s);
+
+	  while(ss.good()) {
+	      std::string substr;
+	      std::getline(ss, substr, ',');
+	      v.push_back(substr);
+	  }
+	  if (v.size() != gpu_per_node){
+	    //error
+	    ;
+	  }
+	  myrank = std::stoi(v[myrank]);
+      } else {
+	  // use defualt mapping
+          myrank = GPU_ASSIGN_SEQUENCE[myrank];
+      }
+
 #else
 #endif
       return myrank;
