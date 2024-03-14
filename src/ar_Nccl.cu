@@ -29,28 +29,6 @@
 
 int main(int argc, char *argv[])
 {
-    printf("Compile time check:\n");
-#if defined(MPIX_CUDA_AWARE_SUPPORT) && MPIX_CUDA_AWARE_SUPPORT
-    printf("This MPI library has CUDA-aware support.\n", MPIX_CUDA_AWARE_SUPPORT);
-#elif defined(MPIX_CUDA_AWARE_SUPPORT) && !MPIX_CUDA_AWARE_SUPPORT
-    printf("This MPI library does not have CUDA-aware support.\n");
-#else
-    printf("This MPI library cannot determine if there is CUDA-aware support.\n");
-#endif /* MPIX_CUDA_AWARE_SUPPORT */
-
-    printf("Run time check:n");
-#if defined(MPIX_CUDA_AWARE_SUPPORT)
-    if (1 == MPIX_Query_cuda_support()) {
-        printf("This MPI library has CUDA-aware support.\n");
-    } else {
-        printf("This MPI library does not have CUDA-aware support.\n");
-    }
-#else /* !defined(MPIX_CUDA_AWARE_SUPPORT) */
-    printf("This MPI library cannot determine if there is CUDA-aware support.\n");
-#endif /* MPIX_CUDA_AWARE_SUPPORT */
-
-
-
 
     /* -------------------------------------------------------------------------------------------
         MPI Initialization 
@@ -73,14 +51,6 @@ int main(int argc, char *argv[])
     MPI_Barrier(MPI_COMM_WORLD);
 
 
-//     if(size != 2){
-//         if(rank == 0){
-//             printf("This program requires exactly 2 MPI ranks, but you are attempting to use %d! Exiting...\n", size);
-//         }
-//         MPI_Finalize();
-//         exit(0);
-//     }
-
     // Map MPI ranks to GPUs
     int num_devices = 0;
     cudaErrorCheck( cudaGetDeviceCount(&num_devices) );
@@ -92,6 +62,34 @@ int main(int argc, char *argv[])
     int mynodeid = -1, mynodesize = -1;
     MPI_Comm_rank(nodeComm, &mynodeid);
     MPI_Comm_size(nodeComm, &mynodesize);
+
+    /* -------------------------------------------------------------------------------------------
+        CUDA AWARE CHECK
+    --------------------------------------------------------------------------------------------*/
+
+    if (rank == 0) {
+        printf("Compile time check:\n");
+#if defined(MPIX_CUDA_AWARE_SUPPORT) && MPIX_CUDA_AWARE_SUPPORT
+        printf("This MPI library has CUDA-aware support.\n", MPIX_CUDA_AWARE_SUPPORT);
+#elif defined(MPIX_CUDA_AWARE_SUPPORT) && !MPIX_CUDA_AWARE_SUPPORT
+        printf("This MPI library does not have CUDA-aware support.\n");
+#else
+        printf("This MPI library cannot determine if there is CUDA-aware support.\n");
+#endif /* MPIX_CUDA_AWARE_SUPPORT */
+
+        printf("Run time check:\n");
+#if defined(MPIX_CUDA_AWARE_SUPPORT)
+        if (1 == MPIX_Query_cuda_support()) {
+            printf("This MPI library has CUDA-aware support.\n");
+        } else {
+            printf("This MPI library does not have CUDA-aware support.\n");
+        }
+#else /* !defined(MPIX_CUDA_AWARE_SUPPORT) */
+        printf("This MPI library cannot determine if there is CUDA-aware support.\n");
+#endif /* MPIX_CUDA_AWARE_SUPPORT */
+    }
+    fflush(stdout);
+    MPI_Barrier(MPI_COMM_WORLD);
 
 
     /* -------------------------------------------------------------------------------------------
@@ -129,10 +127,9 @@ int main(int argc, char *argv[])
 
     printf("[%d] NCCL_COMM_WORLD: nccl size = %d, nccl rank = %d\n", rank, nccl_w_sz, nccl_w_rk);
     printf("[%d] NCCL_COMM_NODE:  nccl size = %d, nccl rank = %d\n", rank, nccl_n_sz, nccl_n_rk);
+
     fflush(stdout);
-
     MPI_Barrier(MPI_COMM_WORLD);
-
 
     /* -------------------------------------------------------------------------------------------
         Reading command line inputs
@@ -161,6 +158,9 @@ int main(int argc, char *argv[])
     if (rank == 0) printf("buff_cycle: %d loop_count: %d max_j: %d\n", buff_cycle, loop_count, max_j);
     if (flag_x > 0 && rank == 0) printf("fix_buff_size is set as %d\n", fix_buff_size);
 
+    fflush(stdout);
+    MPI_Barrier(MPI_COMM_WORLD);
+
      /* -------------------------------------------------------------------------------------------
         Loop from 8 B to 1 GB
     --------------------------------------------------------------------------------------------*/
@@ -175,7 +175,6 @@ int main(int argc, char *argv[])
     for(int j=fix_buff_size; j<max_j; j++){
 
         uint64_t N = 1 << j;
-        if (rank == 0) {printf("%i#", j); fflush(stdout);}
 
         // Allocate memory for A on CPU
         dtype *A, *B;
@@ -216,6 +215,7 @@ int main(int argc, char *argv[])
         cudaErrorCheck(cudaEventCreate(&start));
         cudaErrorCheck(cudaEventCreate(&stop));
 
+        if (rank == 0) {printf("%i#", j); fflush(stdout);}
         for(int i=1-(WARM_UP); i<=loop_count; i++){
             MPI_Barrier(MPI_COMM_WORLD);
             cudaErrorCheck(cudaEventRecord(start, NULL));
@@ -273,6 +273,7 @@ int main(int argc, char *argv[])
         if(rank == 0) printf("[Average] Transfer size (B): %10li, Transfer Time (s): %15.9f, Bandwidth (GB/s): %15.9f, Error: %d\n", num_B, avg_time_per_transfer, num_GB/avg_time_per_transfer, error[j] );
     }
     fflush(stdout);
+    MPI_Barrier(MPI_COMM_WORLD);
 
     char *s = (char*)malloc(sizeof(char)*(20*buff_cycle + 100));
     sprintf(s, "[%d] recv_cpu_check = %u", rank, cpu_checks[0]);
@@ -282,6 +283,7 @@ int main(int argc, char *argv[])
     sprintf(s+strlen(s), " (for Error)\n");
     printf("%s", s);
     fflush(stdout);
+    MPI_Barrier(MPI_COMM_WORLD);
 
     sprintf(s, "[%d] gpu_checks = %u", rank, gpu_checks[0]);
     for (int i=fix_buff_size; i<max_j; i++) {
@@ -290,6 +292,7 @@ int main(int argc, char *argv[])
     sprintf(s+strlen(s), " (for Error)\n");
     printf("%s", s);
     fflush(stdout);
+    MPI_Barrier(MPI_COMM_WORLD);
 
     free(error);
     free(my_error);
