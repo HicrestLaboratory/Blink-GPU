@@ -6,7 +6,7 @@
 #include "mpi.h"
 
 // GPU assgined for LUMI
-int GPU_ASSIGN_SEQUENCE[8] = {5, 3, 1, 7, 4, 2, 0, 6};
+int GPU_ASSIGN_SEQUENCE[8] = {5, 3, 7, 1, 4, 2, 6, 0};
 
 static int stringCmp( const void *a, const void *b) {
      return strcmp((const char*)a,(const char*)b);

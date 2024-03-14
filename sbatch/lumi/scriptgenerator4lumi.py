@@ -29,7 +29,7 @@ import os.path
 names=["a2a", "ar", "mpp"]
 types=["Baseline", "CudaAware", "Nccl"]
 nodes_tasks = [(2, 4)]
-
+cpu_list = [9, 25, 41, 57, 1, 17, 33, 49]
 
 
 args = ""
@@ -52,12 +52,20 @@ for cur_name in names:
             f.write("#SBATCH --nodes={}\n".format(str(cur_nodes)))
             f.write("#SBATCH --gpus-per-node=8\n")
             f.write("#SBATCH --ntasks-per-node={}\n".format(str(cur_ntasks_per_node)))
-            f.write("#SBATCH --cpus-per-task=1\n\n")
+            # f.write("#SBATCH --cpus-per-task=56\n\n")
             f.write("#SBATCH --account=project_465000997\n\n")
+            #f.write('CPU_BIND="map_cpu:1,2,17,18"\n\n')
+            #f.write('CPU_BIND="map_cpu:8,24,56,40"\n\n')
+            #f.write('CPU_BIND="map_cpu:8,24,56,40,0,16,48,32"\n\n')
+            #f.write('CPU_BIND="map_cpu:9,25,57,41,1,17,49,33"\n\n')
+            cur_cpu_list = cpu_list[0:cur_ntasks_per_node]
+            cur_cpu_list = [str(x) for x in cur_cpu_list]
+            cur_cpu_list = ','.join(cur_cpu_list)
+            f.write('CPU_BIND="map_cpu:{}"\n\n'.format(cur_cpu_list))
             f.write("mkdir -p sout\n\n")
             if cur_type == 'CudaAware':
                 f.write("export MPICH_GPU_SUPPORT_ENABLED=1\n\n")
-            f.write("srun bin/{}_{} {}\n\n".format(cur_name, cur_type, args))
+            f.write("srun --cpu-bind=${}CPU_BIND{} bin/{}_{} {}\n\n".format('{', '}', cur_name, cur_type, args))
             f.close()
             
             f_run_all.write("sbatch {}\n".format(sbatch_fname))
