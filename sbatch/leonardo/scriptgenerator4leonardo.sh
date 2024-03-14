@@ -17,13 +17,80 @@ stencil_script=$(cat << 'EOF'
 #SBATCH --cpus-per-task=8
 #SBATCH --mem=494000MB
 
+#SBATCH --requeue
+
+echo "-------- Topology Info --------"
+echo "Nnodes = $SLURM_NNODES"
+srun -l bash -c 'if [[ "$SLURM_LOCALID" == "0" ]] ; then t="$SLURM_TOPOLOGY_ADDR" ; echo "Node: $SLURM_NODEID ---> $t" ; echo "$t" > tmp_${SLURM_NODEID}_${SLURM_JOB_ID}.txt ; fi'
+echo "-------------------------------"
+switchesPaths=()
+for i in $(seq 0 $SLURM_NNODES)
+do
+        text=$(cat "tmp_${i}_${SLURM_JOB_ID}.txt")
+        switchesPaths+=( "$text" )
+        rm "tmp_${i}_${SLURM_JOB_ID}.txt"
+done
+
+echo "switchesPaths:"
+for e in ${switchesPaths[@]}
+do
+        echo $e
+done
+
+echo "-------------------------------"
+IFS='.' read -a zeroPath <<< "${switchesPaths[0]}"
+# echo "zeroPath:"
+# for e in ${zeroPath[@]}
+# do
+#         echo $e
+# done
+
+y="${#zeroPath[@]}"
+zeroNode=${zeroPath[-1]}
+maxDist="${#zeroPath[@]}"
+for e in ${switchesPaths[@]}
+do
+        IFS='.' read -a tmpPath <<< "$e"
+        tmpNode=${tmpPath[-1]}
+        x="${#zeroPath[@]}"
+        for j in ${!zeroPath[@]}
+        do
+                if [[ "${zeroPath[$j]}" != "${tmpPath[$j]}" && "$j" < "$x" ]]
+                then
+                        x="$j"
+                        if [[ "$x" < "$y" ]]
+                        then
+                                y="$x"
+                        fi
+                fi
+        done
+        echo "$tmpNode ---> distance with node 0 ($zeroNode) = $(($maxDist - $x))"
+done
+
+echo "Max distance: $(($maxDist - $y))"
+# if [[ "$(($maxDist - $y))" != "<my_min_sw_distance>" ]]
+# then
+#     echo "nodes are at the wrong distance ($(($maxDist - $y)) instead of <my_min_sw_distance>); job requeued"
+#     scontrol requeue ${SLURM_JOB_ID}
+# fi
+
+echo "-------------------------------"
+echo "<sl-export>"
+echo "-------------------------------"
+
+
+
 MODULE_PATH="moduleload/load_<exp-type>_modules.sh"
 EXPORT_PATH="exportload/load_<exp-type>_<exp-topo>_exports.sh"
 
 mkdir -p sout
-source ${MODULE_PATH} && source ${EXPORT_PATH} && srun bin/<exp-name>_<exp-type> <exp_args>
+cat "${EXPORT_PATH}"
+source ${MODULE_PATH} && source ${EXPORT_PATH} && <sl-export> <sl-exp-and> srun bin/<exp-name>_<exp-type> <exp_args>
 EOF
 )
+
+my_sl="1"
+my_min_sw_distance="3"
 
 names=("pp" "a2a" "ar" "hlo" "mpp" "ampp")
 types=("Baseline" "CudaAware" "Nccl" "Nvlink")
@@ -64,6 +131,27 @@ do
                     fi
                 else
                     out_script_contenent=$(echo "$tmp_script_contenent" | sed "s/<exp_args>//g")
+                fi
+
+                tmp_script_contenent=$(echo "$out_script_contenent")
+                if [[ "$topo" == "multinode" && "${my_sl}" != "0" ]]
+                then
+                    if [[ "$type" == "Nccl" ]]
+                    then
+                        out_script_contenent=$(echo "$tmp_script_contenent" | sed "s/<sl-export>/export NCCL_IB_SL=${my_sl}/g" | sed "s/<sl-exp-and>/\&\&/g")
+                    else
+                        out_script_contenent=$(echo "$tmp_script_contenent" | sed "s/<sl-export>/export UCX_IB_SL=${my_sl}/g" | sed "s/<sl-exp-and>/\&\&/g")
+                    fi
+                else
+                    out_script_contenent=$(echo "$tmp_script_contenent" | sed "s/<sl-export>//g" | sed "s/<sl-exp-and>//g")
+                fi
+
+                tmp_script_contenent=$(echo "$out_script_contenent")
+                if [[ "$topo" == "multinode" ]]
+                then
+                    out_script_contenent=$(echo "$tmp_script_contenent" | sed "s/<my_min_sw_distance>/${my_min_sw_distance}/g")
+                else
+                    out_script_contenent=$(echo "$tmp_script_contenent" | sed "s/<my_min_sw_distance>/0/g")
                 fi
 
                 # Write the new script to a file
