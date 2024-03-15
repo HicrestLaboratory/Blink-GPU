@@ -430,7 +430,7 @@ int main(int argc, char *argv[])
     if (ppCouples != MPI_COMM_NULL) {
         for(int j=fix_buff_size; j<max_j; j++){
 
-            N <<= 1;
+            (j!=0) ? (N <<= 1) : (N = 1);
             if (rank == 0) {printf("%i#", j); fflush(stdout);}
 
             // Allocate memory for A on CPU
@@ -530,7 +530,7 @@ int main(int argc, char *argv[])
                 }
 
                 stop_time = MPI_Wtime();
-                if (i>0) inner_elapsed_time[j*buff_cycle+i-1] = stop_time - start_time;
+                if (i>0) inner_elapsed_time[(j-fix_buff_size)*buff_cycle+i-1] = stop_time - start_time;
 
                 if (rank == 0) {printf("%%"); fflush(stdout);}
             }
@@ -568,9 +568,11 @@ int main(int argc, char *argv[])
         }
 
         MPI_Allreduce(my_error, error, buff_cycle, MPI_INT, MPI_MAX, ppCouples);
-        MPI_Allreduce(inner_elapsed_time, elapsed_time, buff_cycle*loop_count, MPI_DOUBLE, MPI_MAX, ppFirstSenders);
+        if(ppFirstSenders != MPI_COMM_NULL) {
+            MPI_Allreduce(inner_elapsed_time, elapsed_time, buff_cycle*loop_count, MPI_DOUBLE, MPI_MAX, ppFirstSenders);
+        }
         for(int j=fix_buff_size; j<max_j; j++) {
-            N <<= 1;
+            (j!=0) ? (N <<= 1) : (N = 1);
 
             SZTYPE num_B, int_num_GB;
             double num_GB;
@@ -587,9 +589,9 @@ int main(int argc, char *argv[])
 
             double avg_time_per_transfer = 0.0;
             for (int i=0; i<loop_count; i++) {
-                elapsed_time[j*buff_cycle+i] /= 2.0;
-                avg_time_per_transfer += elapsed_time[j*buff_cycle+i];
-                if(rank == 0) printf("\tTransfer size (B): %10" PRIu64 ", Transfer Time (s): %15.9f, Bandwidth (GB/s): %15.9f, Iteration %d\n", num_B, elapsed_time[j*buff_cycle+i], num_GB/elapsed_time[j*buff_cycle+i], i);
+                elapsed_time[(j-fix_buff_size)*buff_cycle+i] /= 2.0;
+                avg_time_per_transfer += elapsed_time[(j-fix_buff_size)*buff_cycle+i];
+                if(rank == 0) printf("\tTransfer size (B): %10" PRIu64 ", Transfer Time (s): %15.9f, Bandwidth (GB/s): %15.9f, Iteration %d\n", num_B, elapsed_time[(j-fix_buff_size)*buff_cycle+i], num_GB/elapsed_time[(j-fix_buff_size)*buff_cycle+i], i);
             }
             avg_time_per_transfer /= (double)loop_count;
 
