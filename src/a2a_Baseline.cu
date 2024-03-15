@@ -71,15 +71,6 @@ int main(int argc, char *argv[])
     fflush(stdout);
     MPI_Barrier(MPI_COMM_WORLD);
 
-
-//     if(size != 2){
-//         if(rank == 0){
-//             printf("This program requires exactly 2 MPI ranks, but you are attempting to use %d! Exiting...\n", size);
-//         }
-//         MPI_Finalize();
-//         exit(0);
-//     }
-
     // Map MPI ranks to GPUs
     int num_devices = 0;
     cudaErrorCheck( cudaGetDeviceCount(&num_devices) );
@@ -89,10 +80,12 @@ int main(int argc, char *argv[])
     cudaSetDevice(dev);
 
     // print device affiniy
+#ifndef SKIPCPUAFFINITY
     if (0==rank) printf("List device affinity:\n");
     check_cpu_and_gpu_affinity(dev);
     if (0==rank) printf("List device affinity done.\n\n");
     MPI_Barrier(MPI_COMM_WORLD);
+#endif
 
     int mynodeid = -1, mynodesize = -1;
     MPI_Comm_rank(nodeComm, &mynodeid);

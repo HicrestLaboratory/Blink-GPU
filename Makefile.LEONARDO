@@ -5,7 +5,7 @@ MPI_CUDA_HOME=/leonardo/prod/spack/03/install/0.19/linux-rhel8-icelake/nvhpc-23.
 NCCL_HOME=/home/root/opt/nvhpc/Linux_x86_64/23.1/comm_libs/11.8/nccl
 # ---------------- Common ----------------
 CC=nvcc
-CFLAGS=-std=c++14 -O3
+CFLAGS=-std=c++14 -O3 -DSKIPCPUAFFINITY
 LIBS=
 INCL=-I/leonardo/prod/build/compilers/cuda/11.8/none/BA_WORK/var/cuda-repo-rhel8-11-8-local/usr/src/nvidia-520.61.05/nvidia
 LIBFLAGS=
