@@ -13,6 +13,8 @@
 #include "../include/gpu_ops.h"
 #include "../include/device_assignment.h"
 #include "../include/prints.h"
+#include "../include/cmd_util.h"
+
 
 #if !defined(OPEN_MPI) || !OPEN_MPI
 #error This source code uses an Open MPI-specific extension
@@ -220,7 +222,7 @@ int main(int argc, char *argv[])
     if (rank == 0 || rank == rank2) {
         for(int j=fix_buff_size; j<max_j; j++){
 
-            long int N = 1 << j;
+            uint64_t N = 1 << j;
             if (rank == 0) {printf("%i#", j); fflush(stdout);}
 
             // Allocate memory for A on CPU
@@ -321,9 +323,9 @@ int main(int argc, char *argv[])
         //MPI_Allreduce(inner_elapsed_time, elapsed_time, buff_cycle*loop_count, MPI_DOUBLE, MPI_MAX, firstsenderComm);
         memcpy(elapsed_time, inner_elapsed_time, buff_cycle*loop_count*sizeof(double)); // No need to do allreduce, there is only one rank in firstsenderComm
         for(int j=fix_buff_size; j<max_j; j++) {
-            long int N = 1 << j;
-            long int B_in_GB = 1 << 30;
-            long int num_B = sizeof(dtype)*N;
+            uint64_t N = 1 << j;
+            uint64_t B_in_GB = 1 << 30;
+            uint64_t num_B = sizeof(dtype)*N;
             double num_GB = (double)num_B / (double)B_in_GB;
 
             double avg_time_per_transfer = 0.0;
