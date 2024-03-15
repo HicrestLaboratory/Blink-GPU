@@ -25,7 +25,6 @@ do
         sed -i 's/#include "mpi-ext.h"//g' src/${cur_name}.cpp
         sed -i 's/cuda/hip/g' src/${cur_name}.cpp
         sed -i 's/<nccl.h>/<rccl.h>/g' src/${cur_name}.cpp
-        sed -i 's/ncclGetUniqueId(&Id)/ncclSuccess/g' src/${cur_name}.cpp
         sed -i 's/hipHostAlloc(/hipHostMalloc((void **)/g' src/${cur_name}.cpp
         sed -i 's/hipHostAllocDefault/hipHostMallocDefault/g' src/${cur_name}.cpp
 
