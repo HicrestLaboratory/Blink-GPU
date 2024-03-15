@@ -11,3 +11,5 @@
 #define MPI_cktype MPI_INT // MPI_INT32_T?
 
 #define ncclDtype ncclChar // ncclUint8
+
+#define SZTYPE uint64_t

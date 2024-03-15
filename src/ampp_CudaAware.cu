@@ -4,6 +4,7 @@
 #include <cuda.h>
 #include <cuda_runtime.h>
 #include <unistd.h>
+#include <inttypes.h>
 
 #define MPI
 
@@ -406,6 +407,14 @@ int main(int argc, char *argv[])
 
     PICO_enable_peer_access(mynodeid, nodesize, dev);
 
+    SZTYPE N;
+    if (fix_buff_size<=30) {
+        N = 1 << (fix_buff_size - 1);
+    } else {
+        N = 1 << 30;
+        N <<= (fix_buff_size - 31);
+    }
+
     MPI_Status IPCstat;
     dtype *peerBBuffers[ncouples], *peerAggBuffer;
     cudaEvent_t event;
@@ -421,7 +430,7 @@ int main(int argc, char *argv[])
     if (ppCouples != MPI_COMM_NULL) {
         for(int j=fix_buff_size; j<max_j; j++){
 
-            uint64_t N = 1 << j;
+            N <<= 1;
             if (rank == 0) {printf("%i#", j); fflush(stdout);}
 
             // Allocate memory for A on CPU
@@ -431,7 +440,7 @@ int main(int argc, char *argv[])
             cktype my_cpu_check = 0, recv_cpu_check, gpu_check = 0;
 
             // Initialize all elements of A to 0.0
-            for(int i=0; i<N; i++){
+            for(SZTYPE i=0; i<N; i++){
                 A[i] = 1U * (rank+1);
                 B[i] = 0U;
             }
@@ -551,23 +560,40 @@ int main(int argc, char *argv[])
             free(B);
         }
 
+        if (fix_buff_size<=30) {
+            N = 1 << (fix_buff_size - 1);
+        } else {
+            N = 1 << 30;
+            N <<= (fix_buff_size - 31);
+        }
+
         MPI_Allreduce(my_error, error, buff_cycle, MPI_INT, MPI_MAX, ppCouples);
         MPI_Allreduce(inner_elapsed_time, elapsed_time, buff_cycle*loop_count, MPI_DOUBLE, MPI_MAX, ppFirstSenders);
         for(int j=fix_buff_size; j<max_j; j++) {
-            uint64_t N = 1 << j;
-            uint64_t B_in_GB = 1 << 30;
-            uint64_t num_B = sizeof(dtype)*N*ncouples;
-            double num_GB = (double)num_B / (double)B_in_GB;
+            N <<= 1;
+
+            SZTYPE num_B, int_num_GB;
+            double num_GB;
+
+            if (j < 31) {
+                SZTYPE B_in_GB = 1 << 30;
+                num_B = sizeof(dtype)*N*((size-1)/(float)size)*2;
+                num_GB = (double)num_B / (double)B_in_GB;
+            } else {
+                SZTYPE M = 1 << (j - 30);
+                num_B = N*((size-1)/(float)size)*2*sizeof(dtype);
+                num_GB = sizeof(dtype)*M*((size-1)/(float)size)*2;
+            }
 
             double avg_time_per_transfer = 0.0;
             for (int i=0; i<loop_count; i++) {
                 elapsed_time[j*buff_cycle+i] /= 2.0;
                 avg_time_per_transfer += elapsed_time[j*buff_cycle+i];
-                if(rank == 0) printf("\tTransfer size (B): %10li, Transfer Time (s): %15.9f, Bandwidth (GB/s): %15.9f, Iteration %d\n", num_B, elapsed_time[j*buff_cycle+i], num_GB/elapsed_time[j*buff_cycle+i], i);
+                if(rank == 0) printf("\tTransfer size (B): %10" PRIu64 ", Transfer Time (s): %15.9f, Bandwidth (GB/s): %15.9f, Iteration %d\n", num_B, elapsed_time[j*buff_cycle+i], num_GB/elapsed_time[j*buff_cycle+i], i);
             }
             avg_time_per_transfer /= (double)loop_count;
 
-            if(rank == 0) printf("[Average] Transfer size (B): %10li, Transfer Time (s): %15.9f, Bandwidth (GB/s): %15.9f, Error: %d\n", num_B, avg_time_per_transfer, num_GB/avg_time_per_transfer, error[j] );
+            if(rank == 0) printf("[Average] Transfer size (B): %10" PRIu64 ", Transfer Time (s): %15.9f, Bandwidth (GB/s): %15.9f, Error: %d\n", num_B, avg_time_per_transfer, num_GB/avg_time_per_transfer, error[j] );
             fflush(stdout);
         }
 

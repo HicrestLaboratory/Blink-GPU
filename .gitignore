@@ -13,3 +13,6 @@ sbatch/leonardo/run-leonardo*
 __pycache__/*
 pytest.py
 test.c
+
+# tmp
+include/communicators.h
