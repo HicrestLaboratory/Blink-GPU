@@ -709,7 +709,7 @@ int main(int argc, char *argv[])
                     cudaErrorCheck(cudaEventElapsedTime(&(time_table[1][k]), start[0], stop[k]));
                 }
 
-                cudaErrorCheck(cudaEventElapsedTime(&(inner_elapsed_time[(j-fix_buff_size)*buff_cycle+i-1]), start[first_start], stop[first_start]));
+                cudaErrorCheck(cudaEventElapsedTime(&(inner_elapsed_time[(j-fix_buff_size)*loop_count+i-1]), start[first_start], stop[first_start]));
 
                 // -------------------- For DE BUG --------------------
 //                 if (inner_elapsed_time[j][i-1] > 1000.0) {PRINT_STREAM_TIMETABLE(time_table, 12)}
@@ -830,9 +830,9 @@ int main(int argc, char *argv[])
 
         double avg_time_per_transfer = 0.0;
         for (int i=0; i<loop_count; i++) {
-            elapsed_time[(j-fix_buff_size)*buff_cycle+i] *= 0.001;
-            avg_time_per_transfer += elapsed_time[(j-fix_buff_size)*buff_cycle+i];
-            if(rank == 0) printf("\tTransfer size (B): %10" PRIu64 ", Transfer Time (s): %15.9f, Bandwidth (GB/s): %15.9f, Iteration %d\n", num_B, elapsed_time[(j-fix_buff_size)*buff_cycle+i], num_GB/elapsed_time[(j-fix_buff_size)*buff_cycle+i], i);
+            elapsed_time[(j-fix_buff_size)*loop_count+i] *= 0.001;
+            avg_time_per_transfer += elapsed_time[(j-fix_buff_size)*loop_count+i];
+            if(rank == 0) printf("\tTransfer size (B): %10" PRIu64 ", Transfer Time (s): %15.9f, Bandwidth (GB/s): %15.9f, Iteration %d\n", num_B, elapsed_time[(j-fix_buff_size)*loop_count+i], num_GB/elapsed_time[(j-fix_buff_size)*loop_count+i], i);
         }
         avg_time_per_transfer /= ((double)loop_count);
 

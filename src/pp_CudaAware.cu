@@ -236,7 +236,7 @@ int main(int argc, char *argv[])
                 }
 
                 stop_time = MPI_Wtime();
-                if (i>0) inner_elapsed_time[(j-fix_buff_size)*buff_cycle+i-1] = stop_time - start_time;
+                if (i>0) inner_elapsed_time[(j-fix_buff_size)*loop_count+i-1] = stop_time - start_time;
 
                 if (rank == 0) {printf("%%"); fflush(stdout);}
             }
@@ -298,9 +298,9 @@ int main(int argc, char *argv[])
 
             double avg_time_per_transfer = 0.0;
             for (int i=0; i<loop_count; i++) {
-                elapsed_time[(j-fix_buff_size)*buff_cycle+i] /= 2.0;
-                avg_time_per_transfer += elapsed_time[(j-fix_buff_size)*buff_cycle+i];
-                if(rank == 0) printf("\tTransfer size (B): %10" PRIu64 ", Transfer Time (s): %15.9f, Bandwidth (GB/s): %15.9f, Iteration %d\n", num_B, elapsed_time[(j-fix_buff_size)*buff_cycle+i], num_GB/elapsed_time[(j-fix_buff_size)*buff_cycle+i], i);
+                elapsed_time[(j-fix_buff_size)*loop_count+i] /= 2.0;
+                avg_time_per_transfer += elapsed_time[(j-fix_buff_size)*loop_count+i];
+                if(rank == 0) printf("\tTransfer size (B): %10" PRIu64 ", Transfer Time (s): %15.9f, Bandwidth (GB/s): %15.9f, Iteration %d\n", num_B, elapsed_time[(j-fix_buff_size)*loop_count+i], num_GB/elapsed_time[(j-fix_buff_size)*loop_count+i], i);
             }
             avg_time_per_transfer /= (double)loop_count;
 
