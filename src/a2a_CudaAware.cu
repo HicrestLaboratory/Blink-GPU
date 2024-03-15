@@ -12,6 +12,7 @@
 #include "../include/gpu_ops.h"
 #include "../include/device_assignment.h"
 #include "../include/cmd_util.h"
+#include "../include/prints.h"
 
 #if !defined(OPEN_MPI) || !OPEN_MPI
 #error This source code uses an Open MPI-specific extension
@@ -85,6 +86,12 @@ int main(int argc, char *argv[])
     MPI_Comm nodeComm;
     int dev = assignDeviceToProcess(&nodeComm, &nnodes, &mynode);
     cudaSetDevice(dev);
+
+    // print device affiniy
+    if (0==rank) printf("List device affinity:\n");
+    check_cpu_and_gpu_affinity(dev);
+    if (0==rank) printf("List device affinity done.\n\n");
+    MPI_Barrier(MPI_COMM_WORLD);
 
     int mynodeid = -1, mynodesize = -1;
     MPI_Comm_rank(nodeComm, &mynodeid);
