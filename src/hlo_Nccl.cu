@@ -6,6 +6,7 @@
 #include <cuda_runtime.h>
 #include <string.h>
 #include <unistd.h>
+#include <inttypes.h>
 
 #define MPI
 
@@ -374,10 +375,12 @@ int main(int argc, char *argv[])
     cudaSetDevice(dev);
 
     // print device affiniy
+#ifndef SKIPCPUAFFINITY
     if (0==rank) printf("List device affinity:\n");
     check_cpu_and_gpu_affinity(dev);
     if (0==rank) printf("List device affinity done.\n\n");
     MPI_Barrier(MPI_COMM_WORLD);
+#endif
 
     int mynodeid = -1, mynodesize = -1;
     MPI_Comm_rank(nodeComm, &mynodeid);
@@ -550,6 +553,14 @@ int main(int argc, char *argv[])
         Loop from 8 B to 1 GB
     --------------------------------------------------------------------------------------------*/
 
+    SZTYPE N;
+    if (fix_buff_size<=30) {
+        N = 1 << (fix_buff_size - 1);
+    } else {
+        N = 1 << 30;
+        N <<= (fix_buff_size - 31);
+    }
+
     cudaStream_t Streams[12];
     double start_time, stop_time;
     cudaEvent_t start[12], stop[12];
@@ -561,7 +572,7 @@ int main(int argc, char *argv[])
     for(int j=fix_buff_size; j<max_j; j++){
 
         // Define cycle sizes
-        uint64_t N = 1 << j;
+        (j!=0) ? (N <<= 1) : (N = 1);
         xSize = ny * nz * N;
         ySize = nx * nz * N;
         zSize = nx * ny * N;
@@ -698,7 +709,7 @@ int main(int argc, char *argv[])
                     cudaErrorCheck(cudaEventElapsedTime(&(time_table[1][k]), start[0], stop[k]));
                 }
 
-                cudaErrorCheck(cudaEventElapsedTime(&(inner_elapsed_time[j*buff_cycle+i-1]), start[first_start], stop[first_start]));
+                cudaErrorCheck(cudaEventElapsedTime(&(inner_elapsed_time[(j-fix_buff_size)*loop_count+i-1]), start[first_start], stop[first_start]));
 
                 // -------------------- For DE BUG --------------------
 //                 if (inner_elapsed_time[j][i-1] > 1000.0) {PRINT_STREAM_TIMETABLE(time_table, 12)}
@@ -786,28 +797,46 @@ int main(int argc, char *argv[])
         FREE_HALO3D_BUFFER(zDownRecvBuffer, dev_zDownRecvBuffer)
     }
 
+    if (fix_buff_size<=30) {
+        N = 1 << (fix_buff_size - 1);
+    } else {
+        N = 1 << 30;
+        N <<= (fix_buff_size - 31);
+    }
+
     MPI_Allreduce(inner_elapsed_time, elapsed_time, buff_cycle*loop_count, MPI_FLOAT, MPI_MAX, MPI_COMM_WORLD);
     for(int j=fix_buff_size; j<max_j; j++) {
-        uint64_t N = 1 << j;
-        uint64_t B_in_GB = 1 << 30;
-        uint64_t num_B = 0;
+        (j!=0) ? (N <<= 1) : (N = 1);
+
+        SZTYPE num_B, int_num_GB;
+        double num_GB;
+
+        if (j < 31) {
+            SZTYPE B_in_GB = 1 << 30;
+            num_B = sizeof(dtype)*N*((size-1)/(float)size)*2;
+            num_GB = (double)num_B / (double)B_in_GB;
+        } else {
+            SZTYPE M = 1 << (j - 30);
+            num_B = N*((size-1)/(float)size)*2*sizeof(dtype);
+            num_GB = sizeof(dtype)*M*((size-1)/(float)size)*2;
+        }
+
         if (xUp > -1) num_B += ny * nz * N;
         if (yUp > -1) num_B += nx * nz * N;
         if (zUp > -1) num_B += nx * ny * N;
         if (xDown > -1) num_B += ny * nz * N;
         if (yDown > -1) num_B += nx * nz * N;
         if (zDown > -1) num_B += nx * ny * N;
-        double num_GB = (double)num_B / (double)B_in_GB;
 
         double avg_time_per_transfer = 0.0;
         for (int i=0; i<loop_count; i++) {
-            elapsed_time[j*buff_cycle+i] *= 0.001;
-            avg_time_per_transfer += elapsed_time[j*buff_cycle+i];
-            if(rank == 0) printf("\tTransfer size (B): %10li, Transfer Time (s): %15.9f, Bandwidth (GB/s): %15.9f, Iteration %d\n", num_B, elapsed_time[j*buff_cycle+i], num_GB/elapsed_time[j*buff_cycle+i], i);
+            elapsed_time[(j-fix_buff_size)*loop_count+i] *= 0.001;
+            avg_time_per_transfer += elapsed_time[(j-fix_buff_size)*loop_count+i];
+            if(rank == 0) printf("\tTransfer size (B): %10" PRIu64 ", Transfer Time (s): %15.9f, Bandwidth (GB/s): %15.9f, Iteration %d\n", num_B, elapsed_time[(j-fix_buff_size)*loop_count+i], num_GB/elapsed_time[(j-fix_buff_size)*loop_count+i], i);
         }
         avg_time_per_transfer /= ((double)loop_count);
 
-        if(rank == 0) printf("[Average] Transfer size (B): %10li, Transfer Time (s): %15.9f, Bandwidth (GB/s): %15.9f, Error: %u\n", num_B, avg_time_per_transfer, num_GB/avg_time_per_transfer, halo_checks[j] );
+        if(rank == 0) printf("[Average] Transfer size (B): %10" PRIu64 ", Transfer Time (s): %15.9f, Bandwidth (GB/s): %15.9f, Error: %u\n", num_B, avg_time_per_transfer, num_GB/avg_time_per_transfer, halo_checks[j] );
         fflush(stdout);
     }
 

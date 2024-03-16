@@ -16,3 +16,5 @@ test.c
 
 src/*cpp
 sbatch/lumi/*sh
+# tmp
+include/communicators.h

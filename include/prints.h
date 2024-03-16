@@ -1,6 +1,9 @@
+#pragma once
+
 #include <sched.h>
 #include "mpi.h"
 
+#ifndef SKIPCPUAFFINITY
 /*
  * Check CPU affniity and print, this is needed to be called after MPI init
  */
@@ -71,3 +74,4 @@ void check_cpu_and_gpu_affinity (int dev_id) {
 
     return;
 }
+#endif
