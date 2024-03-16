@@ -79,9 +79,6 @@ int  assignDeviceToProcess(MPI_Comm *nodeComm, int *nnodes, int *mynodeid)
      return 0;
 #endif
 
-      printf ("Assigning device %d  to process on node %s rank %d\n", myrank, host_name, rank);
-      /* Assign device to MPI process, initialize BLAS and probe device properties */
-      //cudaSetDevice(*myrank);
 
 #ifdef HIP
       // The mapping is hard-coded in the code for LUMI, the 4GCDs connnected to the network 
@@ -116,5 +113,9 @@ int  assignDeviceToProcess(MPI_Comm *nodeComm, int *nnodes, int *mynodeid)
 
 #else
 #endif
+      printf ("Assigning device %d  to process on node %s rank %d\n", myrank, host_name, rank);
+      /* Assign device to MPI process, initialize BLAS and probe device properties */
+      //cudaSetDevice(*myrank);
+
       return myrank;
 }
