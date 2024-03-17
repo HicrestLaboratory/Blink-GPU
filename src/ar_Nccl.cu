@@ -303,13 +303,13 @@ int main(int argc, char *argv[])
         SZTYPE num_B, int_num_GB;
         double num_GB;
 
+        num_B = sizeof(dtype)*N*((size-1)/(float)size)*2;
+        // TODO: maybe we can avoid if and just divide always by B_in_GB
         if (j < 31) {
             SZTYPE B_in_GB = 1 << 30;
-            num_B = sizeof(dtype)*N*((size-1)/(float)size)*2;
             num_GB = (double)num_B / (double)B_in_GB;
         } else {
-            SZTYPE M = 1 << (j - 30);
-            num_B = N*((size-1)/(float)size)*2*sizeof(dtype);
+            SZTYPE M = 1 << (j - 30);            
             num_GB = sizeof(dtype)*M*((size-1)/(float)size)*2;
         }
 
