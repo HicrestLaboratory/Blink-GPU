@@ -28,9 +28,32 @@ import os.path
 
 names=["a2a", "ar", "mpp"]
 types=["Baseline", "CudaAware", "Nccl"]
+
+# nodes_tasks = [(1, 4), (1,8), (2,8)]
 nodes_tasks = [(2, 4)]
 cpu_list = [9, 25, 41, 57, 1, 17, 33, 49]
 gpu_list = [5, 3, 7, 1, 4, 2, 6, 0]
+
+rccl_env = """
+module purge
+export EBU_USER_PREFIX=/project/project_465000997/EasyBuild
+module load LUMI/22.08
+module load aws-ofi-rccl
+module load craype-accel-amd-gfx90a
+module load rocm
+
+export NCCL_NET_GDR_LEVEL=3
+export FI_CXI_ATS=0
+export NCCL_BUFFSIZE=33554432
+"""
+
+standard_env = """
+module purge
+module load LUMI/23.09
+module load PrgEnv-cray
+module load craype-accel-amd-gfx90a
+module load rocm
+"""
 
 args = ""
 f_run_all_name = 'sbatch/lumi/run-lumi-all.sh'
@@ -39,7 +62,7 @@ f_run_all = open(f_run_all_name, 'w')
 for cur_name in names:
     for cur_type in types:
         for cur_nodes, cur_ntasks_per_node in nodes_tasks:
-            topo_name = "{}_{}".format(str(cur_nodes), str(cur_ntasks_per_node))
+            topo_name = "{}-{}".format(str(cur_nodes), str(cur_ntasks_per_node))
             sbatch_fname = "run-lumi-{}-{}-{}.sh".format(cur_name, cur_type, topo_name)
             sbatch_fname = os.path.join('sbatch/lumi', sbatch_fname)
             f = open(sbatch_fname, 'w')
@@ -58,6 +81,12 @@ for cur_name in names:
             cur_cpu_list = ','.join(cur_cpu_list)
             f.write('CPU_BIND="map_cpu:{}"\n\n'.format(cur_cpu_list))
             f.write("mkdir -p sout\n\n")
+
+            # RCCL specific options
+            if cur_type == "Nccl":
+                f.write(rccl_env)
+            else:
+                f.write(standard_env)
 
             # define GPU env
             cur_gpu_list = gpu_list[0:cur_ntasks_per_node]
