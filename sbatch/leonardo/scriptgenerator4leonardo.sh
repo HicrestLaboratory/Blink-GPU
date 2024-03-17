@@ -92,8 +92,8 @@ EOF
 my_sl="1"
 my_min_sw_distance="3"
 
-names=("pp" "a2a" "ar" "hlo" "mpp" "ampp")
-types=("Baseline" "CudaAware" "Nccl" "Nvlink")
+names=("pp" "a2a" "ar" "hlo" "mpp")
+types=("Baseline" "CudaAware" "Nccl" "Nvlink" "Aggregated")
 topos=("singlenode" "multinode")
 
 for name in "${names[@]}"
@@ -104,8 +104,8 @@ do
         for topo in "${topos[@]}"
         do
             if [[
-                ("$name" != "ampp" || "$topo" != "singlenode") &&
                 ("$topo" != "multinode" || "$type" != "Nvlink") &&
+                ("$type" != "Aggregated" || "$name" == "mpp") &&
                 ("$name" != "mpp" || "$topo" != "singlenode") &&
                 ("$name" != "hlo" || "$type" != "Nvlink") &&
                 ("$name" != "ar" || "$type" != "Nvlink")

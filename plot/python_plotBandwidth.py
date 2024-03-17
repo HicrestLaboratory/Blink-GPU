@@ -30,7 +30,7 @@ def extract_data(file_path):
     return pd.DataFrame({'Transfer Size (B)': transfer_sizes, 'Bandwidth (GB/s)': bandwidths})
 
 
-lable_colors = { 'Baseline': 'blue', 'CudaAware': 'red', 'Nccl': 'green', 'Nvlink': 'gray'}
+lable_colors = { 'Baseline': 'blue', 'CudaAware': 'red', 'Nccl': 'green', 'Nvlink': 'gray', 'Aggregated': 'orange'}
 
 lable_machines = { 'leonardo': 'Leonardo', 'marzola': 'Marzola'}
 lable_topologyes = { 'singlenode': 'Single-node', 'multinode': 'Multi-nodes'}
@@ -63,7 +63,8 @@ def plot_performance(file_paths):
     for m in all_machines:
         for e in all_experiments:
             for t in all_topologyes:
-                plots[m+'-'+e+'-'+t]={}
+                if (e != "mpp" or t != "singlenode"):
+                    plots[m+'-'+e+'-'+t]={}
 
     for f in files:
         plots[f[0]+'-'+f[1]+'-'+f[3]][f[2]] = f[4]
@@ -92,7 +93,7 @@ def plot_performance(file_paths):
                             max_bandwidth = max(plots[key][line]['Bandwidth (GB/s)'])
                             print('max_bandwidth: ', max_bandwidth)
 
-                        if (line != 'Nvlink' or (not '-ar-' in key and not '-hlo-' in key)):
+                        if ((line != 'Nvlink' or (not '-ar-' in key and not '-hlo-' in key)) and (line != "Aggregated" or ('-mpp-' in key))):
                             plt.plot(transfer_size, bandwidth, label="%s (up to %d GB/s)" % (line, max_bandwidth), linestyle=linestyle, color=lable_colors[line])
 
                 #e = 'ping-pong' if 'pp' in key else 'all2all'
@@ -129,7 +130,7 @@ def plot_performance(file_paths):
                 plt.ylabel('Bandwidth (GB/s)')
 
                 plt.title(m + ' ' + e + ' ' + t + ' Performance Comparison')
-                print(line_order)
+                print("line_order:", line_order)
                 #plt.legend(legend_order)
                 plt.legend()
                 plt.grid(True)
