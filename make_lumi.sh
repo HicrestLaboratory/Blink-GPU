@@ -28,7 +28,7 @@ do
         sed -i 's/hipHostAlloc(/hipHostMalloc((void **)/g' src/${cur_name}.cpp
         sed -i 's/hipHostAllocDefault/hipHostMallocDefault/g' src/${cur_name}.cpp
 
-        CC -xhip -DHIP -DOPEN_MPI -DPINNED -lrccl src/${cur_name}.cpp -o bin/${cur_name}  #
+        CC -xhip -DHIP -DOPEN_MPI -DPINNED -lrccl -O3 src/${cur_name}.cpp -o bin/${cur_name}  #
 
         # rm src/${cur_name}.cpp
     done
