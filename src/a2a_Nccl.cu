@@ -263,7 +263,7 @@ int main(int argc, char *argv[])
             cudaErrorCheck(cudaEventSynchronize(stop));
             if (i>0) {cudaErrorCheck(cudaEventElapsedTime(&(inner_elapsed_time[(j-fix_buff_size)*loop_count+i-1]), start, stop));}
 
-            if (rank == 0) {printf("%%"); fflush(stdout);}
+            if (rank == 0 && !endless) {printf("%%"); fflush(stdout);}
         }
         if (rank == 0) {printf("#\n"); fflush(stdout);}
 
