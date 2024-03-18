@@ -179,6 +179,7 @@ int main(int argc, char *argv[])
     size_t num_ranks_to_skip = 0;
     int* ranks_to_skip = (int*) malloc(size*sizeof(int));
     memset(ranks_to_skip, 0, size*sizeof(int));
+    size_t skipped = 0;
     if (skip_ranks_str != NULL) {
         char *token = strtok(skip_ranks_str, ",");
         while (token != NULL) {
@@ -187,9 +188,10 @@ int main(int argc, char *argv[])
                 skip_rank = 1;
                 break;
             }
-            token = strtok(NULL, ",");
             ranks_to_skip[atoi(token)] = 1;
             ++num_ranks_to_skip;
+	    ++skipped;
+	    token = strtok(NULL, ",");
         }
     }
 
@@ -263,10 +265,13 @@ int main(int argc, char *argv[])
                 for (int r=1; r<size; r++){
                     if(!ranks_to_skip[r]){
                         ncclSend(d_A, N, ncclDtype, r, NCCL_COMM_WORLD, NULL);
-                    }
+                    }else{
+		        printf("[%d] Skipping send to %d\n", rank, r);
+		    }
                 }
             }else if(!skip_rank){
                 ncclRecv(d_A, N, ncclDtype, 0, NCCL_COMM_WORLD, NULL);
+		printf("[%d] Receiving from 0\n", rank);
             }
             ncclGroupEnd();
 
@@ -312,14 +317,14 @@ int main(int argc, char *argv[])
         SZTYPE num_B, int_num_GB;
         double num_GB;
 
-        num_B = sizeof(dtype)*N*(size-1);
+        num_B = sizeof(dtype)*N*(size-1-skipped);
         // TODO: maybe we can avoid if and just divide always by B_in_GB
         if (j < 31) {
             SZTYPE B_in_GB = 1 << 30;
             num_GB = (double)num_B / (double)B_in_GB;
         } else {
             SZTYPE M = 1 << (j - 30);            
-            num_GB = sizeof(dtype)*M*(size-1);
+            num_GB = sizeof(dtype)*M*(size-1-skipped);
         }
 
         double avg_time_per_transfer = 0.0;
