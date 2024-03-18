@@ -16,8 +16,6 @@
 #include "../include/device_assignment.h"
 #include "../include/cmd_util.h"
 #include "../include/prints.h"
-#include "../include/communicators.h"
-#include "../include/common.h"
 
 #if !defined(OPEN_MPI) || !OPEN_MPI
 #error This source code uses an Open MPI-specific extension
@@ -37,11 +35,22 @@ int main(int argc, char *argv[])
     /* -------------------------------------------------------------------------------------------
         MPI Initialization 
     --------------------------------------------------------------------------------------------*/
+    MPI_Init(&argc, &argv);
 
-    int nnodes, mynode; // tmp
-    int size, rank, namelen;
+    int size, nnodes;
+    MPI_Comm_size(MPI_COMM_WORLD, &size);
+
+    int rank, mynode;
+    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+
+    int namelen;
     char host_name[MPI_MAX_PROCESSOR_NAME];
-    MY_MPI_INIT(size, rank, namelen, host_name)
+    MPI_Get_processor_name(host_name, &namelen);
+    MPI_Barrier(MPI_COMM_WORLD);
+
+    printf("Size = %d, myrank = %d, host_name = %s\n", size, rank, host_name);
+    fflush(stdout);
+    MPI_Barrier(MPI_COMM_WORLD);
 
 
     // Map MPI ranks to GPUs
@@ -68,7 +77,30 @@ int main(int argc, char *argv[])
         CUDA AWARE CHECK
     --------------------------------------------------------------------------------------------*/
 
-    cudaAwareCheck();
+    if (rank == 0) {
+        printf("Compile time check:\n");
+#if defined(MPIX_CUDA_AWARE_SUPPORT) && MPIX_CUDA_AWARE_SUPPORT
+        printf("This MPI library has CUDA-aware support.\n", MPIX_CUDA_AWARE_SUPPORT);
+#elif defined(MPIX_CUDA_AWARE_SUPPORT) && !MPIX_CUDA_AWARE_SUPPORT
+        printf("This MPI library does not have CUDA-aware support.\n");
+#else
+        printf("This MPI library cannot determine if there is CUDA-aware support.\n");
+#endif /* MPIX_CUDA_AWARE_SUPPORT */
+
+        printf("Run time check:\n");
+#if defined(MPIX_CUDA_AWARE_SUPPORT)
+        if (1 == MPIX_Query_cuda_support()) {
+            printf("This MPI library has CUDA-aware support.\n");
+        } else {
+            printf("This MPI library does not have CUDA-aware support.\n");
+        }
+#else /* !defined(MPIX_CUDA_AWARE_SUPPORT) */
+        printf("This MPI library cannot determine if there is CUDA-aware support.\n");
+#endif /* MPIX_CUDA_AWARE_SUPPORT */
+    }
+    fflush(stdout);
+    MPI_Barrier(MPI_COMM_WORLD);
+
 
     /* -------------------------------------------------------------------------------------------
         NCCL Initialization
@@ -161,18 +193,52 @@ int main(int argc, char *argv[])
     for(int j=fix_buff_size; j<max_j; j++){
         (j!=0) ? (N <<= 1) : (N = 1);
 
+
         // Allocate memory for A on CPU
         dtype *A, *B;
-        alloc_host_buffers(rank, &A, N, &B, N);
+#ifdef PINNED
+        cudaHostAlloc(&A, N*sizeof(dtype), cudaHostAllocDefault);
+        cudaHostAlloc(&B, N*sizeof(dtype), cudaHostAllocDefault);
+#else
+        A = (dtype*)malloc(N*sizeof(dtype));
+        B = (dtype*)malloc(N*sizeof(dtype));
+#endif
+        int errorflag = 0;
+        if (A == NULL || B == NULL) {
+            fprintf(stderr, "[%d] Error while allocating buffers at line %d (%lu Bytes requested)\n", rank, __LINE__, N*sizeof(dtype));
+            fflush(stderr);
+            errorflag = __LINE__;
+
+        }
+        MPI_Barrier(MPI_COMM_WORLD);
+        if (errorflag != 0) MPI_Abort(MPI_COMM_WORLD, errorflag);
+        MPI_Barrier(MPI_COMM_WORLD);
+
+        if (rank == 0) printf("Buffers of size %" PRIu64 " B succesfuly allocated by all ranks\n", N*sizeof(dtype));
+        fflush(stdout);
+        MPI_Barrier(MPI_COMM_WORLD);
+
+
+        cktype *my_cpu_check = (cktype*)malloc(sizeof(cktype));
+        cktype *recv_cpu_check = (cktype*)malloc(sizeof(cktype)*size), gpu_check = 0;
+        *my_cpu_check = 0U;
 
         // Initialize all elements of A to 0.0
-        INIT_HOST_BUFFER(A, N, 1U * (rank+1))
-        INIT_HOST_BUFFER(B, N, 0U)
+        for(SZTYPE i=0; i<N; i++) {
+            A[i] = 1U * (rank+1);
+        }
+        *B = 0U;
 
-        dtype *d_A, *d_B;
-        alloc_device_buffers(A, &d_A, N, B, &d_B, N);
+        dtype *d_B;
+        cudaErrorCheck( cudaMalloc(&d_B, N*sizeof(dtype)) );
+        cudaErrorCheck( cudaMemcpy(d_B, B, N*sizeof(dtype), cudaMemcpyHostToDevice) );
 
-        cktype *all_local_checks = share_local_checks(size, d_A, N);
+        dtype *d_A;
+        cudaErrorCheck( cudaMalloc(&d_A, N*sizeof(dtype)) );
+        cudaErrorCheck( cudaMemcpy(d_A, A, N*sizeof(dtype), cudaMemcpyHostToDevice) );
+
+        gpu_device_reduce_max(d_A, N, my_cpu_check);
+
 
         /*
 
@@ -199,12 +265,20 @@ int main(int argc, char *argv[])
         if (rank == 0) {printf("#\n"); fflush(stdout);}
 
 
-        compute_global_checks(size, all_local_checks, d_B, N, &(cpu_checks[j]), &(gpu_checks[j]));
+
+        gpu_device_reduce_max(d_B, N, &gpu_check);
+        MPI_Allgather(my_cpu_check, 1, MPI_cktype, recv_cpu_check, 1, MPI_cktype, MPI_COMM_WORLD);
+
+        cpu_checks[j] = 0;
+        gpu_checks[j] = gpu_check;
+        for (int i=0; i<size; i++)
+            if (cpu_checks[j] < recv_cpu_check[i]) cpu_checks[j] = recv_cpu_check[i];
         my_error[j] = abs(gpu_checks[j] - cpu_checks[j]);
 
         cudaErrorCheck( cudaFree(d_A) );
         cudaErrorCheck( cudaFree(d_B) );
-        free(all_local_checks);
+        free(recv_cpu_check);
+        free(my_cpu_check);
 #ifdef PINNED
         cudaFreeHost(A);
         cudaFreeHost(B);
