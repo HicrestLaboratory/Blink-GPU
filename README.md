@@ -27,6 +27,8 @@ Depending on the particular experiment (i.e. communication scheme), the **SD** a
 3. AllReduce (**ar**): given a message size **k** and a binary operation *Op*(), each GPU *i* owns a message **m(i)** of **k** elements; at the end of the communication each GPUs own the same message **M** = *Op*(**m(0)**, **m(1)**, ...,  **m(N-1)**) (where the operation *Op* is applied to the messages as an element-wise operation over the **k** elements).
 4. Halo3D (**hlo**): The involved processes are divided over a 3D grid in which each process communicates with the adjacent ones; since we have three axes, each process should need to communicate with up to six other processes depending on the selected grid. Different to all the other communication schemes, the Halo3D involves non-blocking communications.
 5. Multi-Peer-To-Peer (**mpp**): a set of multiple GPUs *A_0*, *A_1*, ... *A_k* send the messages **m1_0**, **m1_1**, ... **m1_k** to a disjoint set of GPUs *B_0*, *B_1*, ... *B_k* that, after recived **m1_0**, **m1_1**, ... **m1_k**, they send other messages **m2_0**, **m2_1**, ... **m2_k** to *A_0*, *A_1*, ... *A_k*.
+6. Incast (**inc**): The **N-1** GPUs involved in the experiments send a message to the GPU with rank 0.
+7. One-to-many (**otom**): The GPU with rank 0 sends a message to all the other **N-1** GPUs involved in the experiments.
 
 # Repository structure
 
