@@ -17,12 +17,10 @@
 #include "../include/cmd_util.h"
 #include "../include/prints.h"
 
-#if !defined(OPEN_MPI) || !OPEN_MPI
-#error This source code uses an Open MPI-specific extension
-#endif
-
+#ifdef MPIX_CUDA_AWARE_SUPPORT
 /* Needed for MPIX_Query_cuda_support(), below */
 #include "mpi-ext.h"
+#endif
 
 #define BUFF_CYCLE 28
 #define LOOP_COUNT 50
