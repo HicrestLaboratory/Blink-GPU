@@ -28,7 +28,6 @@ ARNAME=ar
 A2ANAME=a2a
 MPPNAME=mpp
 HALONAME=hlo
-AMPPNAME=ampp
 INCNAME=inc
 OTOMNAME=otom
 # --------------- Folders ----------------
@@ -58,7 +57,7 @@ CUDA_AWARE_SN_EXPORTS="${EXPORTFOLDER}/load_CudaAware_singlenode_exports.sh"
 # =====================================================================================
 
 
-all: pp a2a ar hlo mpp ampp inc otom
+all: pp a2a ar hlo mpp inc otom
 pp: $(BINFOLDER)/$(NAME)_Baseline $(BINFOLDER)/$(NAME)_CudaAware $(BINFOLDER)/$(NAME)_Nccl $(BINFOLDER)/$(NAME)_Nvlink
 a2a: $(BINFOLDER)/$(A2ANAME)_Baseline $(BINFOLDER)/$(A2ANAME)_CudaAware $(BINFOLDER)/$(A2ANAME)_Nccl $(BINFOLDER)/$(A2ANAME)_Nvlink
 ar: $(BINFOLDER)/$(ARNAME)_Baseline $(BINFOLDER)/$(ARNAME)_CudaAware $(BINFOLDER)/$(ARNAME)_Nccl
@@ -70,6 +69,7 @@ otom: $(BINFOLDER)/$(OTOMNAME)_Nccl
 # --------------- Baseline ---------------
 $(BASELINE_MODULES):
 	mkdir -p ${MODULEFOLDER}
+	touch $@
 #	@echo "module purge" > $@
 #	@echo "module load nvhpc/23.1" >> $@
 #	@echo "module load openmpi/4.1.4--gcc--11.3.0-cuda-11.8" >> $@
@@ -107,6 +107,7 @@ $(BINFOLDER)/$(MPPNAME)_Baseline: src/$(MPPNAME)_Baseline.cu $(BASELINE_MODULES)
 # -------------- CUDA aware --------------
 $(CUDA_AWARE_MODULES):
 	mkdir -p ${MODULEFOLDER}
+	touch $@
 #	@echo "module purge" > $@
 #	@echo "module load nvhpc/23.1" >> $@
 #	@echo "module load openmpi/4.1.4--nvhpc--23.1-cuda-11.8" >> $@
@@ -147,6 +148,7 @@ $(BINFOLDER)/$(MPPNAME)_Aggregated: src/$(MPPNAME)_Aggregated.cu $(CUDA_AWARE_MO
 # ----------------- Nccl -----------------
 $(NCCL_MODULES):
 	mkdir -p ${MODULEFOLDER}
+	touch $@
 #	@echo "module purge" > $@
 #	@echo "module load nvhpc/23.1" >> $@
 #	@echo "module load openmpi/4.1.4--nvhpc--23.1-cuda-11.8" >> $@
@@ -192,6 +194,7 @@ $(BINFOLDER)/$(OTOMNAME)_Nccl: src/$(OTOMNAME)_Nccl.cu $(NCCL_MODULES) $(NCCL_SN
 # ---------------- NVLink ----------------
 $(NVLINK_MODULES):
 	mkdir -p ${MODULEFOLDER}
+	touch $@
 #	@echo "module purge" > $@
 #	@echo "module load nvhpc/23.1" >> $@
 #	@echo "module load openmpi/4.1.4--nvhpc--23.1-cuda-11.8" >> $@
