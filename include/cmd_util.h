@@ -20,7 +20,7 @@ void read_line_parameters (int argc, char *argv[], int myrank,
 
             *flag_l = 1;
             *loop_count = atoi(argv[i + 1]);
-            if (*loop_count <= 0) {
+            if (*loop_count < 0) { // Can be 0 for endless mode (only for a2a and incast)
                 fprintf(stderr, "Error: loop_count must be a positive integer.\n");
                 exit(__LINE__);
             }

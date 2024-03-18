@@ -116,6 +116,7 @@ int main(int argc, char *argv[])
     int loop_count = LOOP_COUNT;
     int buff_cycle = BUFF_CYCLE;
     int fix_buff_size = 0;
+    int endless = 0;
 
     // Parse command-line options
     read_line_parameters(argc, argv, rank,
@@ -130,7 +131,13 @@ int main(int argc, char *argv[])
     max_j = (flag_x == 0) ? buff_cycle : (fix_buff_size + 1) ;
     if (rank == 0) printf("buff_cycle: %d loop_count: %d max_j: %d\n", buff_cycle, loop_count, max_j);
     if (flag_x > 0 && rank == 0) printf("fix_buff_size is set as %d\n", fix_buff_size);
-
+    // In endless mode we can run only at a fixed buffer size, quick hack
+    if (loop_count == 0){
+        assert(flag_x); 
+        assert(LOOP_COUNT > 2);
+        endless = 1;
+        loop_count = LOOP_COUNT
+    } 
 
     /* -------------------------------------------------------------------------------------------
         NCCL Initialization
@@ -234,6 +241,9 @@ int main(int argc, char *argv[])
         cudaErrorCheck(cudaEventCreate(&stop));
 
         for(int i=1-(WARM_UP); i<=loop_count; i++){
+            // Quick hack for endless mode
+            if(endless){i = 1;}
+
             MPI_Barrier(MPI_COMM_WORLD);
             cudaErrorCheck(cudaEventRecord(start, NULL));
 
