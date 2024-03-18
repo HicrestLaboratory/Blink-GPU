@@ -23,6 +23,7 @@ EOF
 
 import os
 import stat
+import sys
 import os.path
 
 
@@ -54,6 +55,25 @@ module load PrgEnv-cray
 module load craype-accel-amd-gfx90a
 module load rocm
 """
+
+# Update the number of nodes, and number tasks per-node from command line arguments
+if len(sys.argv) == 1:
+    print("#nodes and #tasks-per-node not provided.")
+    print("Use default setting with {} node(s) and {} task(s) per node.".format(nodes_tasks[0][0], nodes_tasks[0][1]))
+    print("")
+elif len(sys.argv) == 3:
+    num_nodes = int(sys.argv[1])
+    num_tasks_per_node = int(sys.argv[2])
+    if num_nodes < 1:
+        print("Invalid number-of-nodes, should > 1, get {}".format(num_nodes))
+        exit(1)
+    if num_tasks_per_node < 1 or num_tasks_per_node > 8:
+        print("Invalid number-of-tasks-per-node, shoud be in [1, 8], get {}.".format(num_tasks_per_node))
+        exit(1)
+    nodes_tasks = [(num_nodes, num_tasks_per_node)]
+else:
+    print("Invalid argument.")
+    print("Usage: python3 script-name.py number-of-nodes number-of-tasks-per-node.")
 
 args = ""
 f_run_all_name = 'sbatch/lumi/run-lumi-all.sh'
