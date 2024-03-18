@@ -136,7 +136,7 @@ int main(int argc, char *argv[])
         assert(flag_x); 
         assert(LOOP_COUNT > 2);
         endless = 1;
-        loop_count = LOOP_COUNT
+        loop_count = LOOP_COUNT;
     } 
 
     /* -------------------------------------------------------------------------------------------
