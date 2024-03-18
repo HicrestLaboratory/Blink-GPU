@@ -5,10 +5,10 @@
 #include <unistd.h>
 
 #define dtype u_int8_t
-#define MPI_dtype MPI_BYTE // MPI_UINT8_T?
+#define MPI_dtype MPI_BYTE 
 
 #define cktype int32_t
-#define MPI_cktype MPI_INT // MPI_INT32_T?
+#define MPI_cktype MPI_INT32_T
 
 #define ncclDtype ncclChar // ncclUint8
 
