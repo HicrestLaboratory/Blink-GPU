@@ -171,6 +171,28 @@ int main(int argc, char *argv[])
     printf("[%d] NCCL_COMM_NODE:  nccl size = %d, nccl rank = %d\n", rank, nccl_n_sz, nccl_n_rk);
     fflush(stdout);
 
+    // Check if I am one of the ranks to be skipped
+    // Read the GPUBENCH_OTOM_SKIP environment variable (comma-separated string of ranks)
+    // If I am one of those ranks, I will not issue the recv, and the root will not issue the send
+    int skip_rank = 0;
+    char *skip_ranks_str = getenv("GPUBENCH_OTOM_SKIP");
+    size_t num_ranks_to_skip = 0;
+    int* ranks_to_skip = (int*) malloc(size*sizeof(int));
+    if (skip_ranks_str != NULL) {
+        char *token = strtok(skip_ranks_str, ",");
+        while (token != NULL) {
+            if (atoi(token) == rank) {
+                assert(rank != 0); // rank 0 should not be in the list (it is the root of the otom)
+                skip_rank = 1;
+                break;
+            }
+            token = strtok(NULL, ",");
+            ranks_to_skip[num_ranks_to_skip] = atoi(token);
+            ++num_ranks_to_skip;
+        }
+    }
+
+
     MPI_Barrier(MPI_COMM_WORLD);
 
 
@@ -238,9 +260,19 @@ int main(int argc, char *argv[])
             // Assume the root of the otom is rank 0
             if(rank == 0){
                 for (int r=1; r<size; r++){
-                    ncclSend(d_A, N, ncclDtype, r, NCCL_COMM_WORLD, NULL);
+                    uint send = 1;
+                    // Check if we must send to rank r
+                    for (size_t j=0; j<num_ranks_to_skip; ++j) {
+                        if (ranks_to_skip[j] == r) {
+                            send = 0;
+                            break;
+                        }
+                    }
+                    if(send){
+                        ncclSend(d_A, N, ncclDtype, r, NCCL_COMM_WORLD, NULL);
+                    }
                 }
-            }else{
+            }else if(!skip_rank){
                 ncclRecv(d_A, N, ncclDtype, 0, NCCL_COMM_WORLD, NULL);
             }
             ncclGroupEnd();
