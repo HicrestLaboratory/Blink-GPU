@@ -209,10 +209,10 @@ int main(int argc, char *argv[])
 #else
         A = (dtype*)malloc(elems_in_buffer*sizeof(dtype));
 #endif
-        cktype *my_cpu_check = (cktype*)malloc(sizeof(cktype)*size);
+        cktype *my_cpu_check = (cktype*)malloc(sizeof(cktype));
         cktype *recv_cpu_check = (cktype*)malloc(sizeof(cktype)*size), gpu_check = 0;
-        for (int i=0; i<size; i++)
-            my_cpu_check[i] = 0U;
+        *my_cpu_check = 0U;
+
 
         // Initialize all elements of A to 0.0
         for(SZTYPE i=0; i<elems_in_buffer; i++) {
@@ -222,7 +222,7 @@ int main(int argc, char *argv[])
         dtype *d_A;
         cudaErrorCheck( cudaMalloc(&d_A, elems_in_buffer*sizeof(dtype)) );
         cudaErrorCheck( cudaMemcpy(d_A, A, elems_in_buffer*sizeof(dtype), cudaMemcpyHostToDevice) );
-        gpu_device_reduce(d_A, N, &my_cpu_check[i]);
+        gpu_device_reduce_max(d_A, N, my_cpu_check);
 
 
         /*
@@ -258,7 +258,7 @@ int main(int argc, char *argv[])
         if (rank == 0) {printf("#\n"); fflush(stdout);}
 
         gpu_device_reduce(d_A, elems_in_buffer, &gpu_check);
-        MPI_Alltoall(my_cpu_check, 1, MPI_cktype, recv_cpu_check, 1, MPI_cktype, MPI_COMM_WORLD);
+        MPI_Allgather(my_cpu_check, 1, MPI_cktype, recv_cpu_check, 1, MPI_cktype, MPI_COMM_WORLD);
 
         cpu_checks[j] = 0;
         gpu_checks[j] = gpu_check;
