@@ -15,7 +15,7 @@ struct char2int
   }
 };
 
-int gpu_host_reduce(dtype* input_vec, int len, cktype* out_scalar) {
+int gpu_host_reduce(dtype* input_vec, uint64_t len, cktype* out_scalar) {
   int result = thrust::transform_reduce(thrust::host,
                                         input_vec, input_vec + len,
                                         char2int(),
@@ -27,7 +27,7 @@ int gpu_host_reduce(dtype* input_vec, int len, cktype* out_scalar) {
   return 0;
 }
 
-int gpu_device_reduce(dtype* d_input_vec, int len, cktype* out_scalar) {
+int gpu_device_reduce(dtype* d_input_vec, uint64_t len, cktype* out_scalar) {
   cktype result = thrust::transform_reduce(thrust::device,
                                         d_input_vec, d_input_vec + len,
                                         char2int(),
@@ -39,7 +39,7 @@ int gpu_device_reduce(dtype* d_input_vec, int len, cktype* out_scalar) {
   return 0;
 }
 
-int gpu_device_reduce_max(dtype* d_input_vec, int len, cktype* out_scalar) {
+int gpu_device_reduce_max(dtype* d_input_vec, uint64_t len, cktype* out_scalar) {
   cktype result = thrust::transform_reduce(thrust::device,
                                         d_input_vec, d_input_vec + len,
                                         char2int(),
