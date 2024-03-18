@@ -178,7 +178,7 @@ int main(int argc, char *argv[])
     char *skip_ranks_str = getenv("GPUBENCH_OTOM_SKIP");
     size_t num_ranks_to_skip = 0;
     int* ranks_to_skip = (int*) malloc(size*sizeof(int));
-    memset(ranks_to_skip, 0, size*sizeof(int)
+    memset(ranks_to_skip, 0, size*sizeof(int));
     if (skip_ranks_str != NULL) {
         char *token = strtok(skip_ranks_str, ",");
         while (token != NULL) {
