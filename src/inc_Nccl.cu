@@ -192,15 +192,16 @@ int main(int argc, char *argv[])
     float *elapsed_time = (float*)malloc(sizeof(float)*buff_cycle*loop_count);
     float *inner_elapsed_time = (float*)malloc(sizeof(float)*buff_cycle*loop_count);
     size_t elems_in_buffer = 0;
+    for(int j=fix_buff_size; j<max_j; j++){
+
+        (j!=0) ? (N <<= 1) : (N = 1);
+        if (rank == 0) {printf("%i#", j); fflush(stdout);}
+
     if(rank == 0){
         elems_in_buffer = N*size;
     }else{
         elems_in_buffer = N;
     }
-    for(int j=fix_buff_size; j<max_j; j++){
-
-        (j!=0) ? (N <<= 1) : (N = 1);
-        if (rank == 0) {printf("%i#", j); fflush(stdout);}
 
         // Allocate memory for A on CPU
         dtype *A;
@@ -213,16 +214,14 @@ int main(int argc, char *argv[])
         cktype *recv_cpu_check = (cktype*)malloc(sizeof(cktype)*size), gpu_check = 0;
         *my_cpu_check = 0U;
 
-
         // Initialize all elements of A to 0.0
         for(SZTYPE i=0; i<elems_in_buffer; i++) {
             A[i] = 1U * (rank+1);
         }
-
         dtype *d_A;
         cudaErrorCheck( cudaMalloc(&d_A, elems_in_buffer*sizeof(dtype)) );
         cudaErrorCheck( cudaMemcpy(d_A, A, elems_in_buffer*sizeof(dtype), cudaMemcpyHostToDevice) );
-        gpu_device_reduce_max(d_A, N, my_cpu_check);
+        gpu_device_reduce_max(d_A, elems_in_buffer, my_cpu_check);
 
 
         /*
