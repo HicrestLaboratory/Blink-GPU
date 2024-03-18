@@ -178,6 +178,7 @@ int main(int argc, char *argv[])
     char *skip_ranks_str = getenv("GPUBENCH_OTOM_SKIP");
     size_t num_ranks_to_skip = 0;
     int* ranks_to_skip = (int*) malloc(size*sizeof(int));
+    memset(ranks_to_skip, 0, size*sizeof(int)
     if (skip_ranks_str != NULL) {
         char *token = strtok(skip_ranks_str, ",");
         while (token != NULL) {
@@ -187,7 +188,7 @@ int main(int argc, char *argv[])
                 break;
             }
             token = strtok(NULL, ",");
-            ranks_to_skip[num_ranks_to_skip] = atoi(token);
+            ranks_to_skip[atoi(token)] = 1;
             ++num_ranks_to_skip;
         }
     }
@@ -260,15 +261,7 @@ int main(int argc, char *argv[])
             // Assume the root of the otom is rank 0
             if(rank == 0){
                 for (int r=1; r<size; r++){
-                    uint send = 1;
-                    // Check if we must send to rank r
-                    for (size_t j=0; j<num_ranks_to_skip; ++j) {
-                        if (ranks_to_skip[j] == r) {
-                            send = 0;
-                            break;
-                        }
-                    }
-                    if(send){
+                    if(!ranks_to_skip[r]){
                         ncclSend(d_A, N, ncclDtype, r, NCCL_COMM_WORLD, NULL);
                     }
                 }
@@ -364,6 +357,7 @@ int main(int argc, char *argv[])
     free(gpu_checks);
     free(elapsed_time);
     free(inner_elapsed_time);
+    free(ranks_to_skip);
     MPI_Finalize();
     return(0);
 }
