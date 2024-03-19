@@ -28,7 +28,6 @@ ARNAME=ar
 A2ANAME=a2a
 MPPNAME=mpp
 HALONAME=hlo
-AMPPNAME=ampp
 INCNAME=inc
 OTOMNAME=otom
 # --------------- Folders ----------------
@@ -58,7 +57,7 @@ CUDA_AWARE_SN_EXPORTS="${EXPORTFOLDER}/load_CudaAware_singlenode_exports.sh"
 # =====================================================================================
 
 
-all: pp a2a ar hlo mpp ampp inc otom
+all: pp a2a ar hlo mpp inc otom
 pp: $(BINFOLDER)/$(NAME)_Baseline $(BINFOLDER)/$(NAME)_CudaAware $(BINFOLDER)/$(NAME)_Nccl $(BINFOLDER)/$(NAME)_Nvlink
 a2a: $(BINFOLDER)/$(A2ANAME)_Baseline $(BINFOLDER)/$(A2ANAME)_CudaAware $(BINFOLDER)/$(A2ANAME)_Nccl $(BINFOLDER)/$(A2ANAME)_Nvlink
 ar: $(BINFOLDER)/$(ARNAME)_Baseline $(BINFOLDER)/$(ARNAME)_CudaAware $(BINFOLDER)/$(ARNAME)_Nccl
