@@ -5,7 +5,7 @@
 #include <unistd.h>
 
 #define dtype u_int8_t
-#define MPI_dtype MPI_BYTE 
+#define MPI_dtype MPI_UINT8_T  
 
 #define cktype int32_t
 #define MPI_cktype MPI_INT32_T
