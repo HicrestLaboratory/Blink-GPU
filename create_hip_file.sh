@@ -1,5 +1,5 @@
 #! /bin/bash
-names=("mpp" "pp" "a2a" "ar" "otom")
+names=("mpp" "pp" "a2a" "ar" "otom" "inc")
 types=("Baseline" "CudaAware" "Nccl" "Nvlink")
 
 #names=("mpp" "pp" "a2a")
@@ -10,10 +10,20 @@ do
     for type in "${types[@]}"
     do
         # Combinations to skip
+        # otom only available for Nccl
         if [[ $name == "otom" && $type != "Nccl" ]]; then
             continue
         fi
+        # inc only available for Nccl
+        if [[ $name == "inc" && $type != "Nccl" ]]; then
+            continue
+        fi
+        # ar not available for Nvlink
         if [[ $name == "ar" && $type == "Nvlink" ]]; then
+            continue
+        fi        
+        # a2a on Nccl does not need to be generated
+        if [[ $name == "a2a" && $type == "Nccl" ]]; then
             continue
         fi        
         cur_name=${name}_${type}

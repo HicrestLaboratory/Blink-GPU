@@ -28,6 +28,8 @@ A2ANAME=a2a
 MPPNAME=mpp
 HALONAME=hlo
 AMPPNAME=ampp
+OTOMNAME=otom
+INCNAME=inc
 # --------------- Folders ----------------
 BINFOLDER=bin
 OUTFOLDER=out
@@ -53,13 +55,14 @@ CUDA_AWARE_SN_EXPORTS="${EXPORTFOLDER}/load_CudaAware_singlenode_exports.sh"
 
 # =====================================================================================
 #all: pp a2a ar hlo mpp ampp
-all: a2a ar mpp
+all: a2a ar mpp pp otom inc
 pp: $(BINFOLDER)/$(NAME)_Baseline $(BINFOLDER)/$(NAME)_CudaAware $(BINFOLDER)/$(NAME)_Nccl $(BINFOLDER)/$(NAME)_Nvlink
-#a2a: $(BINFOLDER)/$(A2ANAME)_Baseline $(BINFOLDER)/$(A2ANAME)_CudaAware $(BINFOLDER)/$(A2ANAME)_Nccl $(BINFOLDER)/$(A2ANAME)_Nvlink
-a2a: $(BINFOLDER)/$(A2ANAME)_Baseline $(BINFOLDER)/$(A2ANAME)_CudaAware $(BINFOLDER)/$(A2ANAME)_Nccl
+a2a: $(BINFOLDER)/$(A2ANAME)_Baseline $(BINFOLDER)/$(A2ANAME)_CudaAware $(BINFOLDER)/$(A2ANAME)_Nccl $(BINFOLDER)/$(A2ANAME)_Nvlink
 ar: $(BINFOLDER)/$(ARNAME)_Baseline $(BINFOLDER)/$(ARNAME)_CudaAware $(BINFOLDER)/$(ARNAME)_Nccl
 hlo: $(BINFOLDER)/$(HALONAME)_Baseline $(BINFOLDER)/$(HALONAME)_CudaAware $(BINFOLDER)/$(HALONAME)_Nccl
 mpp: $(BINFOLDER)/$(MPPNAME)_Baseline $(BINFOLDER)/$(MPPNAME)_CudaAware $(BINFOLDER)/$(MPPNAME)_Nccl # $(BINFOLDER)/$(MPPNAME)_Nvlink
+otom: $(BINFOLDER)/$(OTOMNAME)_Nccl
+inc: $(BINFOLDER)/$(INCNAME)_Nccl
 ampp: $(BINFOLDER)/$(AMPPNAME)_CudaAware
 
 # --------------- Baseline ---------------
@@ -77,6 +80,10 @@ $(BASELINE_SN_EXPORTS):
 $(BASELINE_MN_EXPORTS):
 	mkdir -p ${EXPORTFOLDER}
 	@echo "echo NO exports to load" > $@
+
+$(BINFOLDER)/$(NAME)_Baseline: src/$(NAME)_Baseline.cpp $(BASELINE_MODULES) $(BASELINE_SN_EXPORTS) $(BASELINE_MN_EXPORTS)
+	mkdir -p $(BINFOLDER) $(OUTFOLDER) $(SOUTFOLDER)
+	source $(BASELINE_MODULES) && $(LUMICC) $(CFLAGS) -o $@ $< $(INCL) $(LIBS) $(LIBFLAGS) -lstdc++ -lm $(DBGFLAGS)
 
 $(BINFOLDER)/$(A2ANAME)_Baseline: src/$(A2ANAME)_Baseline.cpp $(BASELINE_MODULES) $(BASELINE_SN_EXPORTS) $(BASELINE_MN_EXPORTS)
 	mkdir -p $(BINFOLDER) $(OUTFOLDER) $(SOUTFOLDER)
@@ -106,6 +113,10 @@ $(CUDA_AWARE_SN_EXPORTS):
 $(CUDA_AWARE_MN_EXPORTS):
 	mkdir -p ${EXPORTFOLDER}
 	@echo "echo NO exports to load" > $@
+
+$(BINFOLDER)/$(NAME)_CudaAware: src/$(NAME)_CudaAware.cpp $(CUDA_AWARE_MODULES) $(CUDA_AWARE_SN_EXPORTS) $(CUDA_AWARE_MN_EXPORTS)
+	mkdir -p $(BINFOLDER) $(OUTFOLDER) $(SOUTFOLDER)
+	source $(CUDA_AWARE_MODULES) && $(LUMICC) $(CFLAGS) -o $@ $< $(INCL) $(LIBS) $(LIBFLAGS) -lstdc++ -lm $(DBGFLAGS)
 
 $(BINFOLDER)/$(A2ANAME)_CudaAware: src/$(A2ANAME)_CudaAware.cpp $(CUDA_AWARE_MODULES) $(CUDA_AWARE_SN_EXPORTS) $(CUDA_AWARE_MN_EXPORTS)
 	mkdir -p $(BINFOLDER) $(OUTFOLDER) $(SOUTFOLDER)
@@ -139,6 +150,10 @@ $(NCCL_MN_EXPORTS):
 	mkdir -p ${EXPORTFOLDER}
 	@echo "export NCCL_P2P_DISABLE=1" > $@
 
+$(BINFOLDER)/$(NAME)_Nccl: src/$(NAME)_Nccl.cpp $(NCCL_MODULES) $(NCCL_SN_EXPORTS) $(NCCL_MN_EXPORTS)
+	mkdir -p $(BINFOLDER) $(OUTFOLDER) $(SOUTFOLDER)
+	source $(NCCL_MODULES) ; $(CC) $(CFLAGS) -o $@ $< $(INCL) $(LIBS) $(LIBFLAGS) $(MPI) $(CUDA) $(NCCL) -lstdc++ -lm $(DBGFLAGS)
+
 $(BINFOLDER)/$(A2ANAME)_Nccl: src/$(A2ANAME)_Nccl.cpp $(NCCL_MODULES) $(NCCL_SN_EXPORTS) $(NCCL_MN_EXPORTS)
 	mkdir -p $(BINFOLDER) $(OUTFOLDER) $(SOUTFOLDER)
 	source $(NCCL_MODULES) ; $(CC) $(CFLAGS) -o $@ $< $(INCL) $(LIBS) $(LIBFLAGS) $(MPI) $(CUDA) $(NCCL) -lstdc++ -lm $(DBGFLAGS)
@@ -150,6 +165,44 @@ $(BINFOLDER)/$(ARNAME)_Nccl: src/$(ARNAME)_Nccl.cpp $(NCCL_MODULES) $(NCCL_SN_EX
 $(BINFOLDER)/$(MPPNAME)_Nccl: src/$(MPPNAME)_Nccl.cpp $(NCCL_MODULES) $(NCCL_SN_EXPORTS) $(NCCL_MN_EXPORTS)
 	mkdir -p $(BINFOLDER) $(OUTFOLDER) $(SOUTFOLDER)
 	source $(NCCL_MODULES) ; $(CC) $(CFLAGS) -o $@ $< $(INCL) $(LIBS) $(LIBFLAGS) $(MPI) $(CUDA) $(NCCL) -lstdc++ -lm $(DBGFLAGS)
+
+$(BINFOLDER)/$(OTOMNAME)_Nccl: src/$(OTOMNAME)_Nccl.cpp $(NCCL_MODULES) $(NCCL_SN_EXPORTS) $(NCCL_MN_EXPORTS)
+	mkdir -p $(BINFOLDER) $(OUTFOLDER) $(SOUTFOLDER)
+	source $(NCCL_MODULES) ; $(CC) $(CFLAGS) -o $@ $< $(INCL) $(LIBS) $(LIBFLAGS) $(MPI) $(CUDA) $(NCCL) -lstdc++ -lm $(DBGFLAGS)
+
+$(BINFOLDER)/$(INCNAME)_Nccl: src/$(INCNAME)_Nccl.cpp $(NCCL_MODULES) $(NCCL_SN_EXPORTS) $(NCCL_MN_EXPORTS)
+	mkdir -p $(BINFOLDER) $(OUTFOLDER) $(SOUTFOLDER)
+	source $(NCCL_MODULES) ; $(CC) $(CFLAGS) -o $@ $< $(INCL) $(LIBS) $(LIBFLAGS) $(MPI) $(CUDA) $(NCCL) -lstdc++ -lm $(DBGFLAGS)
+# ----------------------------------------
+
+# ----------------- Nvlink -----------------
+$(NVLINK_MODULES):
+	mkdir -p ${MODULEFOLDER}
+	echo "export EBU_USER_PREFIX=/project/project_465000997/EasyBuild" > $@
+	echo "module load LUMI/22.08" >> $@
+	echo "module load aws-ofi-rccl" >> $@
+	echo "module load craype-accel-amd-gfx90a" >> $@
+	echo "module load rocm" >> $@
+
+$(NVLINK_SN_EXPORTS):
+	mkdir -p ${EXPORTFOLDER}
+	@echo "echo NO exports to load" > $@
+
+$(NVLINK_MN_EXPORTS):
+	mkdir -p ${EXPORTFOLDER}
+	@echo "echo NO exports to load" > $@
+
+$(BINFOLDER)/$(NAME)_Nvlink: src/$(NAME)_Nvlink.cpp $(NVLINK_MODULES) $(NVLINK_SN_EXPORTS) $(NVLINK_MN_EXPORTS)
+	mkdir -p $(BINFOLDER) $(OUTFOLDER) $(SOUTFOLDER)
+	source $(NVLINK_MODULES) ; $(CC) $(CFLAGS) -o $@ $< $(INCL) $(LIBS) $(LIBFLAGS) $(MPI) $(CUDA) $(NVLINK) -lstdc++ -lm $(DBGFLAGS)
+
+$(BINFOLDER)/$(A2ANAME)_Nvlink: src/$(A2ANAME)_Nvlink.cpp $(NVLINK_MODULES) $(NVLINK_SN_EXPORTS) $(NVLINK_MN_EXPORTS)
+	mkdir -p $(BINFOLDER) $(OUTFOLDER) $(SOUTFOLDER)
+	source $(NVLINK_MODULES) ; $(CC) $(CFLAGS) -o $@ $< $(INCL) $(LIBS) $(LIBFLAGS) $(MPI) $(CUDA) $(NVLINK) -lstdc++ -lm $(DBGFLAGS)
+
+$(BINFOLDER)/$(MPPNAME)_Nvlink: src/$(MPPNAME)_Nvlink.cpp $(NVLINK_MODULES) $(NVLINK_SN_EXPORTS) $(NVLINK_MN_EXPORTS)
+	mkdir -p $(BINFOLDER) $(OUTFOLDER) $(SOUTFOLDER)
+	source $(NVLINK_MODULES) ; $(CC) $(CFLAGS) -o $@ $< $(INCL) $(LIBS) $(LIBFLAGS) $(MPI) $(CUDA) $(NVLINK) -lstdc++ -lm $(DBGFLAGS)
 
 # ----------------------------------------
 
