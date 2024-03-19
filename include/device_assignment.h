@@ -106,10 +106,11 @@ int  assignDeviceToProcess(MPI_Comm *nodeComm, int *nnodes, int *mynodeid)
 	    ;
 	  }
 	  myrank = std::stoi(v[myrank]);
-      } else {
-	  // use defualt mapping
-          myrank = GPU_ASSIGN_SEQUENCE[myrank];
-      }
+      } 
+      // else {
+	//   // use defualt mapping
+      //     myrank = GPU_ASSIGN_SEQUENCE[myrank];
+      // }
 
 #else
 #endif
