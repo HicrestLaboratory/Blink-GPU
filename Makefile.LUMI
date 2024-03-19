@@ -6,12 +6,11 @@ NCCL_HOME=/users/renzebin/EasyBuild/SW/LUMI-22.08/L/rccl/2.12.7-cpeGNU-22.08
 # ---------------- Common ----------------
 LUMICC=CC -xhip 
 CC=/opt/rocm/bin/hipcc
-CFLAGS=-std=c++14 -O3 --offload-arch=gfx90a -DSKIPCPUAFFINITY
+CFLAGS=-std=c++14 --offload-arch=gfx90a -DSKIPCPUAFFINITY -O3
 LIBS=
 INCL=
 LIBFLAGS=-DHIP -DOPEN_MPI -DPINNED -DMPI_SUPPORT 
-DBGFLAGS=
-# -g -G
+DBGFLAGS= #-g -G -fsanitize=address -fsanitize=undefined -fsanitize=float-divide-by-zero -fsanitize=float-cast-overflow -fno-sanitize-recover=all -fno-sanitize=alignment
 # ----------- Shared libraries -----------
 MPI=-L${MPI_HOME}/lib -I${MPI_HOME}/include -lmpi
 MPI_CUDA=
@@ -60,7 +59,7 @@ pp: $(BINFOLDER)/$(NAME)_Baseline $(BINFOLDER)/$(NAME)_CudaAware $(BINFOLDER)/$(
 a2a: $(BINFOLDER)/$(A2ANAME)_Baseline $(BINFOLDER)/$(A2ANAME)_CudaAware $(BINFOLDER)/$(A2ANAME)_Nccl
 ar: $(BINFOLDER)/$(ARNAME)_Baseline $(BINFOLDER)/$(ARNAME)_CudaAware $(BINFOLDER)/$(ARNAME)_Nccl
 hlo: $(BINFOLDER)/$(HALONAME)_Baseline $(BINFOLDER)/$(HALONAME)_CudaAware $(BINFOLDER)/$(HALONAME)_Nccl
-mpp: $(BINFOLDER)/$(MPPNAME)_Baseline $(BINFOLDER)/$(MPPNAME)_CudaAware $(BINFOLDER)/$(MPPNAME)_Nccl # $(BINFOLDER)/$(MPPNAME)_Nvlink
+mpp: $(BINFOLDER)/$(MPPNAME)_Baseline $(BINFOLDER)/$(MPPNAME)_CudaAware # $(BINFOLDER)/$(MPPNAME)_Nccl # $(BINFOLDER)/$(MPPNAME)_Nvlink
 ampp: $(BINFOLDER)/$(AMPPNAME)_CudaAware
 
 # --------------- Baseline ---------------
