@@ -169,28 +169,21 @@ int main(int argc, char *argv[])
     printf("[%d] NCCL_COMM_NODE:  nccl size = %d, nccl rank = %d\n", rank, nccl_n_sz, nccl_n_rk);
     fflush(stdout);
 
-    // Check if I am one of the ranks to be skipped
-    // Read the GPUBENCH_OTOM_SKIP environment variable (comma-separated string of ranks)
-    // If I am one of those ranks, I will not issue the recv, and the root will not issue the send
-    int skip_rank = 0;
-    char *skip_ranks_str = getenv("GPUBENCH_OTOM_SKIP");
-    size_t num_ranks_to_skip = 0;
-    int* ranks_to_skip = (int*) malloc(size*sizeof(int));
-    memset(ranks_to_skip, 0, size*sizeof(int));
-    size_t skipped = 0;
-    if (skip_ranks_str != NULL) {
-        char *token = strtok(skip_ranks_str, ",");
+    // Check if I am one of the destination ranks
+    // Read the GPUBENCH_OTOM_DEST environment variable (comma-separated string of ranks)    
+    char *dest_ranks_str = getenv("GPUBENCH_OTOM_DEST");
+    size_t num_destinations = 0;
+    int* dest_ranks = (int*) malloc(size*sizeof(int));
+    memset(dest_ranks, 0, size*sizeof(int));
+    if (dest_ranks_str != NULL) {
+        char *token = strtok(dest_ranks_str, ",");
         while (token != NULL) {
-            if (atoi(token) == rank) {
-                assert(rank != 0); // rank 0 should not be in the list (it is the root of the otom)
-                skip_rank = 1;
-                break;
-            }
-            ranks_to_skip[atoi(token)] = 1;
-            ++num_ranks_to_skip;
-	    ++skipped;
-	    token = strtok(NULL, ",");
+            dest_ranks[atoi(token)] = 1;
+            ++num_destinations;
+	        token = strtok(NULL, ",");
         }
+    }else{
+        num_destinations = size - 1;
     }
 
 
@@ -261,15 +254,12 @@ int main(int argc, char *argv[])
             // Assume the root of the otom is rank 0
             if(rank == 0){
                 for (int r=1; r<size; r++){
-                    if(!ranks_to_skip[r]){
+                    if(dest_ranks[r]){
                         ncclSend(d_A, N, ncclDtype, r, NCCL_COMM_WORLD, NULL);
-                    }else{
-		        printf("[%d] Skipping send to %d\n", rank, r);
-		    }
+                    }
                 }
-            }else if(!skip_rank){
+            }else if(dest_ranks[rank]){
                 ncclRecv(d_A, N, ncclDtype, 0, NCCL_COMM_WORLD, NULL);
-		printf("[%d] Receiving from 0\n", rank);
             }
             ncclGroupEnd();
 
@@ -315,14 +305,14 @@ int main(int argc, char *argv[])
         SZTYPE num_B, int_num_GB;
         double num_GB;
 
-        num_B = sizeof(dtype)*N*(size-1-skipped);
+        num_B = sizeof(dtype)*N*num_destinations;
         // TODO: maybe we can avoid if and just divide always by B_in_GB
         if (j < 31) {
             SZTYPE B_in_GB = 1 << 30;
             num_GB = (double)num_B / (double)B_in_GB;
         } else {
             SZTYPE M = 1 << (j - 30);            
-            num_GB = sizeof(dtype)*M*(size-1-skipped);
+            num_GB = sizeof(dtype)*M*num_destinations;
         }
 
         double avg_time_per_transfer = 0.0;
@@ -360,7 +350,7 @@ int main(int argc, char *argv[])
     free(gpu_checks);
     free(elapsed_time);
     free(inner_elapsed_time);
-    free(ranks_to_skip);
+    free(dest_ranks);
     MPI_Finalize();
     return(0);
 }
