@@ -59,7 +59,7 @@ pp: $(BINFOLDER)/$(NAME)_Baseline $(BINFOLDER)/$(NAME)_CudaAware $(BINFOLDER)/$(
 a2a: $(BINFOLDER)/$(A2ANAME)_Baseline $(BINFOLDER)/$(A2ANAME)_CudaAware $(BINFOLDER)/$(A2ANAME)_Nccl
 ar: $(BINFOLDER)/$(ARNAME)_Baseline $(BINFOLDER)/$(ARNAME)_CudaAware $(BINFOLDER)/$(ARNAME)_Nccl
 hlo: $(BINFOLDER)/$(HALONAME)_Baseline $(BINFOLDER)/$(HALONAME)_CudaAware $(BINFOLDER)/$(HALONAME)_Nccl
-mpp: $(BINFOLDER)/$(MPPNAME)_Baseline $(BINFOLDER)/$(MPPNAME)_CudaAware # $(BINFOLDER)/$(MPPNAME)_Nccl # $(BINFOLDER)/$(MPPNAME)_Nvlink
+mpp: $(BINFOLDER)/$(MPPNAME)_Baseline $(BINFOLDER)/$(MPPNAME)_CudaAware $(BINFOLDER)/$(MPPNAME)_Nccl # $(BINFOLDER)/$(MPPNAME)_Nvlink
 ampp: $(BINFOLDER)/$(AMPPNAME)_CudaAware
 
 # --------------- Baseline ---------------
@@ -124,13 +124,12 @@ $(BINFOLDER)/$(MPPNAME)_CudaAware: src/$(MPPNAME)_CudaAware.cpp $(CUDA_AWARE_MOD
 $(NCCL_MODULES):
 	mkdir -p ${MODULEFOLDER}
 	echo "export EBU_USER_PREFIX=/project/project_465000997/EasyBuild" > $@
-	echo "module load LUMI/22.08" > $@
-	echo "module load aws-ofi-rccl" > $@
-	echo "module load craype-accel-amd-gfx90a" > $@
-	echo "module load rocm" > $@
-	echo 'HIPCC_COMPILE_FLAGS_APPEND="--offload-arch=gfx90a $(CC --cray-print-opts=cflags)"' > $@
-	echo 'export HIPCC_LINK_FLAGS_APPEND=$(CC --cray-print-opts=libs)' > $@
-
+	echo "module load LUMI/22.08" >> $@
+	echo "module load aws-ofi-rccl" >> $@
+	echo "module load craype-accel-amd-gfx90a" >> $@
+	echo "module load rocm" >> $@
+	echo 'HIPCC_COMPILE_FLAGS_APPEND="--offload-arch=gfx90a $(CC --cray-print-opts=cflags)"' >> $@
+	echo 'export HIPCC_LINK_FLAGS_APPEND=$(CC --cray-print-opts=libs)' >> $@
 
 $(NCCL_SN_EXPORTS):
 	mkdir -p ${EXPORTFOLDER}
