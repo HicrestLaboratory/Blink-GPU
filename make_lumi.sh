@@ -1,4 +1,5 @@
 #! /bin/bash
+module pruge
 module load PrgEnv-cray
 module load craype-accel-amd-gfx90a
 module load rocm
@@ -9,8 +10,18 @@ mkdir bin
 names=("mpp" "a2a" "ar")
 types=("Baseline" "CudaAware" "Nccl") # "Nvlink")
 
-# names=("ar")
-# types=("Nccl") # "Nvlink")
+# names=("otom")
+# types=("Nccl")
+
+# names=("a2a")
+# types=("Baseline")
+
+# names=("mpp")
+# types=("CudaAware") # "Nvlink")
+
+# Uncomment this to make NVlink
+# names=("mpp" "a2a")
+# types=("Nvlink")
 
 for name in "${names[@]}"
 do
@@ -27,8 +38,11 @@ do
         sed -i 's/<nccl.h>/<rccl.h>/g' src/${cur_name}.cpp
         sed -i 's/hipHostAlloc(/hipHostMalloc((void **)/g' src/${cur_name}.cpp
         sed -i 's/hipHostAllocDefault/hipHostMallocDefault/g' src/${cur_name}.cpp
-
-        CC -xhip -DHIP -DOPEN_MPI -DPINNED -lrccl -O3 src/${cur_name}.cpp -o bin/${cur_name}  #
+        # for nvlink
+        sed -i 's/!prop.unifiedAddressing/0/g' src/${cur_name}.cpp
+        sed -i 's/hipDeviceProp/hipDeviceProp_t/g' src/${cur_name}.cpp
+        
+        CC -xhip -DHIP -DOPEN_MPI -DPINNED -lrccl -O3 -g src/${cur_name}.cpp -o bin/${cur_name}  #
 
         # rm src/${cur_name}.cpp
     done
