@@ -174,7 +174,7 @@ int main(int argc, char *argv[])
     char *dest_ranks_str = getenv("GPUBENCH_OTOM_DEST");
     size_t num_destinations = 0;
     int* dest_ranks = (int*) malloc(size*sizeof(int));
-    memset(dest_ranks, 0, size*sizeof(int));
+    memset(dest_ranks, 1, size*sizeof(int));
     if (dest_ranks_str != NULL) {
         char *token = strtok(dest_ranks_str, ",");
         while (token != NULL) {
