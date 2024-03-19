@@ -162,6 +162,7 @@ int main(int argc, char *argv[])
     MPI_Comm nodeComm;
     int dev = assignDeviceToProcess(&nodeComm, &nnodes, &mynode);
     cudaSetDevice(dev);
+    printf("##N NODES: %d\n", nnodes);
 
     // print device affiniy
 #ifndef SKIPCPUAFFINITY
@@ -178,6 +179,7 @@ int main(int argc, char *argv[])
     // Check that all the nodes has the same size
     int nodesize;
     MPI_Allreduce(&mynodesize, &nodesize, sizeof(int), MPI_INT, MPI_MAX, MPI_COMM_WORLD);
+    MPI_Comm_size(nodeComm, &mynodesize);
     if (nodesize != mynodesize) {
         fprintf(stderr, "Error at node %d: mynodesize (%d) does not metch with nodesize (%d)\n", rank, mynodesize, nodesize);
         fflush(stderr);
