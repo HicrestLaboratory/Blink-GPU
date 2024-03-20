@@ -222,6 +222,7 @@ int main(int argc, char *argv[])
     cudaEvent_t event;
     cudaIpcMemHandle_t sendHandle, recvHandle[size];
 
+    cudaStream_t Streams[MAX_GPUS];
     double start_time, stop_time;
     int *error = (int*)malloc(sizeof(int)*buff_cycle);
     int *my_error = (int*)malloc(sizeof(int)*buff_cycle);
@@ -286,18 +287,22 @@ int main(int argc, char *argv[])
                 peerBuffer[i] = d_A; // NOTE this is the self send case
 
         for(int i=1-(WARM_UP); i<=loop_count; i++){
+            for (int k=0; k<MAX_GPUS; k++) cudaErrorCheck(cudaStreamCreate(&Streams[k]));
+
             MPI_Barrier(MPI_COMM_WORLD);
             start_time = MPI_Wtime();
 
             // Memcopy DeviceToDevice
             for (int k=0; k<size; k++)
-                cudaErrorCheck( cudaMemcpy(d_B + (k*N)*sizeof(dtype), peerBuffer[k] + (k*N)*sizeof(dtype), sizeof(dtype)*N, cudaMemcpyDeviceToDevice) );
+                cudaErrorCheck( cudaMemcpyAsync(d_B + (k*N)*sizeof(dtype), peerBuffer[k] + (k*N)*sizeof(dtype), sizeof(dtype)*N, cudaMemcpyDeviceToDevice, Streams[k]) );
             cudaErrorCheck( cudaDeviceSynchronize() );
 
             stop_time = MPI_Wtime();
             if (i>0) inner_elapsed_time[(j-fix_buff_size)*loop_count+i-1] = stop_time - start_time;
 
             if (rank == 0) {printf("%%"); fflush(stdout);}
+
+            for (int k=0; k<MAX_GPUS; k++) cudaErrorCheck(cudaStreamDestroy(Streams[k]));
         }
         if (rank == 0) {printf("#\n"); fflush(stdout);}
 

@@ -13,3 +13,5 @@
 #define ncclDtype ncclChar // ncclUint8
 
 #define SZTYPE uint64_t
+
+#define MAX_GPUS 4
