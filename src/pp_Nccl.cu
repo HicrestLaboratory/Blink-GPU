@@ -328,8 +328,8 @@ int main(int argc, char *argv[])
         }
 
         MPI_Allreduce(my_error, error, buff_cycle, MPI_INT, MPI_MAX, ppComm);
-        //MPI_Allreduce(inner_elapsed_time, elapsed_time, buff_cycle*loop_count, MPI_DOUBLE, MPI_MAX, firstsenderComm);
-        memcpy(elapsed_time, inner_elapsed_time, buff_cycle*loop_count*sizeof(double)); // No need to do allreduce, there is only one rank in firstsenderComm
+        //MPI_Allreduce(inner_elapsed_time, elapsed_time, buff_cycle*loop_count, MPI_FLOAT, MPI_MAX, firstsenderComm);
+        memcpy(elapsed_time, inner_elapsed_time, buff_cycle*loop_count*sizeof(float)); // No need to do allreduce, there is only one rank in firstsenderComm
         for(int j=fix_buff_size; j<max_j; j++) {
             (j!=0) ? (N <<= 1) : (N = 1);
 
