@@ -10,8 +10,11 @@ do
     for type in "${types[@]}"
     do
         # Combinations to skip
-        # otom only available for Nccl
-        if [[ $name == "otom" && $type != "Nccl" ]]; then
+        # otom only available for Nccl and Nvlink
+        if [[ $name == "otom" && $type == "Baseline" ]]; then
+            continue
+        fi
+        if [[ $name == "otom" && $type == "CudaAware" ]]; then
             continue
         fi
         # inc only available for Nccl

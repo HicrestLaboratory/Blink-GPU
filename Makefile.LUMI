@@ -61,7 +61,7 @@ a2a: $(BINFOLDER)/$(A2ANAME)_Baseline $(BINFOLDER)/$(A2ANAME)_CudaAware $(BINFOL
 ar: $(BINFOLDER)/$(ARNAME)_Baseline $(BINFOLDER)/$(ARNAME)_CudaAware $(BINFOLDER)/$(ARNAME)_Nccl
 hlo: $(BINFOLDER)/$(HALONAME)_Baseline $(BINFOLDER)/$(HALONAME)_CudaAware $(BINFOLDER)/$(HALONAME)_Nccl
 mpp: $(BINFOLDER)/$(MPPNAME)_Baseline $(BINFOLDER)/$(MPPNAME)_CudaAware $(BINFOLDER)/$(MPPNAME)_Nccl # $(BINFOLDER)/$(MPPNAME)_Nvlink
-otom: $(BINFOLDER)/$(OTOMNAME)_Nccl
+otom: $(BINFOLDER)/$(OTOMNAME)_Nccl $(BINFOLDER)/$(OTOMNAME)_Nvlink
 inc: $(BINFOLDER)/$(INCNAME)_Nccl
 ampp: $(BINFOLDER)/$(AMPPNAME)_CudaAware
 
@@ -201,6 +201,10 @@ $(BINFOLDER)/$(A2ANAME)_Nvlink: src/$(A2ANAME)_Nvlink.cpp $(NVLINK_MODULES) $(NV
 	source $(NVLINK_MODULES) ; $(CC) $(CFLAGS) -o $@ $< $(INCL) $(LIBS) $(LIBFLAGS) $(MPI) $(CUDA) $(NVLINK) -lstdc++ -lm $(DBGFLAGS)
 
 $(BINFOLDER)/$(MPPNAME)_Nvlink: src/$(MPPNAME)_Nvlink.cpp $(NVLINK_MODULES) $(NVLINK_SN_EXPORTS) $(NVLINK_MN_EXPORTS)
+	mkdir -p $(BINFOLDER) $(OUTFOLDER) $(SOUTFOLDER)
+	source $(NVLINK_MODULES) ; $(CC) $(CFLAGS) -o $@ $< $(INCL) $(LIBS) $(LIBFLAGS) $(MPI) $(CUDA) $(NVLINK) -lstdc++ -lm $(DBGFLAGS)
+
+$(BINFOLDER)/$(OTOMNAME)_Nvlink: src/$(OTOMNAME)_Nvlink.cpp $(NVLINK_MODULES) $(NVLINK_SN_EXPORTS) $(NVLINK_MN_EXPORTS)
 	mkdir -p $(BINFOLDER) $(OUTFOLDER) $(SOUTFOLDER)
 	source $(NVLINK_MODULES) ; $(CC) $(CFLAGS) -o $@ $< $(INCL) $(LIBS) $(LIBFLAGS) $(MPI) $(CUDA) $(NVLINK) -lstdc++ -lm $(DBGFLAGS)
 
