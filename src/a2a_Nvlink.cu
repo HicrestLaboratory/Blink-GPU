@@ -274,7 +274,7 @@ int main(int argc, char *argv[])
         */
 
         // Generate IPC MemHandle
-        cudaErrorCheck( cudaIpcGetMemHandle((cudaIpcMemHandle_t*)&sendHandle, d_A) );
+        cudaErrorCheck( cudaIpcGetMemHandle((cudaIpcMemHandle_t*)&sendHandle, d_B) );
 
         // Share IPC MemHandle
         MPI_Allgather(&sendHandle, sizeof(cudaIpcMemHandle_t), MPI_BYTE, &recvHandle, sizeof(cudaIpcMemHandle_t), MPI_BYTE, MPI_COMM_WORLD);
@@ -284,7 +284,7 @@ int main(int argc, char *argv[])
             if (i != rank)
                 cudaErrorCheck( cudaIpcOpenMemHandle((void**)&peerBuffer[i], *(cudaIpcMemHandle_t*)&recvHandle[i], cudaIpcMemLazyEnablePeerAccess) );
             else
-                peerBuffer[i] = d_A; // NOTE this is the self send case
+                peerBuffer[i] = d_B; // NOTE this is the self send case
 
         for(int i=1-(WARM_UP); i<=loop_count; i++){
             for (int k=0; k<MAX_GPUS; k++) cudaErrorCheck(cudaStreamCreate(&Streams[k]));
@@ -294,7 +294,7 @@ int main(int argc, char *argv[])
 
             // Memcopy DeviceToDevice
             for (int k=0; k<size; k++)
-                cudaErrorCheck( cudaMemcpyAsync(d_B + (k*N)*sizeof(dtype), peerBuffer[k] + (k*N)*sizeof(dtype), sizeof(dtype)*N, cudaMemcpyDeviceToDevice, Streams[k]) );
+                cudaErrorCheck( cudaMemcpyAsync(peerBuffer[k] + (k*N)*sizeof(dtype), d_A + (k*N)*sizeof(dtype), sizeof(dtype)*N, cudaMemcpyDeviceToDevice, Streams[k]) );
             cudaErrorCheck( cudaDeviceSynchronize() );
 
             stop_time = MPI_Wtime();
