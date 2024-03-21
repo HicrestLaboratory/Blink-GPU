@@ -6,7 +6,7 @@ NCCL_HOME=/project/project_465000997/EasyBuild/SW/LUMI-22.08/L/rccl/2.12.7-cpeGN
 # ---------------- Common ----------------
 LUMICC=CC -xhip 
 CC=/opt/rocm/bin/hipcc
-CFLAGS=-std=c++14 --offload-arch=gfx90a -O3
+CFLAGS=-std=c++14 --offload-arch=gfx90a -DSKIPCPUAFFINITY -O3 -DMICROBENCH_MAX_GPUS=8
 LIBS=
 INCL=
 LIBFLAGS=-DHIP -DOPEN_MPI -DPINNED -DMPI_SUPPORT 

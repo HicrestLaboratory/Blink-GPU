@@ -19,4 +19,6 @@
 
 #define SZTYPE uint64_t
 
-#define MAX_GPUS 4
+#ifndef MICROBENCH_MAX_GPUS
+#define MICROBENCH_MAX_GPUS 16
+#endif
