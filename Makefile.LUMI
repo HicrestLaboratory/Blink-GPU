@@ -138,7 +138,8 @@ $(BINFOLDER)/$(MPPNAME)_CudaAware: src/$(MPPNAME)_CudaAware.cpp $(CUDA_AWARE_MOD
 # ----------------- Nccl -----------------
 $(NCCL_MODULES):
 	mkdir -p ${MODULEFOLDER}
-	echo "export EBU_USER_PREFIX=/project/project_465000997/EasyBuild" > $@
+	echo "module purge" > $@
+	echo "export EBU_USER_PREFIX=/project/project_465000997/EasyBuild" >> $@
 	echo "module load LUMI/22.12" >> $@
 	echo "module loadpartition/G" >> $@
 	echo "module load aws-ofi-rccl" >> $@
