@@ -13,7 +13,7 @@ DBGFLAGS=
 # -g -G
 # ----------- Shared libraries -----------
 MPI=-L$(MPI_HOME)/lib -I$(MPI_HOME)/include -lmpi
-MPI_CUDA=-L$(MPI_CUDA_HOME)/lib -I$(MPI_CUDA_HOME)/include -lmpi
+MPI_CUDA=-L$(MPI_CUDA_HOME)/lib -I$(MPI_CUDA_HOME)/include -lmpi -L/user-environment/linux-sles15-neoverse_v2/gcc-12.3.0/cray-gtl-8.1.28-zrpwudcmtmevtnjgtbug7ykbdyxkqmrn/lib -lmpi_gtl_cuda
 CUDA=-L$(CUDA_HOME)/lib64 -L$(CUDA_HOME)/compact -I$(CUDA_HOME)/include -lcudart -lcuda
 NCCL=-L$(NCCL_HOME)/lib -I$(NCCL_HOME)/include -lnccl
 # ----------------------------------------
