@@ -109,6 +109,7 @@ $(CUDA_AWARE_MODULES):
 	@echo "module load PrgEnv-cray" >> $@
 	@echo "module load craype-accel-amd-gfx90a" >> $@
 	@echo "module load rocm" >> $@
+	@echo "export HSA_ENABLE_SDMA=0" >> $@
 
 $(CUDA_AWARE_SN_EXPORTS):
 	mkdir -p ${EXPORTFOLDER}
@@ -141,7 +142,7 @@ $(NCCL_MODULES):
 	echo "module purge" > $@
 	echo "export EBU_USER_PREFIX=/project/project_465000997/EasyBuild" >> $@
 	echo "module load LUMI/22.12" >> $@
-	echo "module loadpartition/G" >> $@
+	echo "module load partition/G" >> $@
 	echo "module load aws-ofi-rccl" >> $@
 	echo "module load craype-accel-amd-gfx90a" >> $@
 #	echo "module load rocm" >> $@
