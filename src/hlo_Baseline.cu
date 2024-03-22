@@ -401,15 +401,16 @@ int main(int argc, char *argv[])
 //     cudaErrorCheck( cudaSetDevice(rank % num_devices) );
 
     MPI_Comm nodeComm;
+#ifndef NO_SET_DEVICE
     int dev = assignDeviceToProcess(&nodeComm, &nnodes, &mynode);
     cudaSetDevice(dev);
-
     // print device affiniy
 #ifndef SKIPCPUAFFINITY
     if (0==rank) printf("List device affinity:\n");
     check_cpu_and_gpu_affinity(dev);
     if (0==rank) printf("List device affinity done.\n\n");
     MPI_Barrier(MPI_COMM_WORLD);
+#endif
 #endif
 
     int mynodeid = -1, mynodesize = -1;
