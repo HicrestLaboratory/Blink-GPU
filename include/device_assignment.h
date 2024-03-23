@@ -88,7 +88,6 @@ int  assignDeviceToProcess(MPI_Comm *nodeComm, int *nnodes, int *mynodeid)
       // we first check if the GPU senquence is defined
       const char * GPU_ENV_NAME = "USER_HIP_GPU_MAP";
       const char * gpu_env = getenv(GPU_ENV_NAME);
-      int gpu_sequence[gpu_per_node];
 
       if (NULL != gpu_env) {
 	  // scan GPU id, I will just use the c++ function

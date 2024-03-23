@@ -21,7 +21,7 @@ do
         if [[ $name == "inc" && $type != "Nccl" ]]; then
             continue
         fi
-        # ar not available for Nvlink
+                # ar not available for Nvlink
         if [[ $name == "ar" && $type == "Nvlink" ]]; then
             continue
         fi        

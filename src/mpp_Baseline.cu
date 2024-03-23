@@ -347,7 +347,7 @@ int main(int argc, char *argv[])
 
             int tag1 = 10;
             int tag2 = 20;
-            MPI_Request request[2*ncouples];
+            MPI_Request* request = (MPI_Request*) malloc(sizeof(MPI_Request)*2*ncouples);
 
             /*
 
@@ -402,6 +402,7 @@ int main(int argc, char *argv[])
             free(A);
             free(B);
 #endif
+            free(request);
         }
 
         if (fix_buff_size<=30) {

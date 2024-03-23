@@ -74,6 +74,7 @@ $(BASELINE_MODULES):
 	@echo "module load PrgEnv-cray" >> $@
 	@echo "module load craype-accel-amd-gfx90a" >> $@
 	@echo "module load rocm" >> $@
+	@echo "export HSA_ENABLE_SDMA=0" >> $@
 
 $(BASELINE_SN_EXPORTS):
 	mkdir -p ${EXPORTFOLDER}
@@ -132,20 +133,21 @@ $(BINFOLDER)/$(ARNAME)_CudaAware: src/$(ARNAME)_CudaAware.cpp $(CUDA_AWARE_MODUL
 	source $(CUDA_AWARE_MODULES) && $(LUMICC) $(CFLAGS) -o $@ $< $(INCL) $(LIBS) $(LIBFLAGS) -lstdc++ -lm $(DBGFLAGS)
 
 $(BINFOLDER)/$(MPPNAME)_CudaAware: src/$(MPPNAME)_CudaAware.cpp $(CUDA_AWARE_MODULES) $(CUDA_AWARE_SN_EXPORTS) $(CUDA_AWARE_MN_EXPORTS)
-	mkdir -p $(BINFOLDER) $(OUTFOLDER) $(SOUTFOLDER)
+		mkdir -p $(BINFOLDER) $(OUTFOLDER) $(SOUTFOLDER)
 	source $(CUDA_AWARE_MODULES) && $(LUMICC) $(CFLAGS) -o $@ $< $(INCL) $(LIBS) $(LIBFLAGS) -lstdc++ -lm $(DBGFLAGS)
 # ----------------------------------------
 
 # ----------------- Nccl -----------------
 $(NCCL_MODULES):
 	mkdir -p ${MODULEFOLDER}
-	echo "module purge" > $@
-	echo "export EBU_USER_PREFIX=/project/project_465000997/EasyBuild" >> $@
-	echo "module load LUMI/22.12" >> $@
-	echo "module load partition/G" >> $@
-	echo "module load aws-ofi-rccl" >> $@
-	echo "module load craype-accel-amd-gfx90a" >> $@
+	@echo "module purge" > $@
+	@echo "export EBU_USER_PREFIX=/project/project_465000997/EasyBuild" >> $@
+	@echo "module load LUMI/22.12" >> $@
+	@echo "module load partition/G" >> $@
+	@echo "module load aws-ofi-rccl" >> $@
+	@echo "module load craype-accel-amd-gfx90a" >> $@
 #	echo "module load rocm" >> $@
+	@echo "export HSA_ENABLE_SDMA=0" >> $@
 
 $(NCCL_SN_EXPORTS):
 	mkdir -p ${EXPORTFOLDER}
@@ -189,8 +191,9 @@ $(NVLINK_MODULES):
 	@echo "module load LUMI/23.09" >> $@
 	@echo "module load partition/G" >> $@
 	@echo "module load PrgEnv-cray" >> $@
-	echo "module load craype-accel-amd-gfx90a" >> $@
-	echo "module load rocm" >> $@
+	@echo "module load craype-accel-amd-gfx90a" >> $@
+	@echo "module load rocm" >> $@
+	@echo "export HSA_ENABLE_SDMA=0" >> $@
 
 $(NVLINK_SN_EXPORTS):
 	mkdir -p ${EXPORTFOLDER}
