@@ -1,5 +1,5 @@
 #! /bin/bash
-names=("mpp" "pp" "a2a" "ar" "otom" "inc")
+names=("mpp" "pp" "a2a" "a2am" "ar" "otom" "inc")
 types=("Baseline" "CudaAware" "Nccl" "Nvlink")
 
 #names=("mpp" "pp" "a2a")
@@ -21,7 +21,11 @@ do
         if [[ $name == "inc" && $type != "Nccl" ]]; then
             continue
         fi
-                # ar not available for Nvlink
+        # a2am only available for Nccl
+        if [[ $name == "a2am" && $type != "Nccl" ]]; then
+            continue
+        fi
+        # ar not available for Nvlink
         if [[ $name == "ar" && $type == "Nvlink" ]]; then
             continue
         fi        
