@@ -76,6 +76,7 @@ int  assignDeviceToProcess(MPI_Comm *nodeComm, int *nnodes, int *mynodeid)
 
 #else
      //*myrank = 0;
+     cudaSetDevice(0);
      return 0;
 #endif
 
@@ -106,16 +107,24 @@ int  assignDeviceToProcess(MPI_Comm *nodeComm, int *nnodes, int *mynodeid)
 	  }
 	  myrank = std::stoi(v[myrank]);
       } 
-      // else {
-	//   // use defualt mapping
-      //     myrank = GPU_ASSIGN_SEQUENCE[myrank];
-      // }
-
-#else
 #endif
       printf ("Assigning device %d  to process on node %s rank %d\n", myrank, host_name, rank);
       /* Assign device to MPI process, initialize BLAS and probe device properties */
-      //cudaSetDevice(*myrank);
-
+      
+#ifdef HIP
+      if(getenv("ROCR_VISIBLE_DEVICES") == NULL){
+            hipSetDevice(myrank);      
+      }else{
+            myrank = atoi(getenv("ROCR_VISIBLE_DEVICES"));
+            assert(myrank == atoi(getenv("SLURM_LOCALID")));
+      }
+#else
+      if(getenv("CUDA_VISIBLE_DEVICES") == NULL){
+            cudaSetDevice(myrank);           
+      }else{
+            myrank = atoi(getenv("CUDA_VISIBLE_DEVICES"));
+            assert(myrank == atoi(getenv("SLURM_LOCALID")));
+      }
+#endif
       return myrank;
 }
