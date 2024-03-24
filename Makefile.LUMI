@@ -6,7 +6,7 @@ NCCL_HOME=/project/project_465000997/EasyBuild/SW/LUMI-22.08/L/rccl/2.12.7-cpeGN
 # ---------------- Common ----------------
 LUMICC=CC -xhip 
 CC=/opt/rocm/bin/hipcc
-CFLAGS=-std=c++14 --offload-arch=gfx90a -DSKIPCPUAFFINITY -O3 -DMICROBENCH_MAX_GPUS=8
+CFLAGS=-std=c++14 --offload-arch=gfx90a -O3 -DMICROBENCH_MAX_GPUS=8
 LIBS=
 INCL=
 LIBFLAGS=-DHIP -DOPEN_MPI -DPINNED -DMPI_SUPPORT 
@@ -115,11 +115,11 @@ $(CUDA_AWARE_MODULES):
 
 $(CUDA_AWARE_SN_EXPORTS):
 	mkdir -p ${EXPORTFOLDER}
-	@echo "echo NO exports to load" > $@
+	@echo "echo NO exports to load (already included in moduleload file)" > $@
 
 $(CUDA_AWARE_MN_EXPORTS):
 	mkdir -p ${EXPORTFOLDER}
-	@echo "echo NO exports to load" > $@
+	@echo "echo NO exports to load (already included in moduleload file)" > $@
 
 $(BINFOLDER)/$(NAME)_CudaAware: src/$(NAME)_CudaAware.cpp $(CUDA_AWARE_MODULES) $(CUDA_AWARE_SN_EXPORTS) $(CUDA_AWARE_MN_EXPORTS)
 	mkdir -p $(BINFOLDER) $(OUTFOLDER) $(SOUTFOLDER)
@@ -149,14 +149,17 @@ $(NCCL_MODULES):
 	@echo "module load craype-accel-amd-gfx90a" >> $@
 #	echo "module load rocm" >> $@
 	@echo "export HSA_ENABLE_SDMA=0" >> $@
+	@echo "export NCCL_NET_GDR_LEVEL=3" >> $@
+	@echo "export FI_CXI_ATS=0" >> $@
+	@echo "export NCCL_BUFFSIZE=33554432" >> $@
 
 $(NCCL_SN_EXPORTS):
 	mkdir -p ${EXPORTFOLDER}
-	@echo "export NCCL_P2P_LEVEL=NVL" > $@
+	@echo "echo NO other exports to load (already included in moduleload file)" > $@
 
 $(NCCL_MN_EXPORTS):
 	mkdir -p ${EXPORTFOLDER}
-	@echo "export NCCL_P2P_DISABLE=1" > $@
+	@echo "echo NO other exports to load (already included in moduleload file)" > $@
 
 $(BINFOLDER)/$(NAME)_Nccl: src/$(NAME)_Nccl.cpp $(NCCL_MODULES) $(NCCL_SN_EXPORTS) $(NCCL_MN_EXPORTS)
 	mkdir -p $(BINFOLDER) $(OUTFOLDER) $(SOUTFOLDER)
