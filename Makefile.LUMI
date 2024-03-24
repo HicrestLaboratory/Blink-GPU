@@ -25,6 +25,7 @@ NCCL=-L${NCCL_HOME}/lib -lrccl
 NAME=pp
 ARNAME=ar
 A2ANAME=a2a
+A2AMNAME=a2am
 MPPNAME=mpp
 HALONAME=hlo
 AMPPNAME=ampp
@@ -54,10 +55,10 @@ CUDA_AWARE_SN_EXPORTS="${EXPORTFOLDER}/load_CudaAware_singlenode_exports.sh"
 # ----------------------------------------
 
 # =====================================================================================
-#all: pp a2a ar hlo mpp ampp
-all: a2a ar mpp pp otom inc
+all: a2a ar mpp pp otom inc a2am
 pp: $(BINFOLDER)/$(NAME)_Baseline $(BINFOLDER)/$(NAME)_CudaAware $(BINFOLDER)/$(NAME)_Nccl $(BINFOLDER)/$(NAME)_Nvlink
 a2a: $(BINFOLDER)/$(A2ANAME)_Baseline $(BINFOLDER)/$(A2ANAME)_CudaAware $(BINFOLDER)/$(A2ANAME)_Nccl $(BINFOLDER)/$(A2ANAME)_Nvlink
+a2am: $(BINFOLDER)/$(A2AMNAME)_Nccl
 ar: $(BINFOLDER)/$(ARNAME)_Baseline $(BINFOLDER)/$(ARNAME)_CudaAware $(BINFOLDER)/$(ARNAME)_Nccl
 hlo: $(BINFOLDER)/$(HALONAME)_Baseline $(BINFOLDER)/$(HALONAME)_CudaAware $(BINFOLDER)/$(HALONAME)_Nccl
 mpp: $(BINFOLDER)/$(MPPNAME)_Baseline $(BINFOLDER)/$(MPPNAME)_CudaAware $(BINFOLDER)/$(MPPNAME)_Nccl # $(BINFOLDER)/$(MPPNAME)_Nvlink
@@ -162,6 +163,12 @@ $(BINFOLDER)/$(NAME)_Nccl: src/$(NAME)_Nccl.cpp $(NCCL_MODULES) $(NCCL_SN_EXPORT
 	source $(NCCL_MODULES) &&  $(CC) $(CFLAGS) -o $@ $< $(INCL) $(LIBS) $(LIBFLAGS) $(MPI) $(CUDA) $(NCCL) -lstdc++ -lm $(DBGFLAGS)
 
 $(BINFOLDER)/$(A2ANAME)_Nccl: src/$(A2ANAME)_Nccl.cpp $(NCCL_MODULES) $(NCCL_SN_EXPORTS) $(NCCL_MN_EXPORTS)
+	mkdir -p $(BINFOLDER) $(OUTFOLDER) $(SOUTFOLDER)
+	export HIPCC_COMPILE_FLAGS_APPEND="--offload-arch=gfx90a $(CC --cray-print-opts=cflags)"
+	export HIPCC_LINK_FLAGS_APPEND=$(CC --cray-print-opts=libs)
+	source $(NCCL_MODULES) && $(CC) $(CFLAGS) -o $@ $< $(INCL) $(LIBS) $(LIBFLAGS) $(MPI) $(CUDA) $(NCCL) -lstdc++ -lm $(DBGFLAGS)
+
+$(BINFOLDER)/$(A2AMNAME)_Nccl: src/$(A2AMNAME)_Nccl.cpp $(NCCL_MODULES) $(NCCL_SN_EXPORTS) $(NCCL_MN_EXPORTS)
 	mkdir -p $(BINFOLDER) $(OUTFOLDER) $(SOUTFOLDER)
 	export HIPCC_COMPILE_FLAGS_APPEND="--offload-arch=gfx90a $(CC --cray-print-opts=cflags)"
 	export HIPCC_LINK_FLAGS_APPEND=$(CC --cray-print-opts=libs)
