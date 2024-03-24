@@ -9,6 +9,7 @@
 #include "../include/error.h"
 #include "../include/type.h"
 #include "../include/gpu_ops.h"
+#include <chrono>
 
 #define BUFF_CYCLE 31
 #define LOOP_COUNT 50
@@ -161,8 +162,10 @@ int main(int argc, char *argv[])
     cktype *gpu_checks_c = (cktype*)malloc(sizeof(cktype)*buff_cycle);
     double *elapsed_time_b = (double*)malloc(sizeof(double)*buff_cycle*loop_count);
     double *elapsed_time_c = (double*)malloc(sizeof(double)*buff_cycle*loop_count);
+    double *elapsed_time_total = (double*)malloc(sizeof(double)*buff_cycle*loop_count);
     double *inner_elapsed_time_b = (double*)malloc(sizeof(double)*buff_cycle*loop_count);
     double *inner_elapsed_time_c = (double*)malloc(sizeof(double)*buff_cycle*loop_count);
+    double *inner_elapsed_time_total = (double*)malloc(sizeof(double)*buff_cycle*loop_count);
 
     int gpu_a = g0, gpu_b = g1, gpu_c = g2;
     printf("Use gpu g0 %d, g1 %d, g2 %d \n", gpu_a, gpu_b, gpu_c);
@@ -203,6 +206,7 @@ int main(int argc, char *argv[])
 
             float ms_b, ms_c;
 
+            const unsigned long int start_time_us = std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock::now().time_since_epoch()).count();
             hipEventRecord(start_b, stream_b);
             hipErrorCheck( hipMemcpyAsync(d_B, d_A, N*sizeof(dtype), hipMemcpyDeviceToDevice, stream_b));
             hipEventRecord(stop_b, stream_b);
@@ -215,6 +219,7 @@ int main(int argc, char *argv[])
             hipStreamSynchronize(stream_b);
             hipStreamSynchronize(stream_c);
             hipErrorCheck( hipDeviceSynchronize() );
+            const unsigned long int end_time_us = std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock::now().time_since_epoch()).count();
 
             hipErrorCheck( hipEventElapsedTime(&ms_b, start_b, stop_b) );
             hipErrorCheck( hipEventElapsedTime(&ms_c, start_c, stop_c) );
@@ -222,6 +227,8 @@ int main(int argc, char *argv[])
 
             if (i>0) inner_elapsed_time_b[(j-fix_buff_size)*loop_count+i-1] = ms_b/1000.0;
             if (i>0) inner_elapsed_time_c[(j-fix_buff_size)*loop_count+i-1] = ms_c/1000.0;
+            if (i>0) inner_elapsed_time_total[(j-fix_buff_size)*loop_count+i-1] = (end_time_us-start_time_us)/1e6;
+            printf("%f %f %f\n", ms_b/1000.0, ms_c/1000.0, (end_time_us-start_time_us)/1e6 );
 
            printf("%%"); fflush(stdout);
         }
@@ -250,6 +257,7 @@ int main(int argc, char *argv[])
 
     memcpy(elapsed_time_b, inner_elapsed_time_b, buff_cycle*loop_count*sizeof(double));
     memcpy(elapsed_time_c, inner_elapsed_time_c, buff_cycle*loop_count*sizeof(double));
+    memcpy(elapsed_time_total, inner_elapsed_time_total, buff_cycle*loop_count*sizeof(double));
     for(int j=fix_buff_size; j<max_j; j++) {
         (j!=0) ? (N <<= 1) : (N = 1);
 
@@ -266,19 +274,21 @@ int main(int argc, char *argv[])
             num_GB = sizeof(dtype)*M;
         }
 
-        double avg_time_per_transfer_b = 0.0, avg_time_per_transfer_c = 0.0;
+        double avg_time_per_transfer_b = 0.0, avg_time_per_transfer_c = 0.0, avg_time_per_transfer_total = 0.0;
         for (int i=0; i<loop_count; i++) {
             // We only copy in one direction
             // elapsed_time_b[(j-fix_buff_size)*loop_count+i] /= 2.0;
             // elapsed_time_c[(j-fix_buff_size)*loop_count+i] /= 2.0;
             avg_time_per_transfer_b += elapsed_time_b[(j-fix_buff_size)*loop_count+i];
             avg_time_per_transfer_c += elapsed_time_c[(j-fix_buff_size)*loop_count+i];
-            printf("\tTransfer size (B): %10" PRIu64 ", Transfer Time (s): %15.9f/%15.9f, Bandwidth (GB/s): %15.9f/%15.9f, Iteration %d\n", num_B, elapsed_time_b[(j-fix_buff_size)*loop_count+i], elapsed_time_c[(j-fix_buff_size)*loop_count+i], num_GB/elapsed_time_b[(j-fix_buff_size)*loop_count+i], num_GB/elapsed_time_c[(j-fix_buff_size)*loop_count+i], i);
+            avg_time_per_transfer_total += elapsed_time_total[(j-fix_buff_size)*loop_count+i];
+            printf("\tTransfer size (B): %10" PRIu64 ", Transfer Time (s): %15.9f/%15.9f (total: %15.9f), Bandwidth (GB/s): %15.9f/%15.9f (Overall: %15.9f), Iteration %d\n", num_B, elapsed_time_b[(j-fix_buff_size)*loop_count+i], elapsed_time_c[(j-fix_buff_size)*loop_count+i], elapsed_time_total[(j-fix_buff_size)*loop_count+i], num_GB/elapsed_time_b[(j-fix_buff_size)*loop_count+i], num_GB/elapsed_time_c[(j-fix_buff_size)*loop_count+i], num_GB*2/elapsed_time_total[(j-fix_buff_size)*loop_count+i], i);
         }
         avg_time_per_transfer_b /= (double)loop_count;
         avg_time_per_transfer_c /= (double)loop_count;
+        avg_time_per_transfer_total /= (double)loop_count;
 
-         printf("[Average] Transfer size (B, MB, GB): %10" PRIu64 ", %4" PRIu64 ", %2" PRIu64 ", Transfer Time (s): %15.9f/%15.9f, Bandwidth (GB/s): %15.9f/%15.9f, Error: %d\ / %d\n", num_B, num_B >> 20, num_B >>30, avg_time_per_transfer_b,  avg_time_per_transfer_c, num_GB/avg_time_per_transfer_b, num_GB/avg_time_per_transfer_c, my_error_b[j], my_error_c[j] );
+         printf("[Average] Transfer size (B, MB, GB): %10" PRIu64 ", %4" PRIu64 ", %2" PRIu64 ", Transfer Time (s): %15.9f/%15.9f (Overall: %15.9f), Bandwidth (GB/s): %15.9f/%15.9f (total: %15.9f), Error: %d\ / %d\n", num_B, num_B >> 20, num_B >>30, avg_time_per_transfer_b,  avg_time_per_transfer_c, avg_time_per_transfer_total, num_GB/avg_time_per_transfer_b, num_GB/avg_time_per_transfer_c, num_GB*2/avg_time_per_transfer_total,my_error_b[j], my_error_c[j] );
         fflush(stdout);
     }
 

@@ -31,7 +31,7 @@ names=["a2a", "ar", "mpp"]
 types=["Baseline", "CudaAware", "Nccl"]
 
 # nodes_tasks = [(1, 4), (1,8), (2,8)]
-nodes_tasks = [(2, 4)]
+nodes_tasks = [(2, 8)]
 cpu_list = [9, 25, 41, 57, 1, 17, 33, 49]
 gpu_list = [5, 3, 7, 1, 4, 2, 6, 0]
 
@@ -55,6 +55,11 @@ module load PrgEnv-cray
 module load craype-accel-amd-gfx90a
 module load rocm
 """
+
+rccl_module_load = "source moduleload/load_Nccl_modules.sh\n"
+baseline_module_load = "source moduleload/load_Baseline_modules.sh\n"
+cudaaware_module_load = "source moduleload/load_CudaAware_modules.sh\n"
+nvlink_module_load = "source moduleload/load_Nvlink_modules.sh\n"
 
 # Update the number of nodes, and number tasks per-node from command line arguments
 if len(sys.argv) == 1:
@@ -104,17 +109,22 @@ for cur_name in names:
 
             # RCCL specific options
             if cur_type == "Nccl":
-                f.write(rccl_env)
+                f.write(rccl_module_load)
+            elif cur_type == "Baseline":
+                f.write(baseline_module_load)
+            elif cur_type =="CudaAware":
+                f.write(cudaaware_module_load)
+            elif cur_type =="Nvlink":
+                f.write(nvlink_module_load)
             else:
-                f.write(standard_env)
+                raise RuntimeError(f"Unknown benchmark type: {cur_type}")
+
 
             # define GPU env
             cur_gpu_list = gpu_list[0:cur_ntasks_per_node]
             cur_gpu_list = [str(x) for x in cur_gpu_list]
             cur_gpu_list = ','.join(cur_gpu_list)
             f.write("export USER_HIP_GPU_MAP={}\n".format(cur_gpu_list))
-            if cur_type == 'CudaAware':
-                f.write("export MPICH_GPU_SUPPORT_ENABLED=1\n\n")
             f.write("srun --cpu-bind=${}CPU_BIND{} bin/{}_{} {}\n\n".format('{', '}', cur_name, cur_type, args))
             f.close()
             
