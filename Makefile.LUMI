@@ -76,6 +76,10 @@ $(BASELINE_MODULES):
 	@echo "module load craype-accel-amd-gfx90a" >> $@
 	@echo "module load rocm" >> $@
 	@echo "export HSA_ENABLE_SDMA=0" >> $@
+	@echo "unset NCCL_NET_GDR_LEVEL" >> $@
+	@echo "unset FI_CXI_ATS" >> $@
+	@echo "unset NCCL_BUFFSIZE" >> $@
+	@echo "unset MPICH_GPU_SUPPORT_ENABLED" >> $@
 
 $(BASELINE_SN_EXPORTS):
 	mkdir -p ${EXPORTFOLDER}
@@ -112,6 +116,10 @@ $(CUDA_AWARE_MODULES):
 	@echo "module load craype-accel-amd-gfx90a" >> $@
 	@echo "module load rocm" >> $@
 	@echo "export HSA_ENABLE_SDMA=0" >> $@
+	@echo "unset NCCL_NET_GDR_LEVEL" >> $@
+	@echo "unset FI_CXI_ATS" >> $@
+	@echo "unset NCCL_BUFFSIZE" >> $@
+	@echo "export MPICH_GPU_SUPPORT_ENABLED=1" >> $@
 
 $(CUDA_AWARE_SN_EXPORTS):
 	mkdir -p ${EXPORTFOLDER}
@@ -152,6 +160,7 @@ $(NCCL_MODULES):
 	@echo "export NCCL_NET_GDR_LEVEL=3" >> $@
 	@echo "export FI_CXI_ATS=0" >> $@
 	@echo "export NCCL_BUFFSIZE=33554432" >> $@
+	@echo "unset MPICH_GPU_SUPPORT_ENABLED" >> $@
 
 $(NCCL_SN_EXPORTS):
 	mkdir -p ${EXPORTFOLDER}
@@ -204,6 +213,10 @@ $(NVLINK_MODULES):
 	@echo "module load craype-accel-amd-gfx90a" >> $@
 	@echo "module load rocm" >> $@
 	@echo "export HSA_ENABLE_SDMA=0" >> $@
+	@echo "unset NCCL_NET_GDR_LEVEL" >> $@
+	@echo "unset FI_CXI_ATS" >> $@
+	@echo "unset NCCL_BUFFSIZE" >> $@
+	@echo "unset MPICH_GPU_SUPPORT_ENABLED" >> $@
 
 $(NVLINK_SN_EXPORTS):
 	mkdir -p ${EXPORTFOLDER}
