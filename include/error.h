@@ -12,6 +12,7 @@
 #include <nccl.h>
 #endif
 
+#ifdef HIP
 // Macro for checking errors in INTERFACE API calls
 #define hipErrorCheck(call)                                                              \
 do{                                                                                       \
@@ -21,6 +22,17 @@ do{                                                                             
         exit(0);                                                                            \
     }                                                                                     \
 } while(0)
+#else
+// Macro for checking errors in CUDA API calls
+#define cudaErrorCheck(call)                                                              \
+do{                                                                                       \
+    cudaError_t cuErr = call;                                                             \
+    if(cudaSuccess != cuErr){                                                             \
+        printf("CUDA Error - %s:%d: '%s'\n", __FILE__, __LINE__, cudaGetErrorString(cuErr));\
+        exit(0);                                                                            \
+    }                                                                                     \
+} while(0)
+#endif
 
 #define NCCLCHECK(cmd) do {                         \
   ncclResult_t r = cmd;                             \

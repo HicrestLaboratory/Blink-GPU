@@ -89,8 +89,6 @@ int main(int argc, char *argv[])
 
     MPI_Comm nodeComm;
     int dev = assignDeviceToProcess(&nodeComm, &nnodes, &mynode);
-    cudaSetDevice(dev);
-
     // print device affiniy
 #ifndef SKIPCPUAFFINITY
     if (0==rank) printf("List device affinity:\n");

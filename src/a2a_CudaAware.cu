@@ -76,8 +76,6 @@ int main(int argc, char *argv[])
 
     MPI_Comm nodeComm;
     int dev = assignDeviceToProcess(&nodeComm, &nnodes, &mynode);
-    cudaSetDevice(dev);
-
     // print device affiniy
 #ifndef SKIPCPUAFFINITY
     if (0==rank) printf("List device affinity:\n");
@@ -143,6 +141,18 @@ int main(int argc, char *argv[])
         (j!=0) ? (N <<= 1) : (N = 1);
         if (rank == 0) {printf("%i#", j); fflush(stdout);}
 
+        size_t large_count = 0;
+        if(N >= 8 && N % 8 == 0){ // Check if I can use 64-bit data types
+            large_count = N / 8;
+            if (large_count >= ((u_int64_t) (1UL << 32)) - 1) { // If large_count can't be represented on 32 bits
+                if(rank == 0) printf("\tTransfer size (B): -1, Transfer Time (s): -1, Bandwidth (GB/s): -1, Iteration -1\n");
+            }
+        }else{
+            if (N >= ((u_int64_t) (1UL << 32)) - 1) { // If N can't be represented on 32 bits
+                if(rank == 0) printf("\tTransfer size (B): -1, Transfer Time (s): -1, Bandwidth (GB/s): -1, Iteration -1\n");
+            }
+        }
+
         // Allocate memory for A on CPU
         dtype *A, *B;
 #ifdef PINNED
@@ -184,7 +194,11 @@ int main(int argc, char *argv[])
             MPI_Barrier(MPI_COMM_WORLD);
             start_time = MPI_Wtime();
 
-            MPI_Alltoall(d_A, N, MPI_dtype, d_B, N, MPI_dtype, MPI_COMM_WORLD);
+            if(large_count){
+                MPI_Alltoall(d_A, large_count, MPI_dtype_big, d_B, large_count, MPI_dtype_big, MPI_COMM_WORLD);
+            }else{
+                MPI_Alltoall(d_A, N, MPI_dtype, d_B, N, MPI_dtype, MPI_COMM_WORLD);
+            }
 
             stop_time = MPI_Wtime();
             if (i>0) inner_elapsed_time[(j-fix_buff_size)*loop_count+i-1] = stop_time - start_time;

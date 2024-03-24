@@ -79,14 +79,8 @@ int main(int argc, char *argv[])
 //         exit(0);
 //     }
 
-    // Map MPI ranks to GPUs
-    int num_devices = 0;
-    cudaErrorCheck( cudaGetDeviceCount(&num_devices) );
-
     MPI_Comm nodeComm;
     int dev = assignDeviceToProcess(&nodeComm, &nnodes, &mynode);
-    cudaSetDevice(dev);
-
     // print device affiniy
 #ifndef SKIPCPUAFFINITY
     if (0==rank) printf("List device affinity:\n");
