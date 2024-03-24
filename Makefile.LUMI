@@ -1,0 +1,248 @@
+# ----------------- Path -----------------
+CUDA_HOME=/opt/rocm
+MPI_HOME=/opt/cray/pe/mpich/8.1.27/ofi/crayclang/14.0
+MPI_CUDA_HOME=
+NCCL_HOME=/project/project_465000997/EasyBuild/SW/LUMI-22.08/L/rccl/2.12.7-cpeGNU-22.08/
+# ---------------- Common ----------------
+LUMICC=CC -xhip 
+CC=/opt/rocm/bin/hipcc
+CFLAGS=-std=c++14 --offload-arch=gfx90a -O3 -DMICROBENCH_MAX_GPUS=8
+LIBS=
+INCL=
+LIBFLAGS=-DHIP -DOPEN_MPI -DPINNED -DMPI_SUPPORT 
+DBGFLAGS= #-g -G -fsanitize=address -fsanitize=undefined -fsanitize=float-divide-by-zero -fsanitize=float-cast-overflow -fno-sanitize-recover=all -fno-sanitize=alignment
+# ----------- Shared libraries -----------
+MPI=-L${MPI_HOME}/lib -I${MPI_HOME}/include -lmpi
+MPI_CUDA=
+CUDA=-I/opt/rocm/include -I/opt/rocm/include/hip -L/opt/rocm/lib -xhip
+NCCL=-L${NCCL_HOME}/lib -lrccl
+# ----------------------------------------
+
+
+# =====================================================================================
+
+# -------------- Experiment --------------
+NAME=pp
+ARNAME=ar
+A2ANAME=a2a
+A2AMNAME=a2am
+MPPNAME=mpp
+HALONAME=hlo
+AMPPNAME=ampp
+OTOMNAME=otom
+INCNAME=inc
+# --------------- Folders ----------------
+BINFOLDER=bin
+OUTFOLDER=out
+SOUTFOLDER=sout
+MODULEFOLDER=moduleload
+EXPORTFOLDER=exportload
+# ------------ Module loading ------------
+SHELL:=/bin/bash
+NCCL_MODULES="${MODULEFOLDER}/load_Nccl_modules.sh"
+NVLINK_MODULES="${MODULEFOLDER}/load_Nvlink_modules.sh"
+BASELINE_MODULES="${MODULEFOLDER}/load_Baseline_modules.sh"
+CUDA_AWARE_MODULES="${MODULEFOLDER}/load_CudaAware_modules.sh"
+# ------------ Export loading ------------
+NCCL_MN_EXPORTS="${EXPORTFOLDER}/load_Nccl_multinode_exports.sh"
+NCCL_SN_EXPORTS="${EXPORTFOLDER}/load_Nccl_singlenode_exports.sh"
+NVLINK_MN_EXPORTS="${EXPORTFOLDER}/load_Nvlink_multinode_exports.sh"
+NVLINK_SN_EXPORTS="${EXPORTFOLDER}/load_Nvlink_singlenode_exports.sh"
+BASELINE_MN_EXPORTS="${EXPORTFOLDER}/load_Baseline_multinode_exports.sh"
+BASELINE_SN_EXPORTS="${EXPORTFOLDER}/load_Baseline_singlenode_exports.sh"
+CUDA_AWARE_MN_EXPORTS="${EXPORTFOLDER}/load_CudaAware_multinode_exports.sh"
+CUDA_AWARE_SN_EXPORTS="${EXPORTFOLDER}/load_CudaAware_singlenode_exports.sh"
+# ----------------------------------------
+
+# =====================================================================================
+all: a2a ar mpp pp otom inc a2am
+pp: $(BINFOLDER)/$(NAME)_Baseline $(BINFOLDER)/$(NAME)_CudaAware $(BINFOLDER)/$(NAME)_Nccl $(BINFOLDER)/$(NAME)_Nvlink
+a2a: $(BINFOLDER)/$(A2ANAME)_Baseline $(BINFOLDER)/$(A2ANAME)_CudaAware $(BINFOLDER)/$(A2ANAME)_Nccl $(BINFOLDER)/$(A2ANAME)_Nvlink
+a2am: $(BINFOLDER)/$(A2AMNAME)_Nccl
+ar: $(BINFOLDER)/$(ARNAME)_Baseline $(BINFOLDER)/$(ARNAME)_CudaAware $(BINFOLDER)/$(ARNAME)_Nccl
+hlo: $(BINFOLDER)/$(HALONAME)_Baseline $(BINFOLDER)/$(HALONAME)_CudaAware $(BINFOLDER)/$(HALONAME)_Nccl
+mpp: $(BINFOLDER)/$(MPPNAME)_Baseline $(BINFOLDER)/$(MPPNAME)_CudaAware $(BINFOLDER)/$(MPPNAME)_Nccl # $(BINFOLDER)/$(MPPNAME)_Nvlink
+otom: $(BINFOLDER)/$(OTOMNAME)_Nccl $(BINFOLDER)/$(OTOMNAME)_Nvlink
+inc: $(BINFOLDER)/$(INCNAME)_Nccl
+ampp: $(BINFOLDER)/$(AMPPNAME)_CudaAware
+
+# --------------- Baseline ---------------
+$(BASELINE_MODULES):
+	mkdir -p ${MODULEFOLDER}
+	@echo "module purge" > $@
+	@echo "module load LUMI/23.09" >> $@
+	@echo "module load partition/G" >> $@
+	@echo "module load PrgEnv-cray" >> $@
+	@echo "module load craype-accel-amd-gfx90a" >> $@
+	@echo "module load rocm" >> $@
+	@echo "export HSA_ENABLE_SDMA=0" >> $@
+	@echo "unset NCCL_NET_GDR_LEVEL" >> $@
+	@echo "unset FI_CXI_ATS" >> $@
+	@echo "unset NCCL_BUFFSIZE" >> $@
+	@echo "unset MPICH_GPU_SUPPORT_ENABLED" >> $@
+
+$(BASELINE_SN_EXPORTS):
+	mkdir -p ${EXPORTFOLDER}
+	@echo "echo NO exports to load" > $@
+
+$(BASELINE_MN_EXPORTS):
+	mkdir -p ${EXPORTFOLDER}
+	@echo "echo NO exports to load" > $@
+
+$(BINFOLDER)/$(NAME)_Baseline: src/$(NAME)_Baseline.cpp $(BASELINE_MODULES) $(BASELINE_SN_EXPORTS) $(BASELINE_MN_EXPORTS)
+	mkdir -p $(BINFOLDER) $(OUTFOLDER) $(SOUTFOLDER)
+	source $(BASELINE_MODULES) && $(LUMICC) $(CFLAGS) -o $@ $< $(INCL) $(LIBS) $(LIBFLAGS) -lstdc++ -lm $(DBGFLAGS)
+
+$(BINFOLDER)/$(A2ANAME)_Baseline: src/$(A2ANAME)_Baseline.cpp $(BASELINE_MODULES) $(BASELINE_SN_EXPORTS) $(BASELINE_MN_EXPORTS)
+	mkdir -p $(BINFOLDER) $(OUTFOLDER) $(SOUTFOLDER)
+	source $(BASELINE_MODULES) && $(LUMICC) $(CFLAGS) -o $@ $< $(INCL) $(LIBS) $(LIBFLAGS) -lstdc++ -lm $(DBGFLAGS)
+
+$(BINFOLDER)/$(ARNAME)_Baseline: src/$(ARNAME)_Baseline.cpp $(BASELINE_MODULES) $(BASELINE_SN_EXPORTS) $(BASELINE_MN_EXPORTS)
+	mkdir -p $(BINFOLDER) $(OUTFOLDER) $(SOUTFOLDER)
+	source $(BASELINE_MODULES) && $(LUMICC) $(CFLAGS) -o $@ $< $(INCL) $(LIBS) $(LIBFLAGS) -lstdc++ -lm $(DBGFLAGS)
+
+$(BINFOLDER)/$(MPPNAME)_Baseline: src/$(MPPNAME)_Baseline.cpp $(BASELINE_MODULES) $(BASELINE_SN_EXPORTS) $(BASELINE_MN_EXPORTS)
+	mkdir -p $(BINFOLDER) $(OUTFOLDER) $(SOUTFOLDER)
+	source $(BASELINE_MODULES) && $(LUMICC) $(CFLAGS) -o $@ $< $(INCL) $(LIBS) $(LIBFLAGS) -lstdc++ -lm $(DBGFLAGS)
+# ----------------------------------------
+
+# -------------- CUDA aware --------------
+$(CUDA_AWARE_MODULES):
+	mkdir -p ${MODULEFOLDER}
+	@echo "module purge" > $@
+	@echo "module load LUMI/23.09" >> $@
+	@echo "module load partition/G" >> $@
+	@echo "module load PrgEnv-cray" >> $@
+	@echo "module load craype-accel-amd-gfx90a" >> $@
+	@echo "module load rocm" >> $@
+	@echo "export HSA_ENABLE_SDMA=0" >> $@
+	@echo "unset NCCL_NET_GDR_LEVEL" >> $@
+	@echo "unset FI_CXI_ATS" >> $@
+	@echo "unset NCCL_BUFFSIZE" >> $@
+	@echo "export MPICH_GPU_SUPPORT_ENABLED=1" >> $@
+
+$(CUDA_AWARE_SN_EXPORTS):
+	mkdir -p ${EXPORTFOLDER}
+	@echo "echo NO exports to load (already included in moduleload file)" > $@
+
+$(CUDA_AWARE_MN_EXPORTS):
+	mkdir -p ${EXPORTFOLDER}
+	@echo "echo NO exports to load (already included in moduleload file)" > $@
+
+$(BINFOLDER)/$(NAME)_CudaAware: src/$(NAME)_CudaAware.cpp $(CUDA_AWARE_MODULES) $(CUDA_AWARE_SN_EXPORTS) $(CUDA_AWARE_MN_EXPORTS)
+	mkdir -p $(BINFOLDER) $(OUTFOLDER) $(SOUTFOLDER)
+	source $(CUDA_AWARE_MODULES) && $(LUMICC) $(CFLAGS) -o $@ $< $(INCL) $(LIBS) $(LIBFLAGS) -lstdc++ -lm $(DBGFLAGS)
+
+$(BINFOLDER)/$(A2ANAME)_CudaAware: src/$(A2ANAME)_CudaAware.cpp $(CUDA_AWARE_MODULES) $(CUDA_AWARE_SN_EXPORTS) $(CUDA_AWARE_MN_EXPORTS)
+	mkdir -p $(BINFOLDER) $(OUTFOLDER) $(SOUTFOLDER)
+	source $(CUDA_AWARE_MODULES) && $(LUMICC) $(CFLAGS) -o $@ $< $(INCL) $(LIBS) $(LIBFLAGS) -lstdc++ -lm $(DBGFLAGS)
+
+$(BINFOLDER)/$(ARNAME)_CudaAware: src/$(ARNAME)_CudaAware.cpp $(CUDA_AWARE_MODULES) $(CUDA_AWARE_SN_EXPORTS) $(CUDA_AWARE_MN_EXPORTS)
+	mkdir -p $(BINFOLDER) $(OUTFOLDER) $(SOUTFOLDER)
+	source $(CUDA_AWARE_MODULES) && $(LUMICC) $(CFLAGS) -o $@ $< $(INCL) $(LIBS) $(LIBFLAGS) -lstdc++ -lm $(DBGFLAGS)
+
+$(BINFOLDER)/$(MPPNAME)_CudaAware: src/$(MPPNAME)_CudaAware.cpp $(CUDA_AWARE_MODULES) $(CUDA_AWARE_SN_EXPORTS) $(CUDA_AWARE_MN_EXPORTS)
+		mkdir -p $(BINFOLDER) $(OUTFOLDER) $(SOUTFOLDER)
+	source $(CUDA_AWARE_MODULES) && $(LUMICC) $(CFLAGS) -o $@ $< $(INCL) $(LIBS) $(LIBFLAGS) -lstdc++ -lm $(DBGFLAGS)
+# ----------------------------------------
+
+# ----------------- Nccl -----------------
+$(NCCL_MODULES):
+	mkdir -p ${MODULEFOLDER}
+	@echo "module purge" > $@
+	@echo "export EBU_USER_PREFIX=/project/project_465000997/EasyBuild" >> $@
+	@echo "module load LUMI/22.12" >> $@
+	@echo "module load partition/G" >> $@
+	@echo "module load aws-ofi-rccl" >> $@
+	@echo "module load craype-accel-amd-gfx90a" >> $@
+#	echo "module load rocm" >> $@
+	@echo "export HSA_ENABLE_SDMA=0" >> $@
+	@echo "export NCCL_NET_GDR_LEVEL=3" >> $@
+	@echo "export FI_CXI_ATS=0" >> $@
+	@echo "export NCCL_BUFFSIZE=33554432" >> $@
+	@echo "unset MPICH_GPU_SUPPORT_ENABLED" >> $@
+
+$(NCCL_SN_EXPORTS):
+	mkdir -p ${EXPORTFOLDER}
+	@echo "echo NO other exports to load (already included in moduleload file)" > $@
+
+$(NCCL_MN_EXPORTS):
+	mkdir -p ${EXPORTFOLDER}
+	@echo "echo NO other exports to load (already included in moduleload file)" > $@
+
+$(BINFOLDER)/$(NAME)_Nccl: src/$(NAME)_Nccl.cpp $(NCCL_MODULES) $(NCCL_SN_EXPORTS) $(NCCL_MN_EXPORTS)
+	mkdir -p $(BINFOLDER) $(OUTFOLDER) $(SOUTFOLDER)
+	source $(NCCL_MODULES) &&  $(CC) $(CFLAGS) -o $@ $< $(INCL) $(LIBS) $(LIBFLAGS) $(MPI) $(CUDA) $(NCCL) -lstdc++ -lm $(DBGFLAGS)
+
+$(BINFOLDER)/$(A2ANAME)_Nccl: src/$(A2ANAME)_Nccl.cpp $(NCCL_MODULES) $(NCCL_SN_EXPORTS) $(NCCL_MN_EXPORTS)
+	mkdir -p $(BINFOLDER) $(OUTFOLDER) $(SOUTFOLDER)
+	export HIPCC_COMPILE_FLAGS_APPEND="--offload-arch=gfx90a $(CC --cray-print-opts=cflags)"
+	export HIPCC_LINK_FLAGS_APPEND=$(CC --cray-print-opts=libs)
+	source $(NCCL_MODULES) && $(CC) $(CFLAGS) -o $@ $< $(INCL) $(LIBS) $(LIBFLAGS) $(MPI) $(CUDA) $(NCCL) -lstdc++ -lm $(DBGFLAGS)
+
+$(BINFOLDER)/$(A2AMNAME)_Nccl: src/$(A2AMNAME)_Nccl.cpp $(NCCL_MODULES) $(NCCL_SN_EXPORTS) $(NCCL_MN_EXPORTS)
+	mkdir -p $(BINFOLDER) $(OUTFOLDER) $(SOUTFOLDER)
+	export HIPCC_COMPILE_FLAGS_APPEND="--offload-arch=gfx90a $(CC --cray-print-opts=cflags)"
+	export HIPCC_LINK_FLAGS_APPEND=$(CC --cray-print-opts=libs)
+	source $(NCCL_MODULES) && $(CC) $(CFLAGS) -o $@ $< $(INCL) $(LIBS) $(LIBFLAGS) $(MPI) $(CUDA) $(NCCL) -lstdc++ -lm $(DBGFLAGS)
+
+$(BINFOLDER)/$(ARNAME)_Nccl: src/$(ARNAME)_Nccl.cpp $(NCCL_MODULES) $(NCCL_SN_EXPORTS) $(NCCL_MN_EXPORTS)
+	mkdir -p $(BINFOLDER) $(OUTFOLDER) $(SOUTFOLDER)
+	source $(NCCL_MODULES) && $(CC) $(CFLAGS) -o $@ $< $(INCL) $(LIBS) $(LIBFLAGS) $(MPI) $(CUDA) $(NCCL) -lstdc++ -lm $(DBGFLAGS)
+
+$(BINFOLDER)/$(MPPNAME)_Nccl: src/$(MPPNAME)_Nccl.cpp $(NCCL_MODULES) $(NCCL_SN_EXPORTS) $(NCCL_MN_EXPORTS)
+	mkdir -p $(BINFOLDER) $(OUTFOLDER) $(SOUTFOLDER)
+	source $(NCCL_MODULES) && $(CC) $(CFLAGS) -o $@ $< $(INCL) $(LIBS) $(LIBFLAGS) $(MPI) $(CUDA) $(NCCL) -lstdc++ -lm $(DBGFLAGS)
+
+$(BINFOLDER)/$(OTOMNAME)_Nccl: src/$(OTOMNAME)_Nccl.cpp $(NCCL_MODULES) $(NCCL_SN_EXPORTS) $(NCCL_MN_EXPORTS)
+	mkdir -p $(BINFOLDER) $(OUTFOLDER) $(SOUTFOLDER)
+	source $(NCCL_MODULES) && $(CC) $(CFLAGS) -o $@ $< $(INCL) $(LIBS) $(LIBFLAGS) $(MPI) $(CUDA) $(NCCL) -lstdc++ -lm $(DBGFLAGS)
+
+$(BINFOLDER)/$(INCNAME)_Nccl: src/$(INCNAME)_Nccl.cpp $(NCCL_MODULES) $(NCCL_SN_EXPORTS) $(NCCL_MN_EXPORTS)
+	mkdir -p $(BINFOLDER) $(OUTFOLDER) $(SOUTFOLDER)
+	source $(NCCL_MODULES) && $(CC) $(CFLAGS) -o $@ $< $(INCL) $(LIBS) $(LIBFLAGS) $(MPI) $(CUDA) $(NCCL) -lstdc++ -lm $(DBGFLAGS)
+# ----------------------------------------
+
+# ----------------- Nvlink -----------------
+$(NVLINK_MODULES):
+	mkdir -p ${MODULEFOLDER}
+	@echo "module purge" > $@
+	@echo "module load LUMI/23.09" >> $@
+	@echo "module load partition/G" >> $@
+	@echo "module load PrgEnv-cray" >> $@
+	@echo "module load craype-accel-amd-gfx90a" >> $@
+	@echo "module load rocm" >> $@
+	@echo "export HSA_ENABLE_SDMA=0" >> $@
+	@echo "unset NCCL_NET_GDR_LEVEL" >> $@
+	@echo "unset FI_CXI_ATS" >> $@
+	@echo "unset NCCL_BUFFSIZE" >> $@
+	@echo "unset MPICH_GPU_SUPPORT_ENABLED" >> $@
+
+$(NVLINK_SN_EXPORTS):
+	mkdir -p ${EXPORTFOLDER}
+	@echo "echo NO exports to load" > $@
+
+$(NVLINK_MN_EXPORTS):
+	mkdir -p ${EXPORTFOLDER}
+	@echo "echo NO exports to load" > $@
+
+$(BINFOLDER)/$(NAME)_Nvlink: src/$(NAME)_Nvlink.cpp $(NVLINK_MODULES) $(NVLINK_SN_EXPORTS) $(NVLINK_MN_EXPORTS)
+	mkdir -p $(BINFOLDER) $(OUTFOLDER) $(SOUTFOLDER)
+	source $(NVLINK_MODULES) && $(LUMICC) $(CFLAGS) -o $@ $< $(INCL) $(LIBS) $(LIBFLAGS) -lstdc++ -lm $(DBGFLAGS)
+
+$(BINFOLDER)/$(A2ANAME)_Nvlink: src/$(A2ANAME)_Nvlink.cpp $(NVLINK_MODULES) $(NVLINK_SN_EXPORTS) $(NVLINK_MN_EXPORTS)
+	mkdir -p $(BINFOLDER) $(OUTFOLDER) $(SOUTFOLDER)
+	source $(NVLINK_MODULES) && $(LUMICC) $(CFLAGS) -o $@ $< $(INCL) $(LIBS) $(LIBFLAGS) -lstdc++ -lm $(DBGFLAGS)
+
+$(BINFOLDER)/$(MPPNAME)_Nvlink: src/$(MPPNAME)_Nvlink.cpp $(NVLINK_MODULES) $(NVLINK_SN_EXPORTS) $(NVLINK_MN_EXPORTS)
+	mkdir -p $(BINFOLDER) $(OUTFOLDER) $(SOUTFOLDER)
+	source $(NVLINK_MODULES) && $(LUMICC) $(CFLAGS) -o $@ $< $(INCL) $(LIBS) $(LIBFLAGS) -lstdc++ -lm $(DBGFLAGS)
+
+$(BINFOLDER)/$(OTOMNAME)_Nvlink: src/$(OTOMNAME)_Nvlink.cpp $(NVLINK_MODULES) $(NVLINK_SN_EXPORTS) $(NVLINK_MN_EXPORTS)
+	mkdir -p $(BINFOLDER) $(OUTFOLDER) $(SOUTFOLDER)
+	source $(NVLINK_MODULES) && $(LUMICC) $(CFLAGS) -o $@ $< $(INCL) $(LIBS) $(LIBFLAGS) -lstdc++ -lm $(DBGFLAGS)
+
+# ----------------------------------------
+
+clean:
+	rm -r $(BINFOLDER)/* ${MODULEFOLDER}/* ${EXPORTFOLDER}/*

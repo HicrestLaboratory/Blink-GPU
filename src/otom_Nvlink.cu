@@ -25,6 +25,82 @@
 
 #define WARM_UP 5
 
+// ---------------------------------------
+void PICO_enable_peer_access(int myrank, int deviceCount, int mydev) {
+    // Pick all the devices that can access each other's memory for this test
+    // Keep in mind that CUDA has minimal support for fork() without a
+    // corresponding exec() in the child process, but in this case our
+    // spawnProcess will always exec, so no need to worry.
+    cudaDeviceProp prop;
+    int allPeers = 1, myIPC = 1, allIPC;
+    cudaErrorCheck(cudaGetDeviceProperties(&prop, mydev));
+
+    int* canAccesPeer = (int*) malloc(sizeof(int)*deviceCount*deviceCount);
+    for (int i = 0; i < deviceCount*deviceCount; i++) canAccesPeer[i] = 0;
+
+    // CUDA IPC is only supported on devices with unified addressing
+    if (!prop.unifiedAddressing) {
+      myIPC = 0;
+    } else {
+    }
+    // This sample requires two processes accessing each device, so we need
+    // to ensure exclusive or prohibited mode is not set
+    if (prop.computeMode != cudaComputeModeDefault) {
+      myIPC = 0;
+    }
+
+    MPI_Allreduce(&myIPC, &allIPC, 1, MPI_INT, MPI_MIN, MPI_COMM_WORLD);
+    if (!allIPC) {
+      exit(__LINE__);
+    }
+
+    if (myrank == 0) {
+      for (int i = 0; i < deviceCount; i++) {
+        for (int j = 0; j < deviceCount; j++) {
+          if (j != i) {
+            int canAccessPeerIJ, canAccessPeerJI;
+            cudaErrorCheck( cudaDeviceCanAccessPeer(&canAccessPeerJI, j, i) );
+            cudaErrorCheck( cudaDeviceCanAccessPeer(&canAccessPeerIJ, i, j) );
+
+            canAccesPeer[i * deviceCount + j] = (canAccessPeerIJ) ? 1 : 0;
+            canAccesPeer[j * deviceCount + i] = (canAccessPeerJI) ? 1 : 0;
+            if (!canAccessPeerIJ || !canAccessPeerJI) allPeers = 0;
+          } else {
+            canAccesPeer[i * deviceCount + j] = -1;
+          }
+        }
+      }
+    }
+
+    MPI_Barrier(MPI_COMM_WORLD);
+    MPI_Bcast(&allPeers, 1, MPI_INT, 0, MPI_COMM_WORLD);
+    MPI_Bcast(canAccesPeer, deviceCount*deviceCount, MPI_INT, 0, MPI_COMM_WORLD);
+
+    if (allPeers) {
+      // Enable peers here.  This isn't necessary for IPC, but it will
+      // setup the peers for the device.  For systems that only allow 8
+      // peers per GPU at a time, this acts to remove devices from CanAccessPeer
+      for (int j = 0; j < deviceCount; j++) {
+        if (j != mydev) {
+          cudaErrorCheck(cudaDeviceEnablePeerAccess(j, 0));
+        }
+      }
+    }
+
+    MPI_Barrier(MPI_COMM_WORLD);
+}
+
+void PICO_disable_peer_access(int deviceCount, int mydev){
+    MPI_Barrier(MPI_COMM_WORLD);
+    for (int j = 0; j < deviceCount; j++) {
+      if (j != mydev) {
+        cudaErrorCheck(cudaDeviceDisablePeerAccess(j));
+      }
+    }
+}
+
+// ----------------------------------------------------------------------------
+
 int main(int argc, char *argv[])
 {
     printf("Compile time check:\n");
@@ -125,9 +201,30 @@ int main(int argc, char *argv[])
     if (rank == 0) printf("buff_cycle: %d loop_count: %d max_j: %d\n", buff_cycle, loop_count, max_j);
     if (flag_x > 0 && rank == 0) printf("fix_buff_size is set as %d\n", fix_buff_size);
 
+    // Check if I am one of the destination ranks
+    // Read the GPUBENCH_OTOM_DEST environment variable (comma-separated string of ranks)    
+    char *dest_ranks_str = getenv("GPUBENCH_OTOM_DEST");
+    size_t num_destinations;
+    int* dest_ranks = (int*) malloc(size*sizeof(int));
+    if (dest_ranks_str != NULL) {
+        memset(dest_ranks, 0, size*sizeof(int));
+        num_destinations = 0;
+        char *token = strtok(dest_ranks_str, ",");
+        while (token != NULL) {
+            dest_ranks[atoi(token)] = 1;
+            ++num_destinations;
+	        token = strtok(NULL, ",");
+        }
+    }else{
+        memset(dest_ranks, 1, size*sizeof(int));
+        num_destinations = size - 1;
+    }
+
      /* -------------------------------------------------------------------------------------------
         Loop from 8 B to 1 GB
     --------------------------------------------------------------------------------------------*/
+
+    PICO_enable_peer_access(rank, num_devices, dev);
 
     SZTYPE N;
     if (fix_buff_size<=30) {
@@ -136,6 +233,12 @@ int main(int argc, char *argv[])
         N = 1 << 30;
         N <<= (fix_buff_size - 31);
     }
+
+    MPI_Status IPCstat;
+    dtype **peerBuffer = (dtype**) malloc(sizeof(dtype*)*size);
+    cudaEvent_t event;
+    cudaIpcMemHandle_t sendHandle;
+    cudaIpcMemHandle_t* recvHandle = (cudaIpcMemHandle_t*) malloc(sizeof(cudaIpcMemHandle_t)*size);
 
     double start_time, stop_time;
     int *error = (int*)malloc(sizeof(int)*buff_cycle);
@@ -152,31 +255,33 @@ int main(int argc, char *argv[])
         // Allocate memory for A on CPU
         dtype *A, *B;
 #ifdef PINNED
-        cudaHostAlloc(&A, N*sizeof(dtype), cudaHostAllocDefault);
-        cudaHostAlloc(&B, N*sizeof(dtype), cudaHostAllocDefault);
+        cudaHostAlloc(&A, size*N*sizeof(dtype), cudaHostAllocDefault);
+        cudaHostAlloc(&B, size*N*sizeof(dtype), cudaHostAllocDefault);
 #else
-        A = (dtype*)malloc(N*sizeof(dtype));
-        B = (dtype*)malloc(N*sizeof(dtype));
+        A = (dtype*)malloc(size*N*sizeof(dtype));
+        B = (dtype*)malloc(size*N*sizeof(dtype));
 #endif
-        cktype *my_cpu_check = (cktype*)malloc(sizeof(cktype));
+        cktype *my_cpu_check = (cktype*)malloc(sizeof(cktype)*size);
         cktype *recv_cpu_check = (cktype*)malloc(sizeof(cktype)*size), gpu_check = 0;
-        *my_cpu_check = 0U;
+        for (int i=0; i<size; i++)
+            my_cpu_check[i] = 0U;
 
         // Initialize all elements of A to 0.0
-        for(SZTYPE i=0; i<N; i++) {
+        for(SZTYPE i=0; i<N*size; i++) {
             A[i] = 1U * (rank+1);
+            B[i] = 0U;
         }
-        *B = 0U;
 
         dtype *d_B;
-        cudaErrorCheck( cudaMalloc(&d_B, N*sizeof(dtype)) );
-        cudaErrorCheck( cudaMemcpy(d_B, B, N*sizeof(dtype), cudaMemcpyHostToDevice) );
+        cudaErrorCheck( cudaMalloc(&d_B, size*N*sizeof(dtype)) );
+        cudaErrorCheck( cudaMemcpy(d_B, B, size*N*sizeof(dtype), cudaMemcpyHostToDevice) );
 
         dtype *d_A;
-        cudaErrorCheck( cudaMalloc(&d_A, N*sizeof(dtype)) );
-        cudaErrorCheck( cudaMemcpy(d_A, A, N*sizeof(dtype), cudaMemcpyHostToDevice) );
+        cudaErrorCheck( cudaMalloc(&d_A, size*N*sizeof(dtype)) );
+        cudaErrorCheck( cudaMemcpy(d_A, A, size*N*sizeof(dtype), cudaMemcpyHostToDevice) );
 
-        gpu_device_reduce_max(d_A, N, my_cpu_check);
+        for (int i=0; i<size; i++)
+            gpu_device_reduce(d_A + (i*N)*sizeof(dtype), N, &my_cpu_check[i]);
 
 
         /*
@@ -185,11 +290,33 @@ int main(int argc, char *argv[])
 
         */
 
+        // Generate IPC MemHandle
+        cudaErrorCheck( cudaIpcGetMemHandle((cudaIpcMemHandle_t*)&sendHandle, d_A) );
+
+        // Share IPC MemHandle
+        MPI_Allgather(&sendHandle, sizeof(cudaIpcMemHandle_t), MPI_BYTE, recvHandle, sizeof(cudaIpcMemHandle_t), MPI_BYTE, MPI_COMM_WORLD);
+
+        // Open MemHandles
+        for (int i=0; i<size; i++)
+            if (i != rank)
+                cudaErrorCheck( cudaIpcOpenMemHandle((void**)&peerBuffer[i], recvHandle[i], cudaIpcMemLazyEnablePeerAccess) );
+            else
+                peerBuffer[i] = d_A; // NOTE this is the self send case
+
         for(int i=1-(WARM_UP); i<=loop_count; i++){
             MPI_Barrier(MPI_COMM_WORLD);
             start_time = MPI_Wtime();
 
-            MPI_Allreduce(d_A, d_B, N, MPI_dtype, MPI_MAX, MPI_COMM_WORLD);
+            // Assume the root of the otom is rank 0
+            if(rank == 0){
+                for (int r=1; r<size; r++){
+                    if(dest_ranks[r]){
+                        cudaErrorCheck( cudaMemcpy(d_B + (r*N)*sizeof(dtype), peerBuffer[r] + (r*N)*sizeof(dtype), sizeof(dtype)*N, cudaMemcpyDeviceToDevice) );
+                    }
+                }
+            }
+                
+            cudaErrorCheck( cudaDeviceSynchronize() );
 
             stop_time = MPI_Wtime();
             if (i>0) inner_elapsed_time[(j-fix_buff_size)*loop_count+i-1] = stop_time - start_time;
@@ -199,14 +326,21 @@ int main(int argc, char *argv[])
         if (rank == 0) {printf("#\n"); fflush(stdout);}
 
 
+        // Close MemHandle
+        for (int i=0; i<size; i++)
+            if (i != rank)
+                cudaErrorCheck( cudaIpcCloseMemHandle(peerBuffer[i]) );
 
-        gpu_device_reduce_max(d_B, N, &gpu_check);
-        MPI_Allgather(my_cpu_check, 1, MPI_cktype, recv_cpu_check, 1, MPI_cktype, MPI_COMM_WORLD);
+
+
+
+        gpu_device_reduce(d_B, size*N, &gpu_check);
+        MPI_Alltoall(my_cpu_check, 1, MPI_cktype, recv_cpu_check, 1, MPI_cktype, MPI_COMM_WORLD);
 
         cpu_checks[j] = 0;
         gpu_checks[j] = gpu_check;
         for (int i=0; i<size; i++)
-            if (cpu_checks[j] < recv_cpu_check[i]) cpu_checks[j] = recv_cpu_check[i];
+            cpu_checks[j] += recv_cpu_check[i];
         my_error[j] = abs(gpu_checks[j] - cpu_checks[j]);
 
         cudaErrorCheck( cudaFree(d_A) );
@@ -237,14 +371,14 @@ int main(int argc, char *argv[])
         SZTYPE num_B, int_num_GB;
         double num_GB;
 
-        num_B = sizeof(dtype)*N*((size-1)/(float)size)*2;
+        num_B = sizeof(dtype)*N*num_destinations;
         // TODO: maybe we can avoid if and just divide always by B_in_GB
         if (j < 31) {
             SZTYPE B_in_GB = 1 << 30;
             num_GB = (double)num_B / (double)B_in_GB;
         } else {
             SZTYPE M = 1 << (j - 30);            
-            num_GB = sizeof(dtype)*M*((size-1)/(float)size)*2;
+            num_GB = sizeof(dtype)*M*num_destinations;
         }
 
         double avg_time_per_transfer = 0.0;
@@ -275,12 +409,16 @@ int main(int argc, char *argv[])
     printf("%s", s);
     fflush(stdout);
 
+    PICO_disable_peer_access(num_devices, dev);
+
     free(error);
     free(my_error);
     free(cpu_checks);
     free(gpu_checks);
     free(elapsed_time);
     free(inner_elapsed_time);
+    free(recvHandle);
+    free(peerBuffer);
     MPI_Finalize();
     return(0);
 }

@@ -88,16 +88,13 @@ int main(int argc, char *argv[])
     cudaErrorCheck( cudaGetDeviceCount(&num_devices) );
 
     MPI_Comm nodeComm;
-#ifndef NO_SET_DEVICE
     int dev = assignDeviceToProcess(&nodeComm, &nnodes, &mynode);
-    cudaSetDevice(dev);
     // print device affiniy
 #ifndef SKIPCPUAFFINITY
     if (0==rank) printf("List device affinity:\n");
     check_cpu_and_gpu_affinity(dev);
     if (0==rank) printf("List device affinity done.\n\n");
     MPI_Barrier(MPI_COMM_WORLD);
-#endif
 #endif
 
     int mynodeid = -1, mynodesize = -1;
@@ -173,10 +170,11 @@ int main(int argc, char *argv[])
     // Check if I am one of the destination ranks
     // Read the GPUBENCH_OTOM_DEST environment variable (comma-separated string of ranks)    
     char *dest_ranks_str = getenv("GPUBENCH_OTOM_DEST");
-    size_t num_destinations = 0;
+    size_t num_destinations;
     int* dest_ranks = (int*) malloc(size*sizeof(int));
-    memset(dest_ranks, 1, size*sizeof(int));
     if (dest_ranks_str != NULL) {
+        memset(dest_ranks, 0, size*sizeof(int));
+        num_destinations = 0;
         char *token = strtok(dest_ranks_str, ",");
         while (token != NULL) {
             dest_ranks[atoi(token)] = 1;
@@ -184,6 +182,7 @@ int main(int argc, char *argv[])
 	        token = strtok(NULL, ",");
         }
     }else{
+        memset(dest_ranks, 1, size*sizeof(int));
         num_destinations = size - 1;
     }
 

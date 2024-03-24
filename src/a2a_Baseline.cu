@@ -76,9 +76,7 @@ int main(int argc, char *argv[])
 
     MPI_Comm nodeComm;
 
-#ifndef NO_SET_DEVICE
     int dev = assignDeviceToProcess(&nodeComm, &nnodes, &mynode);
-    cudaSetDevice(dev);
     // print device affiniy
 #ifndef SKIPCPUAFFINITY
     if (0==rank) printf("List device affinity:\n");
@@ -86,9 +84,6 @@ int main(int argc, char *argv[])
     if (0==rank) printf("List device affinity done.\n\n");
     MPI_Barrier(MPI_COMM_WORLD);
 #endif
-#endif
-
-
 
     int mynodeid = -1, mynodesize = -1;
     MPI_Comm_rank(nodeComm, &mynodeid);

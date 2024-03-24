@@ -5,8 +5,14 @@
 #include <unistd.h>
 #include "mpi.h"
 
+#ifdef HIP
+#include <stdlib.h>
+#include <vector>
+#include <sstream>
+#endif
+
 // GPU assgined for LUMI
-int GPU_ASSIGN_SEQUENCE[8] = {5, 3, 1, 7, 4, 2, 0, 6};
+int GPU_ASSIGN_SEQUENCE[8] = {5, 3, 7, 1, 4, 2, 6, 0};
 
 static int stringCmp( const void *a, const void *b) {
      return strcmp((const char*)a,(const char*)b);
@@ -70,19 +76,55 @@ int  assignDeviceToProcess(MPI_Comm *nodeComm, int *nnodes, int *mynodeid)
 
 #else
      //*myrank = 0;
+     cudaSetDevice(0);
      return 0;
 #endif
 
-      printf ("Assigning device %d  to process on node %s rank %d\n", myrank, host_name, rank);
-      /* Assign device to MPI process, initialize BLAS and probe device properties */
-      //cudaSetDevice(*myrank);
 
 #ifdef HIP
       // The mapping is hard-coded in the code for LUMI, the 4GCDs connnected to the network 
       // are assigned first, then the 4 GCDs not connected to the network are assgined. The sequence
       // is the same as NUMA sequence.
-      myrank = GPU_ASSIGN_SEQUENCE[myrank];
+
+      // we first check if the GPU senquence is defined
+      const char * GPU_ENV_NAME = "USER_HIP_GPU_MAP";
+      const char * gpu_env = getenv(GPU_ENV_NAME);
+
+      if (NULL != gpu_env) {
+	  // scan GPU id, I will just use the c++ function
+	  std::string gpu_env_s = gpu_env;
+	  std::vector<std::string> v;	      
+	  std::stringstream ss(gpu_env_s);
+
+	  while(ss.good()) {
+	      std::string substr;
+	      std::getline(ss, substr, ',');
+	      v.push_back(substr);
+	  }
+	  if (v.size() != gpu_per_node){
+	    //error
+	    ;
+	  }
+	  myrank = std::stoi(v[myrank]);
+      } 
+#endif
+      printf ("Assigning device %d  to process on node %s rank %d\n", myrank, host_name, rank);
+      /* Assign device to MPI process, initialize BLAS and probe device properties */
+      
+#ifdef HIP
+      if(getenv("ROCR_VISIBLE_DEVICES") == NULL){
+            hipSetDevice(myrank);      
+      }else{
+            myrank = atoi(getenv("ROCR_VISIBLE_DEVICES"));
+            assert(myrank == atoi(getenv("SLURM_LOCALID")));
+      }
 #else
+      if(getenv("CUDA_VISIBLE_DEVICES") == NULL){
+            cudaSetDevice(myrank);           
+      }else{
+            myrank = atoi(getenv("CUDA_VISIBLE_DEVICES"));
+            assert(myrank == atoi(getenv("SLURM_LOCALID")));
+      }
 #endif
       return myrank;
 }

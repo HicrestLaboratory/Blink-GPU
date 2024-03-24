@@ -1,3 +1,8 @@
+'''
+Notes:
+    - machine name should not contain underscores (otherwise `unpack` fails)
+'''
+
 import os
 import re
 import pandas as pd
@@ -32,9 +37,12 @@ def extract_data(file_path):
 
 lable_colors = { 'Baseline': 'blue', 'CudaAware': 'red', 'Nccl': 'green', 'Nvlink': 'gray', 'Aggregated': 'orange'}
 
-lable_machines = { 'leonardo': 'Leonardo', 'marzola': 'Marzola'}
-lable_topologyes = { 'singlenode': 'Single-node', 'multinode': 'Multi-nodes'}
-lable_experiments = { '-pp-': 'Ping-pong', '-a2a-': 'AllToAll', '-ar-': 'AllReduce', '-hlo-': 'Halo', '-mpp-': 'Multi-Ping-Pong'}
+# lable_machines = { 'leonardo': 'Leonardo', 'marzola': 'Marzola'}
+lable_machines = { 'lumi': 'LUMI'}
+# label_topologies = { 'singlenode': 'Single-node', 'multinode': 'Multi-nodes'}
+label_topologies = { '2_4': 'Two-nodes(4-GPUs-each)'}
+# lable_experiments = { '-pp-': 'Ping-pong', '-a2a-': 'AllToAll', '-ar-': 'AllReduce', '-hlo-': 'Halo', '-mpp-': 'Multi-Ping-Pong'}
+lable_experiments = { '-a2a-': 'AllToAll', '-ar-': 'AllReduce'}
 
 # Function to plot performance comparison
 def plot_performance(file_paths):
@@ -105,9 +113,9 @@ def plot_performance(file_paths):
                     if k in key:
                         m = lable_machines[k]
                 #t = 'SingleNode' if 'singlenode' in key else 'MultiNode'
-                for k in lable_topologyes:
+                for k in label_topologies:
                     if k in key:
-                        t = lable_topologyes[k]
+                        t = label_topologies[k]
 
                 if m == 'Leonardo':
                     if t == 'Single-node':
@@ -121,6 +129,16 @@ def plot_performance(file_paths):
                         #if e == 'Multi-Ping-Pong':
                         else:
                             peak = 50 # NOTE we suppose to use 4 p2p couples !!!!
+                elif m == 'LUMI':
+                    # TODO: fix this
+                    if t == "2-4":
+                        peak = 25 # TODO: should we divide by two?
+                    else:
+                        raise RuntimeError(f"Topology {t} unknown")
+
+                else:
+                    raise RuntimeError(f"Machine {m} unknown")
+
                 print("[m, t, e] = [%s, %s, %s] ---> peak = %d" % (m, t, e, peak))
                 plt.axhline(y=peak, color='red', linestyle='--', label='Theoretical peak (%s GB/s)' % peak)
 

@@ -160,16 +160,13 @@ int main(int argc, char *argv[])
     cudaErrorCheck( cudaGetDeviceCount(&num_devices) );
 
     MPI_Comm nodeComm;
-#ifndef NO_SET_DEVICE
     int dev = assignDeviceToProcess(&nodeComm, &nnodes, &mynode);
-    cudaSetDevice(dev);
     // print device affiniy
 #ifndef SKIPCPUAFFINITY
     if (0==rank) printf("List device affinity:\n");
     check_cpu_and_gpu_affinity(dev);
     if (0==rank) printf("List device affinity done.\n\n");
     MPI_Barrier(MPI_COMM_WORLD);
-#endif
 #endif
 
     int mynodeid = -1, mynodesize = -1;
@@ -219,11 +216,12 @@ int main(int argc, char *argv[])
     }
 
     MPI_Status IPCstat;
-    dtype *peerBuffer[size];
+    dtype **peerBuffer = (dtype**) malloc(sizeof(dtype*)*size);
     cudaEvent_t event;
-    cudaIpcMemHandle_t sendHandle, recvHandle[size];
+    cudaIpcMemHandle_t sendHandle;
+    cudaIpcMemHandle_t* recvHandle = (cudaIpcMemHandle_t*) malloc(sizeof(cudaIpcMemHandle_t)*size);
 
-    cudaStream_t Streams[MAX_GPUS];
+    cudaStream_t Streams[MICROBENCH_MAX_GPUS];
     double start_time, stop_time;
     int *error = (int*)malloc(sizeof(int)*buff_cycle);
     int *my_error = (int*)malloc(sizeof(int)*buff_cycle);
@@ -278,17 +276,17 @@ int main(int argc, char *argv[])
         cudaErrorCheck( cudaIpcGetMemHandle((cudaIpcMemHandle_t*)&sendHandle, d_B) );
 
         // Share IPC MemHandle
-        MPI_Allgather(&sendHandle, sizeof(cudaIpcMemHandle_t), MPI_BYTE, &recvHandle, sizeof(cudaIpcMemHandle_t), MPI_BYTE, MPI_COMM_WORLD);
+        MPI_Allgather(&sendHandle, sizeof(cudaIpcMemHandle_t), MPI_BYTE, recvHandle, sizeof(cudaIpcMemHandle_t), MPI_BYTE, MPI_COMM_WORLD);
 
         // Open MemHandles
         for (int i=0; i<size; i++)
             if (i != rank)
-                cudaErrorCheck( cudaIpcOpenMemHandle((void**)&peerBuffer[i], *(cudaIpcMemHandle_t*)&recvHandle[i], cudaIpcMemLazyEnablePeerAccess) );
+                cudaErrorCheck( cudaIpcOpenMemHandle((void**)&peerBuffer[i], recvHandle[i], cudaIpcMemLazyEnablePeerAccess) );
             else
                 peerBuffer[i] = d_B; // NOTE this is the self send case
 
         for(int i=1-(WARM_UP); i<=loop_count; i++){
-            for (int k=0; k<MAX_GPUS; k++) cudaErrorCheck(cudaStreamCreate(&Streams[k]));
+            for (int k=0; k<MICROBENCH_MAX_GPUS; k++) cudaErrorCheck(cudaStreamCreate(&Streams[k]));
 
             MPI_Barrier(MPI_COMM_WORLD);
             start_time = MPI_Wtime();
@@ -303,7 +301,7 @@ int main(int argc, char *argv[])
 
             if (rank == 0) {printf("%%"); fflush(stdout);}
 
-            for (int k=0; k<MAX_GPUS; k++) cudaErrorCheck(cudaStreamDestroy(Streams[k]));
+            for (int k=0; k<MICROBENCH_MAX_GPUS; k++) cudaErrorCheck(cudaStreamDestroy(Streams[k]));
         }
         if (rank == 0) {printf("#\n"); fflush(stdout);}
 
@@ -399,6 +397,8 @@ int main(int argc, char *argv[])
     free(gpu_checks);
     free(elapsed_time);
     free(inner_elapsed_time);
+    free(recvHandle);
+    free(peerBuffer);
     MPI_Finalize();
     return(0);
 }

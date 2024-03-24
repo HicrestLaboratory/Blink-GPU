@@ -158,19 +158,15 @@ int main(int argc, char *argv[])
     // Map MPI ranks to GPUs
     int num_devices = 0;
     cudaErrorCheck( cudaGetDeviceCount(&num_devices) );
-//     cudaErrorCheck( cudaSetDevice(rank % num_devices) );
 
     MPI_Comm nodeComm;
-#ifndef NO_SET_DEVICE
     int dev = assignDeviceToProcess(&nodeComm, &nnodes, &mynode);
-    cudaSetDevice(dev);
     // print device affiniy
 #ifndef SKIPCPUAFFINITY
     if (0==rank) printf("List device affinity:\n");
     check_cpu_and_gpu_affinity(dev);
     if (0==rank) printf("List device affinity done.\n\n");
     MPI_Barrier(MPI_COMM_WORLD);
-#endif
 #endif
 
     int mynodeid = -1, mynodesize = -1;
@@ -179,7 +175,7 @@ int main(int argc, char *argv[])
 
     // Check that all the nodes has the same size
     int nodesize;
-    MPI_Allreduce(&mynodesize, &nodesize, sizeof(int), MPI_INT, MPI_MAX, MPI_COMM_WORLD);
+    MPI_Allreduce(&mynodesize, &nodesize, 1, MPI_INT, MPI_MAX, MPI_COMM_WORLD);
     if (nodesize != mynodesize) {
         fprintf(stderr, "Error at node %d: mynodesize (%d) does not metch with nodesize (%d)\n", rank, mynodesize, nodesize);
         fflush(stderr);

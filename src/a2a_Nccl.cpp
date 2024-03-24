@@ -1,7 +1,9 @@
 #include <stdio.h>
 #include "mpi.h"
-#include "cuda.h"
-#include <cuda_runtime.h>
+
+#include <rccl.h>
+
+#include <hip/hip_runtime.h>
 #include <string.h>
 #include <unistd.h>
 #include <inttypes.h>
@@ -16,8 +18,8 @@
 #include "../include/prints.h"
 
 #ifdef MPIX_CUDA_AWARE_SUPPORT
-/* Needed for MPIX_Query_cuda_support(), below */
-#include "mpi-ext.h"
+/* Needed for MPIX_Query_hip_support(), below */
+
 #endif
 
 #define BUFF_CYCLE 28
@@ -38,7 +40,7 @@ int main(int argc, char *argv[])
 
     printf("Run time check:n");
 #if defined(MPIX_CUDA_AWARE_SUPPORT)
-    if (1 == MPIX_Query_cuda_support()) {
+    if (1 == MPIX_Query_hip_support()) {
         printf("This MPI library has CUDA-aware support.\n");
     } else {
         printf("This MPI library does not have CUDA-aware support.\n");
@@ -81,7 +83,7 @@ int main(int argc, char *argv[])
 
     // Map MPI ranks to GPUs
     int num_devices = 0;
-    cudaErrorCheck( cudaGetDeviceCount(&num_devices) );
+    hipErrorCheck( hipGetDeviceCount(&num_devices) );
 
     MPI_Comm nodeComm;
     int dev = assignDeviceToProcess(&nodeComm, &nnodes, &mynode);
@@ -110,6 +112,7 @@ int main(int argc, char *argv[])
     int loop_count = LOOP_COUNT;
     int buff_cycle = BUFF_CYCLE;
     int fix_buff_size = 0;
+    int endless = 0;
 
     // Parse command-line options
     read_line_parameters(argc, argv, rank,
@@ -124,6 +127,54 @@ int main(int argc, char *argv[])
     max_j = (flag_x == 0) ? buff_cycle : (fix_buff_size + 1) ;
     if (rank == 0) printf("buff_cycle: %d loop_count: %d max_j: %d\n", buff_cycle, loop_count, max_j);
     if (flag_x > 0 && rank == 0) printf("fix_buff_size is set as %d\n", fix_buff_size);
+    // In endless mode we can run only at a fixed buffer size, quick hack
+    if (loop_count == 0){
+        assert(flag_x); 
+        assert(LOOP_COUNT > 2);
+        endless = 1;
+        loop_count = LOOP_COUNT;
+    } 
+
+
+    /* -------------------------------------------------------------------------------------------
+        NCCL Initialization
+    --------------------------------------------------------------------------------------------*/
+    ncclUniqueId Id;
+    ncclComm_t NCCL_COMM_WORLD, NCCL_COMM_NODE;
+
+    ncclGroupStart();
+    if (mynodeid == 0) { NCCLCHECK( ncclGetUniqueId(&Id) ); }
+    MPI_Bcast(&Id, sizeof(ncclUniqueId), MPI_BYTE, 0, nodeComm);
+    NCCLCHECK( ncclCommInitRank(&NCCL_COMM_NODE, mynodesize, Id, mynodeid) );
+    ncclGroupEnd();
+    MPI_Barrier(MPI_COMM_WORLD);
+
+    ncclGroupStart();
+    if (rank == 0) { NCCLCHECK( ncclGetUniqueId(&Id) ); }
+    MPI_Bcast(&Id, sizeof(ncclUniqueId), MPI_BYTE, 0, MPI_COMM_WORLD);
+    NCCLCHECK( ncclCommInitRank(&NCCL_COMM_WORLD, size, Id, rank) );
+    ncclGroupEnd();
+
+    int nccl_w_rk;
+    int nccl_w_sz;
+    ncclGroupStart();
+    NCCLCHECK( ncclCommCount(NCCL_COMM_WORLD, &nccl_w_sz)   );
+    NCCLCHECK( ncclCommUserRank(NCCL_COMM_WORLD, &nccl_w_rk) );
+    ncclGroupEnd();
+
+    int nccl_n_rk;
+    int nccl_n_sz;
+    ncclGroupStart();
+    NCCLCHECK( ncclCommCount(NCCL_COMM_NODE, &nccl_n_sz)   );
+    NCCLCHECK( ncclCommUserRank(NCCL_COMM_NODE, &nccl_n_rk) );
+    ncclGroupEnd();
+
+    printf("[%d] NCCL_COMM_WORLD: nccl size = %d, nccl rank = %d\n", rank, nccl_w_sz, nccl_w_rk);
+    printf("[%d] NCCL_COMM_NODE:  nccl size = %d, nccl rank = %d\n", rank, nccl_n_sz, nccl_n_rk);
+    fflush(stdout);
+
+    MPI_Barrier(MPI_COMM_WORLD);
+
 
      /* -------------------------------------------------------------------------------------------
         Loop from 8 B to 1 GB
@@ -137,13 +188,13 @@ int main(int argc, char *argv[])
         N <<= (fix_buff_size - 31);
     }
 
-    double start_time, stop_time;
+    float start_time, stop_time;
     int *error = (int*)malloc(sizeof(int)*buff_cycle);
     int *my_error = (int*)malloc(sizeof(int)*buff_cycle);
     cktype *cpu_checks = (cktype*)malloc(sizeof(cktype)*buff_cycle);
     cktype *gpu_checks = (cktype*)malloc(sizeof(cktype)*buff_cycle);
-    double *elapsed_time = (double*)malloc(sizeof(double)*buff_cycle*loop_count);
-    double *inner_elapsed_time = (double*)malloc(sizeof(double)*buff_cycle*loop_count);
+    float *elapsed_time = (float*)malloc(sizeof(float)*buff_cycle*loop_count);
+    float *inner_elapsed_time = (float*)malloc(sizeof(float)*buff_cycle*loop_count);
     for(int j=fix_buff_size; j<max_j; j++){
 
         (j!=0) ? (N <<= 1) : (N = 1);
@@ -152,31 +203,33 @@ int main(int argc, char *argv[])
         // Allocate memory for A on CPU
         dtype *A, *B;
 #ifdef PINNED
-        cudaHostAlloc(&A, N*sizeof(dtype), cudaHostAllocDefault);
-        cudaHostAlloc(&B, N*sizeof(dtype), cudaHostAllocDefault);
+        hipHostMalloc((void **)&A, size*N*sizeof(dtype), hipHostMallocDefault);
+        hipHostMalloc((void **)&B, size*N*sizeof(dtype), hipHostMallocDefault);
 #else
-        A = (dtype*)malloc(N*sizeof(dtype));
-        B = (dtype*)malloc(N*sizeof(dtype));
+        A = (dtype*)malloc(size*N*sizeof(dtype));
+        B = (dtype*)malloc(size*N*sizeof(dtype));
 #endif
-        cktype *my_cpu_check = (cktype*)malloc(sizeof(cktype));
+        cktype *my_cpu_check = (cktype*)malloc(sizeof(cktype)*size);
         cktype *recv_cpu_check = (cktype*)malloc(sizeof(cktype)*size), gpu_check = 0;
-        *my_cpu_check = 0U;
+        for (int i=0; i<size; i++)
+            my_cpu_check[i] = 0U;
 
         // Initialize all elements of A to 0.0
-        for(SZTYPE i=0; i<N; i++) {
+        for(SZTYPE i=0; i<N*size; i++) {
             A[i] = 1U * (rank+1);
+            B[i] = 0U;
         }
-        *B = 0U;
 
         dtype *d_B;
-        cudaErrorCheck( cudaMalloc(&d_B, N*sizeof(dtype)) );
-        cudaErrorCheck( cudaMemcpy(d_B, B, N*sizeof(dtype), cudaMemcpyHostToDevice) );
+        hipErrorCheck( hipMalloc(&d_B, size*N*sizeof(dtype)) );
+        hipErrorCheck( hipMemcpy(d_B, B, size*N*sizeof(dtype), hipMemcpyHostToDevice) );
 
         dtype *d_A;
-        cudaErrorCheck( cudaMalloc(&d_A, N*sizeof(dtype)) );
-        cudaErrorCheck( cudaMemcpy(d_A, A, N*sizeof(dtype), cudaMemcpyHostToDevice) );
+        hipErrorCheck( hipMalloc(&d_A, size*N*sizeof(dtype)) );
+        hipErrorCheck( hipMemcpy(d_A, A, size*N*sizeof(dtype), hipMemcpyHostToDevice) );
 
-        gpu_device_reduce_max(d_A, N, my_cpu_check);
+        for (int i=0; i<size; i++)
+            gpu_device_reduce(d_A + (i*N)*sizeof(dtype), N, &my_cpu_check[i]);
 
 
         /*
@@ -184,38 +237,47 @@ int main(int argc, char *argv[])
         Implemetantion goes here
 
         */
+        hipEvent_t start, stop;
+        hipErrorCheck(hipEventCreate(&start));
+        hipErrorCheck(hipEventCreate(&stop));
 
         for(int i=1-(WARM_UP); i<=loop_count; i++){
+            // Quick hack for endless mode
+            if(endless){i = 1;}
+            
             MPI_Barrier(MPI_COMM_WORLD);
-            start_time = MPI_Wtime();
+            hipErrorCheck(hipEventRecord(start, NULL));
 
-            MPI_Allreduce(d_A, d_B, N, MPI_dtype, MPI_MAX, MPI_COMM_WORLD);
+            ncclAllToAll(d_A, d_B, N, ncclDtype, NCCL_COMM_WORLD, NULL);
 
-            stop_time = MPI_Wtime();
-            if (i>0) inner_elapsed_time[(j-fix_buff_size)*loop_count+i-1] = stop_time - start_time;
 
-            if (rank == 0) {printf("%%"); fflush(stdout);}
+            hipErrorCheck(hipEventRecord(stop, NULL));
+            hipErrorCheck(hipEventSynchronize(stop));
+            if (i>0) {hipErrorCheck(hipEventElapsedTime(&(inner_elapsed_time[(j-fix_buff_size)*loop_count+i-1]), start, stop));}
+
+            if (rank == 0 && !endless) {printf("%%"); fflush(stdout);}
         }
         if (rank == 0) {printf("#\n"); fflush(stdout);}
 
 
 
-        gpu_device_reduce_max(d_B, N, &gpu_check);
-        MPI_Allgather(my_cpu_check, 1, MPI_cktype, recv_cpu_check, 1, MPI_cktype, MPI_COMM_WORLD);
+
+        gpu_device_reduce(d_B, size*N, &gpu_check);
+        MPI_Alltoall(my_cpu_check, 1, MPI_cktype, recv_cpu_check, 1, MPI_cktype, MPI_COMM_WORLD);
 
         cpu_checks[j] = 0;
         gpu_checks[j] = gpu_check;
         for (int i=0; i<size; i++)
-            if (cpu_checks[j] < recv_cpu_check[i]) cpu_checks[j] = recv_cpu_check[i];
+            cpu_checks[j] += recv_cpu_check[i];
         my_error[j] = abs(gpu_checks[j] - cpu_checks[j]);
 
-        cudaErrorCheck( cudaFree(d_A) );
-        cudaErrorCheck( cudaFree(d_B) );
+        hipErrorCheck( hipFree(d_A) );
+        hipErrorCheck( hipFree(d_B) );
         free(recv_cpu_check);
         free(my_cpu_check);
 #ifdef PINNED
-        cudaFreeHost(A);
-        cudaFreeHost(B);
+        hipFreeHost(A);
+        hipFreeHost(B);
 #else
         free(A);
         free(B);
@@ -230,25 +292,26 @@ int main(int argc, char *argv[])
     }
 
     MPI_Allreduce(my_error, error, buff_cycle, MPI_INT, MPI_MAX, MPI_COMM_WORLD);
-    MPI_Allreduce(inner_elapsed_time, elapsed_time, buff_cycle*loop_count, MPI_DOUBLE, MPI_MAX, MPI_COMM_WORLD);
+    MPI_Allreduce(inner_elapsed_time, elapsed_time, buff_cycle*loop_count, MPI_FLOAT, MPI_MAX, MPI_COMM_WORLD);
     for(int j=fix_buff_size; j<max_j; j++) {
         (j!=0) ? (N <<= 1) : (N = 1);
 
         SZTYPE num_B, int_num_GB;
         double num_GB;
 
-        num_B = sizeof(dtype)*N*((size-1)/(float)size)*2;
+        num_B = sizeof(dtype)*N*(size-1);
         // TODO: maybe we can avoid if and just divide always by B_in_GB
         if (j < 31) {
             SZTYPE B_in_GB = 1 << 30;
             num_GB = (double)num_B / (double)B_in_GB;
         } else {
             SZTYPE M = 1 << (j - 30);            
-            num_GB = sizeof(dtype)*M*((size-1)/(float)size)*2;
+            num_GB = sizeof(dtype)*M*(size-1);
         }
 
         double avg_time_per_transfer = 0.0;
         for (int i=0; i<loop_count; i++) {
+            elapsed_time[(j-fix_buff_size)*loop_count+i] *= 0.001;
             avg_time_per_transfer += elapsed_time[(j-fix_buff_size)*loop_count+i];
             if(rank == 0) printf("\tTransfer size (B): %10" PRIu64 ", Transfer Time (s): %15.9f, Bandwidth (GB/s): %15.9f, Iteration %d\n", num_B, elapsed_time[(j-fix_buff_size)*loop_count+i], num_GB/elapsed_time[(j-fix_buff_size)*loop_count+i], i);
         }

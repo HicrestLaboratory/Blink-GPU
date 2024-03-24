@@ -1,0 +1,14 @@
+sbatch sbatch-lumi-intranode/run-lumi-concurrent-hipmemcpy-dis-dma-0-1-2.sh
+sbatch sbatch-lumi-intranode/run-lumi-concurrent-hipmemcpy-dis-dma-0-1-3.sh
+sbatch sbatch-lumi-intranode/run-lumi-concurrent-hipmemcpy-dis-dma-0-6-2.sh
+sbatch sbatch-lumi-intranode/run-lumi-concurrent-hipmemcpy-dis-dma-1-5-3.sh
+sbatch sbatch-lumi-intranode/run-lumi-concurrent-hipmemcpy-en-dma-0-1-2.sh
+sbatch sbatch-lumi-intranode/run-lumi-concurrent-hipmemcpy-en-dma-0-1-3.sh
+sbatch sbatch-lumi-intranode/run-lumi-concurrent-hipmemcpy-en-dma-0-6-2.sh
+sbatch sbatch-lumi-intranode/run-lumi-concurrent-hipmemcpy-en-dma-1-5-3.sh
+sbatch sbatch-lumi-intranode/run-lumi-pp-hipmemcpy-dis-dma-1-link.sh
+sbatch sbatch-lumi-intranode/run-lumi-pp-hipmemcpy-dis-dma-2-link.sh
+sbatch sbatch-lumi-intranode/run-lumi-pp-hipmemcpy-dis-dma-4-link.sh
+sbatch sbatch-lumi-intranode/run-lumi-pp-hipmemcpy-en-dma-1-link.sh
+sbatch sbatch-lumi-intranode/run-lumi-pp-hipmemcpy-en-dma-2-link.sh
+sbatch sbatch-lumi-intranode/run-lumi-pp-hipmemcpy-en-dma-4-link.sh

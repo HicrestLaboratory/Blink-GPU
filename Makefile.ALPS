@@ -5,7 +5,7 @@ MPI_CUDA_HOME=/user-environment/env/default
 NCCL_HOME=/user-environment/env/default
 # ---------------- Common ----------------
 CC=nvcc
-CFLAGS=-arch=sm_90 -std=c++14 -O3 -DSKIPCPUAFFINITY -DNO_SET_DEVICE
+CFLAGS=-arch=sm_90 -std=c++14 -O3 -DSKIPCPUAFFINITY -DMICROBENCH_MAX_GPUS=4 -DNO_SET_DEVICE
 LIBS=
 INCL=-I/user-environment/env/default
 LIBFLAGS=
