@@ -79,10 +79,6 @@ int main(int argc, char *argv[])
 //         exit(0);
 //     }
 
-    // Map MPI ranks to GPUs
-    int num_devices = 0;
-    cudaErrorCheck( cudaGetDeviceCount(&num_devices) );
-
     MPI_Comm nodeComm;
     int dev = assignDeviceToProcess(&nodeComm, &nnodes, &mynode);
     // print device affiniy

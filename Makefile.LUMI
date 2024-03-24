@@ -6,7 +6,7 @@ NCCL_HOME=/project/project_465000997/EasyBuild/SW/LUMI-22.08/L/rccl/2.12.7-cpeGN
 # ---------------- Common ----------------
 LUMICC=CC -xhip 
 CC=/opt/rocm/bin/hipcc
-CFLAGS=-std=c++14 --offload-arch=gfx90a -O3 -DMICROBENCH_MAX_GPUS=8
+CFLAGS=-std=c++14 --offload-arch=gfx90a -O3 -DMICROBENCH_MAX_GPUS=8 -g
 LIBS=
 INCL=
 LIBFLAGS=-DHIP -DOPEN_MPI -DPINNED -DMPI_SUPPORT 
@@ -14,7 +14,7 @@ DBGFLAGS= #-g -G -fsanitize=address -fsanitize=undefined -fsanitize=float-divide
 # ----------- Shared libraries -----------
 MPI=-L${MPI_HOME}/lib -I${MPI_HOME}/include -lmpi
 MPI_CUDA=
-CUDA=-I/opt/rocm/include -I/opt/rocm/include/hip -L/opt/rocm/lib -xhip
+CUDA=-I/opt/rocm/include -L/opt/rocm/lib -xhip
 NCCL=-L${NCCL_HOME}/lib -lrccl
 # ----------------------------------------
 

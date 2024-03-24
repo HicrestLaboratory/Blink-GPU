@@ -234,6 +234,18 @@ int main(int argc, char *argv[])
         (j!=0) ? (N <<= 1) : (N = 1);
         if (rank == 0) {printf("%i#", j); fflush(stdout);}
 
+        size_t large_count = 0;
+        if(N >= 8 && N % 8 == 0){ // Check if I can use 64-bit data types
+            large_count = N / 8;
+            if (large_count >= ((u_int64_t) (1UL << 32)) - 1) { // If large_count can't be represented on 32 bits
+                if(rank == 0) printf("\tTransfer size (B): -1, Transfer Time (s): -1, Bandwidth (GB/s): -1, Iteration -1\n");
+            }
+        }else{
+            if (N >= ((u_int64_t) (1UL << 32)) - 1) { // If N can't be represented on 32 bits
+                if(rank == 0) printf("\tTransfer size (B): -1, Transfer Time (s): -1, Bandwidth (GB/s): -1, Iteration -1\n");
+            }
+        }
+
         // Allocate memory for A on CPU
         dtype *A, *B;
 #ifdef PINNED
@@ -292,8 +304,13 @@ int main(int argc, char *argv[])
             start_time = MPI_Wtime();
 
             // Memcopy DeviceToDevice
-            for (int k=0; k<size; k++)
-                cudaErrorCheck( cudaMemcpyAsync(peerBuffer[k] + (k*N)*sizeof(dtype), d_A + (k*N)*sizeof(dtype), sizeof(dtype)*N, cudaMemcpyDeviceToDevice, Streams[k]) );
+            for (int k=0; k<size; k++){
+                if(large_count){
+                    cudaErrorCheck( cudaMemcpyAsync(peerBuffer[k] + (k*large_count)*sizeof(dtype_big), d_A + (k*large_count)*sizeof(dtype_big), sizeof(dtype_big)*large_count, cudaMemcpyDeviceToDevice, Streams[k]) );
+                }else{
+                    cudaErrorCheck( cudaMemcpyAsync(peerBuffer[k] + (k*N)*sizeof(dtype), d_A + (k*N)*sizeof(dtype), sizeof(dtype)*N, cudaMemcpyDeviceToDevice, Streams[k]) );
+                }
+            }
             cudaErrorCheck( cudaDeviceSynchronize() );
 
             stop_time = MPI_Wtime();
