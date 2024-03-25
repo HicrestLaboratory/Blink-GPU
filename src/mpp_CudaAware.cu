@@ -360,7 +360,7 @@ int main(int argc, char *argv[])
                 if(rank < my_peer){
                     MPI_Isend(d_A, N, MPI_dtype, my_peer, tag1, MPI_COMM_WORLD, &(request[ppAllCouples_rank]));
                     MPI_Recv(d_B, N, MPI_dtype, my_peer, tag2, MPI_COMM_WORLD, &stat);
-		                    }
+                }
                 else {
                     MPI_Recv(d_B, N, MPI_dtype, my_peer, tag1, MPI_COMM_WORLD, &stat);
 		            MPI_Isend(d_A, N, MPI_dtype, my_peer, tag2, MPI_COMM_WORLD, &(request[ppAllCouples_rank]));

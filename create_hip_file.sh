@@ -1,5 +1,5 @@
 #! /bin/bash
-names=("mpp" "pp" "a2a" "a2am" "ar" "otom" "inc")
+names=("mpp" "pp" "a2a" "a2am" "ar" "otom" "inc" "comm")
 types=("Baseline" "CudaAware" "Nccl" "Nvlink")
 
 #names=("mpp" "pp" "a2a")
@@ -9,12 +9,16 @@ for name in "${names[@]}"
 do
     for type in "${types[@]}"
     do
-        # Combinations to skip
-        # otom only available for Nccl and Nvlink
-        if [[ $name == "otom" && $type == "Baseline" ]]; then
+        # comm only available for Nccl and CudaAware
+        if [[ $name == "comm" && $type == "Nvlink" ]]; then
             continue
         fi
-        if [[ $name == "otom" && $type == "CudaAware" ]]; then
+        if [[ $name == "comm" && $type == "Baseline" ]]; then
+            continue
+        fi
+        # Combinations to skip
+        # otom not available for baseline
+        if [[ $name == "otom" && $type == "Baseline" ]]; then
             continue
         fi
         # inc only available for Nccl

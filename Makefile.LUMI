@@ -31,6 +31,7 @@ HALONAME=hlo
 AMPPNAME=ampp
 OTOMNAME=otom
 INCNAME=inc
+COMMNAME=comm
 # --------------- Folders ----------------
 BINFOLDER=bin
 OUTFOLDER=out
@@ -62,9 +63,10 @@ a2am: $(BINFOLDER)/$(A2AMNAME)_Nccl
 ar: $(BINFOLDER)/$(ARNAME)_Baseline $(BINFOLDER)/$(ARNAME)_CudaAware $(BINFOLDER)/$(ARNAME)_Nccl
 hlo: $(BINFOLDER)/$(HALONAME)_Baseline $(BINFOLDER)/$(HALONAME)_CudaAware $(BINFOLDER)/$(HALONAME)_Nccl
 mpp: $(BINFOLDER)/$(MPPNAME)_Baseline $(BINFOLDER)/$(MPPNAME)_CudaAware $(BINFOLDER)/$(MPPNAME)_Nccl # $(BINFOLDER)/$(MPPNAME)_Nvlink
-otom: $(BINFOLDER)/$(OTOMNAME)_Nccl $(BINFOLDER)/$(OTOMNAME)_Nvlink
+otom: $(BINFOLDER)/$(OTOMNAME)_CudaAware $(BINFOLDER)/$(OTOMNAME)_Nccl $(BINFOLDER)/$(OTOMNAME)_Nvlink
 inc: $(BINFOLDER)/$(INCNAME)_Nccl
 ampp: $(BINFOLDER)/$(AMPPNAME)_CudaAware
+comm: $(BINFOLDER)/$(COMMNAME)_Nccl $(BINFOLDER)/$(COMMNAME)_CudaAware
 
 # --------------- Baseline ---------------
 $(BASELINE_MODULES):
@@ -142,8 +144,17 @@ $(BINFOLDER)/$(ARNAME)_CudaAware: src/$(ARNAME)_CudaAware.cpp $(CUDA_AWARE_MODUL
 	source $(CUDA_AWARE_MODULES) && $(LUMICC) $(CFLAGS) -o $@ $< $(INCL) $(LIBS) $(LIBFLAGS) -lstdc++ -lm $(DBGFLAGS)
 
 $(BINFOLDER)/$(MPPNAME)_CudaAware: src/$(MPPNAME)_CudaAware.cpp $(CUDA_AWARE_MODULES) $(CUDA_AWARE_SN_EXPORTS) $(CUDA_AWARE_MN_EXPORTS)
-		mkdir -p $(BINFOLDER) $(OUTFOLDER) $(SOUTFOLDER)
+	mkdir -p $(BINFOLDER) $(OUTFOLDER) $(SOUTFOLDER)
 	source $(CUDA_AWARE_MODULES) && $(LUMICC) $(CFLAGS) -o $@ $< $(INCL) $(LIBS) $(LIBFLAGS) -lstdc++ -lm $(DBGFLAGS)
+
+$(BINFOLDER)/$(OTOMNAME)_CudaAware: src/$(OTOMNAME)_CudaAware.cpp $(CUDA_AWARE_MODULES) $(CUDA_AWARE_SN_EXPORTS) $(CUDA_AWARE_MN_EXPORTS)
+	mkdir -p $(BINFOLDER) $(OUTFOLDER) $(SOUTFOLDER)
+	source $(CUDA_AWARE_MODULES) && $(LUMICC) $(CFLAGS) -o $@ $< $(INCL) $(LIBS) $(LIBFLAGS) -lstdc++ -lm $(DBGFLAGS)
+
+$(BINFOLDER)/$(COMMNAME)_CudaAware: src/$(COMMNAME)_CudaAware.cpp $(CUDA_AWARE_MODULES) $(CUDA_AWARE_SN_EXPORTS) $(CUDA_AWARE_MN_EXPORTS)
+	mkdir -p $(BINFOLDER) $(OUTFOLDER) $(SOUTFOLDER)
+	source $(CUDA_AWARE_MODULES) && $(LUMICC) $(CFLAGS) -o $@ $< $(INCL) $(LIBS) $(LIBFLAGS) -lstdc++ -lm $(DBGFLAGS)
+
 # ----------------------------------------
 
 # ----------------- Nccl -----------------
@@ -199,6 +210,10 @@ $(BINFOLDER)/$(OTOMNAME)_Nccl: src/$(OTOMNAME)_Nccl.cpp $(NCCL_MODULES) $(NCCL_S
 	source $(NCCL_MODULES) && $(CC) $(CFLAGS) -o $@ $< $(INCL) $(LIBS) $(LIBFLAGS) $(MPI) $(CUDA) $(NCCL) -lstdc++ -lm $(DBGFLAGS)
 
 $(BINFOLDER)/$(INCNAME)_Nccl: src/$(INCNAME)_Nccl.cpp $(NCCL_MODULES) $(NCCL_SN_EXPORTS) $(NCCL_MN_EXPORTS)
+	mkdir -p $(BINFOLDER) $(OUTFOLDER) $(SOUTFOLDER)
+	source $(NCCL_MODULES) && $(CC) $(CFLAGS) -o $@ $< $(INCL) $(LIBS) $(LIBFLAGS) $(MPI) $(CUDA) $(NCCL) -lstdc++ -lm $(DBGFLAGS)
+
+$(BINFOLDER)/$(COMMNAME)_Nccl: src/$(COMMNAME)_Nccl.cpp $(NCCL_MODULES) $(NCCL_SN_EXPORTS) $(NCCL_MN_EXPORTS)
 	mkdir -p $(BINFOLDER) $(OUTFOLDER) $(SOUTFOLDER)
 	source $(NCCL_MODULES) && $(CC) $(CFLAGS) -o $@ $< $(INCL) $(LIBS) $(LIBFLAGS) $(MPI) $(CUDA) $(NCCL) -lstdc++ -lm $(DBGFLAGS)
 # ----------------------------------------
