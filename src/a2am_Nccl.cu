@@ -144,14 +144,8 @@ int main(int argc, char *argv[])
     ncclUniqueId Id;
     ncclComm_t NCCL_COMM_WORLD, NCCL_COMM_NODE;
 
-    const unsigned long int start_time_nccl_init_us = std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock::now().time_since_epoch()).count();
-
-    ncclGroupStart();
-    if (mynodeid == 0) { NCCLCHECK( ncclGetUniqueId(&Id) ); }
-    MPI_Bcast(&Id, sizeof(ncclUniqueId), MPI_BYTE, 0, nodeComm);
-    NCCLCHECK( ncclCommInitRank(&NCCL_COMM_NODE, mynodesize, Id, mynodeid) );
-    ncclGroupEnd();
     MPI_Barrier(MPI_COMM_WORLD);
+    const unsigned long int start_time_nccl_init_us = std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock::now().time_since_epoch()).count();
 
     ncclGroupStart();
     if (rank == 0) { NCCLCHECK( ncclGetUniqueId(&Id) ); }
@@ -160,6 +154,13 @@ int main(int argc, char *argv[])
     ncclGroupEnd();
 
 #ifdef PRINT_NCCL_INTRANODE_INFO
+
+    ncclGroupStart();
+    if (mynodeid == 0) { NCCLCHECK( ncclGetUniqueId(&Id) ); }
+    MPI_Bcast(&Id, sizeof(ncclUniqueId), MPI_BYTE, 0, nodeComm);
+    NCCLCHECK( ncclCommInitRank(&NCCL_COMM_NODE, mynodesize, Id, mynodeid) );
+    ncclGroupEnd();
+
 
     int nccl_w_rk;
     int nccl_w_sz;
