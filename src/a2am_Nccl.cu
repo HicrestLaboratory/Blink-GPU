@@ -7,6 +7,8 @@
 #include <string.h>
 #include <unistd.h>
 #include <inttypes.h>
+#include <chrono>
+
 
 #define MPI
 
@@ -142,6 +144,8 @@ int main(int argc, char *argv[])
     ncclUniqueId Id;
     ncclComm_t NCCL_COMM_WORLD, NCCL_COMM_NODE;
 
+    const unsigned long int start_time_nccl_init_us = std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock::now().time_since_epoch()).count();
+
     ncclGroupStart();
     if (mynodeid == 0) { NCCLCHECK( ncclGetUniqueId(&Id) ); }
     MPI_Bcast(&Id, sizeof(ncclUniqueId), MPI_BYTE, 0, nodeComm);
@@ -154,6 +158,8 @@ int main(int argc, char *argv[])
     MPI_Bcast(&Id, sizeof(ncclUniqueId), MPI_BYTE, 0, MPI_COMM_WORLD);
     NCCLCHECK( ncclCommInitRank(&NCCL_COMM_WORLD, size, Id, rank) );
     ncclGroupEnd();
+
+#ifdef PRINT_NCCL_INTRANODE_INFO
 
     int nccl_w_rk;
     int nccl_w_sz;
@@ -172,9 +178,14 @@ int main(int argc, char *argv[])
     printf("[%d] NCCL_COMM_WORLD: nccl size = %d, nccl rank = %d\n", rank, nccl_w_sz, nccl_w_rk);
     printf("[%d] NCCL_COMM_NODE:  nccl size = %d, nccl rank = %d\n", rank, nccl_n_sz, nccl_n_rk);
     fflush(stdout);
+#endif
 
     MPI_Barrier(MPI_COMM_WORLD);
 
+    const unsigned long int end_time_nccl_init_us = std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock::now().time_since_epoch()).count();
+    if (rank == 0)
+        printf("NCCL init time: %f (s)\n", (end_time_nccl_init_us-start_time_nccl_init_us)/1e6);
+    
 
      /* -------------------------------------------------------------------------------------------
         Loop from 8 B to 1 GB

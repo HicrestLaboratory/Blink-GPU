@@ -7,6 +7,7 @@
 #include <string.h>
 #include <unistd.h>
 #include <inttypes.h>
+#include <chrono>
 
 #define MPI
 
@@ -416,6 +417,8 @@ int main(int argc, char *argv[])
     } while(ncclState == ncclInProgress);
 //     ncclGroupEnd();
 
+#ifdef PRINT_NCCL_INTRANODE_INFO
+
     int nccl_w_rk;
     int nccl_w_sz;
     ncclGroupStart();
@@ -433,6 +436,7 @@ int main(int argc, char *argv[])
     printf("[%d] NCCL_COMM_WORLD: nccl size = %d, nccl rank = %d\n", rank, nccl_w_sz, nccl_w_rk);
     printf("[%d] NCCL_COMM_NODE:  nccl size = %d, nccl rank = %d\n", rank, nccl_n_sz, nccl_n_rk);
     fflush(stdout);
+#endif 
 
     MPI_Barrier(MPI_COMM_WORLD);
 
