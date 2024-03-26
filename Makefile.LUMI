@@ -175,7 +175,7 @@ $(NCCL_MODULES):
 	@echo "export NCCL_SOCKET_IFNAME=hsn0" >> $@
 	@echo "export NCCL_IGNORE_CPU_AFFINITY=1" >> $@
 	@echo "export HIPCC_COMPILE_FLAGS_APPEND=\"--offload-arch=gfx90a $(CC --cray-print-opts=cflags)\"" >> $@
-	@echo "export HIPCC_LINK_FLAGS_APPEND=$(CC --cray-print-opts=libs)" >> $@
+	@echo 'export HIPCC_LINK_FLAGS_APPEND=$$(CC --cray-print-opts=libs)' >> $@
 	@echo "unset MPICH_GPU_SUPPORT_ENABLED" >> $@
 
 $(NCCL_SN_EXPORTS):
