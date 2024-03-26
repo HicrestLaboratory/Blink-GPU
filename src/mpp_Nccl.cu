@@ -416,7 +416,7 @@ int main(int argc, char *argv[])
                     ncclRecv(d_B, N, ncclDtype, my_peer, NCCL_COMM_WORLD, NULL);
                 }
                 ncclGroupEnd();
-
+                cudaDeviceSynchronize();
                 ncclGroupStart();
                 if(rank < my_peer){
                     ncclRecv(d_B, N, ncclDtype, my_peer, NCCL_COMM_WORLD, NULL);

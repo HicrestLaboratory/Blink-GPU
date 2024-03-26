@@ -4,8 +4,7 @@ MPI_HOME=/opt/cray/pe/mpich/8.1.27/ofi/crayclang/14.0
 MPI_CUDA_HOME=
 NCCL_HOME=/project/project_465000997/EasyBuild/SW/LUMI-22.08/L/rccl/2.12.7-cpeGNU-22.08/
 # ---------------- Common ----------------
-LUMICC=CC -xhip 
-CC=/opt/rocm/bin/hipcc
+CC=CC -xhip 
 CFLAGS=-std=c++14 --offload-arch=gfx90a -O3 -DMICROBENCH_MAX_GPUS=8 -g
 LIBS=
 INCL=
@@ -93,19 +92,19 @@ $(BASELINE_MN_EXPORTS):
 
 $(BINFOLDER)/$(NAME)_Baseline: src/$(NAME)_Baseline.cpp $(BASELINE_MODULES) $(BASELINE_SN_EXPORTS) $(BASELINE_MN_EXPORTS)
 	mkdir -p $(BINFOLDER) $(OUTFOLDER) $(SOUTFOLDER)
-	source $(BASELINE_MODULES) && $(LUMICC) $(CFLAGS) -o $@ $< $(INCL) $(LIBS) $(LIBFLAGS) -lstdc++ -lm $(DBGFLAGS)
+	source $(BASELINE_MODULES) && $(CC) $(CFLAGS) -o $@ $< $(INCL) $(LIBS) $(LIBFLAGS) -lstdc++ -lm $(DBGFLAGS)
 
 $(BINFOLDER)/$(A2ANAME)_Baseline: src/$(A2ANAME)_Baseline.cpp $(BASELINE_MODULES) $(BASELINE_SN_EXPORTS) $(BASELINE_MN_EXPORTS)
 	mkdir -p $(BINFOLDER) $(OUTFOLDER) $(SOUTFOLDER)
-	source $(BASELINE_MODULES) && $(LUMICC) $(CFLAGS) -o $@ $< $(INCL) $(LIBS) $(LIBFLAGS) -lstdc++ -lm $(DBGFLAGS)
+	source $(BASELINE_MODULES) && $(CC) $(CFLAGS) -o $@ $< $(INCL) $(LIBS) $(LIBFLAGS) -lstdc++ -lm $(DBGFLAGS)
 
 $(BINFOLDER)/$(ARNAME)_Baseline: src/$(ARNAME)_Baseline.cpp $(BASELINE_MODULES) $(BASELINE_SN_EXPORTS) $(BASELINE_MN_EXPORTS)
 	mkdir -p $(BINFOLDER) $(OUTFOLDER) $(SOUTFOLDER)
-	source $(BASELINE_MODULES) && $(LUMICC) $(CFLAGS) -o $@ $< $(INCL) $(LIBS) $(LIBFLAGS) -lstdc++ -lm $(DBGFLAGS)
+	source $(BASELINE_MODULES) && $(CC) $(CFLAGS) -o $@ $< $(INCL) $(LIBS) $(LIBFLAGS) -lstdc++ -lm $(DBGFLAGS)
 
 $(BINFOLDER)/$(MPPNAME)_Baseline: src/$(MPPNAME)_Baseline.cpp $(BASELINE_MODULES) $(BASELINE_SN_EXPORTS) $(BASELINE_MN_EXPORTS)
 	mkdir -p $(BINFOLDER) $(OUTFOLDER) $(SOUTFOLDER)
-	source $(BASELINE_MODULES) && $(LUMICC) $(CFLAGS) -o $@ $< $(INCL) $(LIBS) $(LIBFLAGS) -lstdc++ -lm $(DBGFLAGS)
+	source $(BASELINE_MODULES) && $(CC) $(CFLAGS) -o $@ $< $(INCL) $(LIBS) $(LIBFLAGS) -lstdc++ -lm $(DBGFLAGS)
 # ----------------------------------------
 
 # -------------- CUDA aware --------------
@@ -133,27 +132,27 @@ $(CUDA_AWARE_MN_EXPORTS):
 
 $(BINFOLDER)/$(NAME)_CudaAware: src/$(NAME)_CudaAware.cpp $(CUDA_AWARE_MODULES) $(CUDA_AWARE_SN_EXPORTS) $(CUDA_AWARE_MN_EXPORTS)
 	mkdir -p $(BINFOLDER) $(OUTFOLDER) $(SOUTFOLDER)
-	source $(CUDA_AWARE_MODULES) && $(LUMICC) $(CFLAGS) -o $@ $< $(INCL) $(LIBS) $(LIBFLAGS) -lstdc++ -lm $(DBGFLAGS)
+	source $(CUDA_AWARE_MODULES) && $(CC) $(CFLAGS) -o $@ $< $(INCL) $(LIBS) $(LIBFLAGS) -lstdc++ -lm $(DBGFLAGS)
 
 $(BINFOLDER)/$(A2ANAME)_CudaAware: src/$(A2ANAME)_CudaAware.cpp $(CUDA_AWARE_MODULES) $(CUDA_AWARE_SN_EXPORTS) $(CUDA_AWARE_MN_EXPORTS)
 	mkdir -p $(BINFOLDER) $(OUTFOLDER) $(SOUTFOLDER)
-	source $(CUDA_AWARE_MODULES) && $(LUMICC) $(CFLAGS) -o $@ $< $(INCL) $(LIBS) $(LIBFLAGS) -lstdc++ -lm $(DBGFLAGS)
+	source $(CUDA_AWARE_MODULES) && $(CC) $(CFLAGS) -o $@ $< $(INCL) $(LIBS) $(LIBFLAGS) -lstdc++ -lm $(DBGFLAGS)
 
 $(BINFOLDER)/$(ARNAME)_CudaAware: src/$(ARNAME)_CudaAware.cpp $(CUDA_AWARE_MODULES) $(CUDA_AWARE_SN_EXPORTS) $(CUDA_AWARE_MN_EXPORTS)
 	mkdir -p $(BINFOLDER) $(OUTFOLDER) $(SOUTFOLDER)
-	source $(CUDA_AWARE_MODULES) && $(LUMICC) $(CFLAGS) -o $@ $< $(INCL) $(LIBS) $(LIBFLAGS) -lstdc++ -lm $(DBGFLAGS)
+	source $(CUDA_AWARE_MODULES) && $(CC) $(CFLAGS) -o $@ $< $(INCL) $(LIBS) $(LIBFLAGS) -lstdc++ -lm $(DBGFLAGS)
 
 $(BINFOLDER)/$(MPPNAME)_CudaAware: src/$(MPPNAME)_CudaAware.cpp $(CUDA_AWARE_MODULES) $(CUDA_AWARE_SN_EXPORTS) $(CUDA_AWARE_MN_EXPORTS)
 	mkdir -p $(BINFOLDER) $(OUTFOLDER) $(SOUTFOLDER)
-	source $(CUDA_AWARE_MODULES) && $(LUMICC) $(CFLAGS) -o $@ $< $(INCL) $(LIBS) $(LIBFLAGS) -lstdc++ -lm $(DBGFLAGS)
+	source $(CUDA_AWARE_MODULES) && $(CC) $(CFLAGS) -o $@ $< $(INCL) $(LIBS) $(LIBFLAGS) -lstdc++ -lm $(DBGFLAGS)
 
 $(BINFOLDER)/$(OTOMNAME)_CudaAware: src/$(OTOMNAME)_CudaAware.cpp $(CUDA_AWARE_MODULES) $(CUDA_AWARE_SN_EXPORTS) $(CUDA_AWARE_MN_EXPORTS)
 	mkdir -p $(BINFOLDER) $(OUTFOLDER) $(SOUTFOLDER)
-	source $(CUDA_AWARE_MODULES) && $(LUMICC) $(CFLAGS) -o $@ $< $(INCL) $(LIBS) $(LIBFLAGS) -lstdc++ -lm $(DBGFLAGS)
+	source $(CUDA_AWARE_MODULES) && $(CC) $(CFLAGS) -o $@ $< $(INCL) $(LIBS) $(LIBFLAGS) -lstdc++ -lm $(DBGFLAGS)
 
 $(BINFOLDER)/$(COMMNAME)_CudaAware: src/$(COMMNAME)_CudaAware.cpp $(CUDA_AWARE_MODULES) $(CUDA_AWARE_SN_EXPORTS) $(CUDA_AWARE_MN_EXPORTS)
 	mkdir -p $(BINFOLDER) $(OUTFOLDER) $(SOUTFOLDER)
-	source $(CUDA_AWARE_MODULES) && $(LUMICC) $(CFLAGS) -o $@ $< $(INCL) $(LIBS) $(LIBFLAGS) -lstdc++ -lm $(DBGFLAGS)
+	source $(CUDA_AWARE_MODULES) && $(CC) $(CFLAGS) -o $@ $< $(INCL) $(LIBS) $(LIBFLAGS) -lstdc++ -lm $(DBGFLAGS)
 
 # ----------------------------------------
 
@@ -168,9 +167,14 @@ $(NCCL_MODULES):
 	@echo "module load craype-accel-amd-gfx90a" >> $@
 #	echo "module load rocm" >> $@
 	@echo "export HSA_ENABLE_SDMA=0" >> $@
-	@echo "export NCCL_NET_GDR_LEVEL=3" >> $@
 	@echo "export FI_CXI_ATS=0" >> $@
+	@echo "export FI_CXI_DEFAULT_CQ_SIZE=131072" >> $@
+	@echo "export NCCL_NET_GDR_LEVEL=3" >> $@
 	@echo "export NCCL_BUFFSIZE=33554432" >> $@
+	@echo "export NCCL_SOCKET_IFNAME=hsn0" >> $@
+	@echo "export NCCL_IGNORE_CPU_AFFINITY=1" >> $@
+#	@echo "export HIPCC_COMPILE_FLAGS_APPEND=\"--offload-arch=gfx90a $(CC --cray-print-opts=cflags)\"" >> $@
+#	@echo "export HIPCC_LINK_FLAGS_APPEND=$(CC --cray-print-opts=libs)" >> $@
 	@echo "unset MPICH_GPU_SUPPORT_ENABLED" >> $@
 
 $(NCCL_SN_EXPORTS):
@@ -187,14 +191,10 @@ $(BINFOLDER)/$(NAME)_Nccl: src/$(NAME)_Nccl.cpp $(NCCL_MODULES) $(NCCL_SN_EXPORT
 
 $(BINFOLDER)/$(A2ANAME)_Nccl: src/$(A2ANAME)_Nccl.cpp $(NCCL_MODULES) $(NCCL_SN_EXPORTS) $(NCCL_MN_EXPORTS)
 	mkdir -p $(BINFOLDER) $(OUTFOLDER) $(SOUTFOLDER)
-	export HIPCC_COMPILE_FLAGS_APPEND="--offload-arch=gfx90a $(CC --cray-print-opts=cflags)"
-	export HIPCC_LINK_FLAGS_APPEND=$(CC --cray-print-opts=libs)
 	source $(NCCL_MODULES) && $(CC) $(CFLAGS) -o $@ $< $(INCL) $(LIBS) $(LIBFLAGS) $(MPI) $(CUDA) $(NCCL) -lstdc++ -lm $(DBGFLAGS)
 
 $(BINFOLDER)/$(A2AMNAME)_Nccl: src/$(A2AMNAME)_Nccl.cpp $(NCCL_MODULES) $(NCCL_SN_EXPORTS) $(NCCL_MN_EXPORTS)
 	mkdir -p $(BINFOLDER) $(OUTFOLDER) $(SOUTFOLDER)
-	export HIPCC_COMPILE_FLAGS_APPEND="--offload-arch=gfx90a $(CC --cray-print-opts=cflags)"
-	export HIPCC_LINK_FLAGS_APPEND=$(CC --cray-print-opts=libs)
 	source $(NCCL_MODULES) && $(CC) $(CFLAGS) -o $@ $< $(INCL) $(LIBS) $(LIBFLAGS) $(MPI) $(CUDA) $(NCCL) -lstdc++ -lm $(DBGFLAGS)
 
 $(BINFOLDER)/$(ARNAME)_Nccl: src/$(ARNAME)_Nccl.cpp $(NCCL_MODULES) $(NCCL_SN_EXPORTS) $(NCCL_MN_EXPORTS)
@@ -243,19 +243,19 @@ $(NVLINK_MN_EXPORTS):
 
 $(BINFOLDER)/$(NAME)_Nvlink: src/$(NAME)_Nvlink.cpp $(NVLINK_MODULES) $(NVLINK_SN_EXPORTS) $(NVLINK_MN_EXPORTS)
 	mkdir -p $(BINFOLDER) $(OUTFOLDER) $(SOUTFOLDER)
-	source $(NVLINK_MODULES) && $(LUMICC) $(CFLAGS) -o $@ $< $(INCL) $(LIBS) $(LIBFLAGS) -lstdc++ -lm $(DBGFLAGS)
+	source $(NVLINK_MODULES) && $(CC) $(CFLAGS) -o $@ $< $(INCL) $(LIBS) $(LIBFLAGS) -lstdc++ -lm $(DBGFLAGS)
 
 $(BINFOLDER)/$(A2ANAME)_Nvlink: src/$(A2ANAME)_Nvlink.cpp $(NVLINK_MODULES) $(NVLINK_SN_EXPORTS) $(NVLINK_MN_EXPORTS)
 	mkdir -p $(BINFOLDER) $(OUTFOLDER) $(SOUTFOLDER)
-	source $(NVLINK_MODULES) && $(LUMICC) $(CFLAGS) -o $@ $< $(INCL) $(LIBS) $(LIBFLAGS) -lstdc++ -lm $(DBGFLAGS)
+	source $(NVLINK_MODULES) && $(CC) $(CFLAGS) -o $@ $< $(INCL) $(LIBS) $(LIBFLAGS) -lstdc++ -lm $(DBGFLAGS)
 
 $(BINFOLDER)/$(MPPNAME)_Nvlink: src/$(MPPNAME)_Nvlink.cpp $(NVLINK_MODULES) $(NVLINK_SN_EXPORTS) $(NVLINK_MN_EXPORTS)
 	mkdir -p $(BINFOLDER) $(OUTFOLDER) $(SOUTFOLDER)
-	source $(NVLINK_MODULES) && $(LUMICC) $(CFLAGS) -o $@ $< $(INCL) $(LIBS) $(LIBFLAGS) -lstdc++ -lm $(DBGFLAGS)
+	source $(NVLINK_MODULES) && $(CC) $(CFLAGS) -o $@ $< $(INCL) $(LIBS) $(LIBFLAGS) -lstdc++ -lm $(DBGFLAGS)
 
 $(BINFOLDER)/$(OTOMNAME)_Nvlink: src/$(OTOMNAME)_Nvlink.cpp $(NVLINK_MODULES) $(NVLINK_SN_EXPORTS) $(NVLINK_MN_EXPORTS)
 	mkdir -p $(BINFOLDER) $(OUTFOLDER) $(SOUTFOLDER)
-	source $(NVLINK_MODULES) && $(LUMICC) $(CFLAGS) -o $@ $< $(INCL) $(LIBS) $(LIBFLAGS) -lstdc++ -lm $(DBGFLAGS)
+	source $(NVLINK_MODULES) && $(CC) $(CFLAGS) -o $@ $< $(INCL) $(LIBS) $(LIBFLAGS) -lstdc++ -lm $(DBGFLAGS)
 
 # ----------------------------------------
 
