@@ -17,7 +17,7 @@
 #include "../include/device_assignment.h"
 #include "../include/cmd_util.h"
 #include "../include/prints.h"
-#include<sys/time.h>
+#include <sys/time.h>
 
 double timeInSeconds(void) {
     struct timeval tv;
