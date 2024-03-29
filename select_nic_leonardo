@@ -1,0 +1,3 @@
+#!/bin/bash
+export UCX_NET_DEVICES=mlx5_$SLURM_LOCALID:1
+exec $*
