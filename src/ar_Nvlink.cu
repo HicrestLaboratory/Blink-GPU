@@ -247,8 +247,8 @@ int main(int argc, char *argv[])
     dtype **peerBufferA;
     dtype **peerBufferB;
     cudaEvent_t event;
-    cudaIpcMemHandle_t *sendHandle;
-    cudaIpcMemHandle_t *recvHandle;
+    cudaIpcMemHandle_t sendHandleA, sendHandleB;
+    cudaIpcMemHandle_t *recvHandleA, *recvHandleB;
 
     if (rank == 0) {
         peerBufferA = (dtype**) malloc(sizeof(dtype*)*size);
@@ -256,9 +256,11 @@ int main(int argc, char *argv[])
     }
 
     if (rank == 0) {
-        recvHandle = (cudaIpcMemHandle_t*) malloc(sizeof(cudaIpcMemHandle_t)*(size-1)*2);
+        recvHandleA = (cudaIpcMemHandle_t*) malloc(sizeof(cudaIpcMemHandle_t)*(size));
+        recvHandleB = (cudaIpcMemHandle_t*) malloc(sizeof(cudaIpcMemHandle_t)*(size));
     }
-    sendHandle = (cudaIpcMemHandle_t*) malloc(sizeof(cudaIpcMemHandle_t)*2);
+//     sendHandleA = (cudaIpcMemHandle_t*) malloc(sizeof(cudaIpcMemHandle_t));
+//     sendHandleB = (cudaIpcMemHandle_t*) malloc(sizeof(cudaIpcMemHandle_t));
 
     cudaStream_t Streams[MICROBENCH_MAX_GPUS];
     double start_time, stop_time;
@@ -338,24 +340,34 @@ int main(int argc, char *argv[])
         */
 
         // Generate IPC MemHandle
-        if (rank != 0) {
-            cudaErrorCheck( cudaIpcGetMemHandle((cudaIpcMemHandle_t*)&(sendHandle[0]), d_A) );
-            cudaErrorCheck( cudaIpcGetMemHandle((cudaIpcMemHandle_t*)&(sendHandle[1]), d_B) );
-        }
+//         if (rank != 0) {
+            cudaErrorCheck( cudaIpcGetMemHandle((cudaIpcMemHandle_t*)&sendHandleA, d_A) );
+            cudaErrorCheck( cudaIpcGetMemHandle((cudaIpcMemHandle_t*)&sendHandleB, d_B) );
+//         }
 
         // Share IPC MemHandle
         if (rank != 0) {
-            MPI_Gather(&sendHandle, 2*sizeof(cudaIpcMemHandle_t), MPI_BYTE, NULL, 0, MPI_BYTE, 0, MPI_COMM_WORLD);
+            MPI_Gather(&sendHandleA, sizeof(cudaIpcMemHandle_t), MPI_BYTE, NULL, 0, MPI_BYTE, 0, MPI_COMM_WORLD);
         } else {
-            MPI_Gather(&sendHandle, 2*sizeof(cudaIpcMemHandle_t), MPI_BYTE, recvHandle, 2*(size-1)*sizeof(cudaIpcMemHandle_t), MPI_BYTE, 0, MPI_COMM_WORLD);
+            MPI_Gather(&sendHandleA, sizeof(cudaIpcMemHandle_t), MPI_BYTE, recvHandleA, size*sizeof(cudaIpcMemHandle_t), MPI_BYTE, 0, MPI_COMM_WORLD);
         }
+        MPI_Barrier(MPI_COMM_WORLD);
+
+
+        if (rank != 0) {
+            MPI_Gather(&sendHandleB, sizeof(cudaIpcMemHandle_t), MPI_BYTE, NULL, 0, MPI_BYTE, 0, MPI_COMM_WORLD);
+        } else {
+            MPI_Gather(&sendHandleB, sizeof(cudaIpcMemHandle_t), MPI_BYTE, recvHandleB, size*sizeof(cudaIpcMemHandle_t), MPI_BYTE, 0, MPI_COMM_WORLD);
+        }
+        MPI_Barrier(MPI_COMM_WORLD);
 
         // Open MemHandles
         if (rank == 0) {
             for (int i=0; i<size; i++)
                 if (i != rank) {
-                    cudaErrorCheck( cudaIpcOpenMemHandle((void**)&peerBufferA[i], recvHandle[2*i], cudaIpcMemLazyEnablePeerAccess) );
-                    cudaErrorCheck( cudaIpcOpenMemHandle((void**)&peerBufferB[i], recvHandle[2*i+1], cudaIpcMemLazyEnablePeerAccess) );
+                    printf("size = %d, i= %d, recvHandle = %p %p\n", size, i, &recvHandleA[i], &recvHandleB[i]);
+                    cudaErrorCheck( cudaIpcOpenMemHandle((void**)&(peerBufferA[i]), recvHandleA[i], cudaIpcMemLazyEnablePeerAccess) );
+                    cudaErrorCheck( cudaIpcOpenMemHandle((void**)&peerBufferB[i], recvHandleB[i], cudaIpcMemLazyEnablePeerAccess) );
                 } else {
                     peerBufferA[i] = d_A; // NOTE this is the self send case
                     peerBufferB[i] = d_B; // NOTE this is the self send case
@@ -502,8 +514,10 @@ int main(int argc, char *argv[])
     free(inner_elapsed_time);
     free(peerBufferA);
     free(peerBufferB);
-    free(sendHandle);
-    free(recvHandle);
+    if (rank == 0) {
+        free(recvHandleA);
+        free(recvHandleB);
+    }
     MPI_Finalize();
     return(0);
 }
