@@ -244,21 +244,13 @@ int main(int argc, char *argv[])
     }
 
     MPI_Status IPCstat;
-    dtype **peerBufferA;
-    dtype **peerBufferB;
+    dtype **peerBufferA = (dtype**) malloc(sizeof(dtype*)*size);
+    dtype **peerBufferB = (dtype**) malloc(sizeof(dtype*)*size);
     cudaEvent_t event;
-    cudaIpcMemHandle_t *sendHandle;
-    cudaIpcMemHandle_t *recvHandle;
-
-    if (rank == 0) {
-        peerBufferA = (dtype**) malloc(sizeof(dtype*)*size);
-        peerBufferB = (dtype**) malloc(sizeof(dtype*)*size);
-    }
-
-    if (rank == 0) {
-        recvHandle = (cudaIpcMemHandle_t*) malloc(sizeof(cudaIpcMemHandle_t)*(size-1)*2);
-    }
-    sendHandle = (cudaIpcMemHandle_t*) malloc(sizeof(cudaIpcMemHandle_t)*2);
+    cudaIpcMemHandle_t sendHandleA;
+    cudaIpcMemHandle_t sendHandleB;
+    cudaIpcMemHandle_t* recvHandleA = (cudaIpcMemHandle_t*) malloc(sizeof(cudaIpcMemHandle_t)*size);
+    cudaIpcMemHandle_t* recvHandleB = (cudaIpcMemHandle_t*) malloc(sizeof(cudaIpcMemHandle_t)*size);
 
     cudaStream_t Streams[MICROBENCH_MAX_GPUS];
     double start_time, stop_time;
@@ -309,7 +301,7 @@ int main(int argc, char *argv[])
         *my_cpu_check = 0U;
 
         // Initialize all elements of A to 0.0
-        for(SZTYPE i=0; i<N*size; i++) {
+        for(SZTYPE i=0; i<N; i++) {
             A[i] = 1U * (rank+1);
             B[i] = 0U;
         }
@@ -338,29 +330,28 @@ int main(int argc, char *argv[])
         */
 
         // Generate IPC MemHandle
-        if (rank != 0) {
-            cudaErrorCheck( cudaIpcGetMemHandle((cudaIpcMemHandle_t*)&(sendHandle[0]), d_A) );
-            cudaErrorCheck( cudaIpcGetMemHandle((cudaIpcMemHandle_t*)&(sendHandle[1]), d_B) );
-        }
+        cudaErrorCheck( cudaIpcGetMemHandle((cudaIpcMemHandle_t*)&sendHandleA, d_A) );
+        cudaErrorCheck( cudaIpcGetMemHandle((cudaIpcMemHandle_t*)&sendHandleB, d_B) );
+
 
         // Share IPC MemHandle
-        if (rank != 0) {
-            MPI_Gather(&sendHandle, 2*sizeof(cudaIpcMemHandle_t), MPI_BYTE, NULL, 0, MPI_BYTE, 0, MPI_COMM_WORLD);
-        } else {
-            MPI_Gather(&sendHandle, 2*sizeof(cudaIpcMemHandle_t), MPI_BYTE, recvHandle, 2*(size-1)*sizeof(cudaIpcMemHandle_t), MPI_BYTE, 0, MPI_COMM_WORLD);
-        }
+        MPI_Allgather(&sendHandleA, sizeof(cudaIpcMemHandle_t), MPI_BYTE, recvHandleA, sizeof(cudaIpcMemHandle_t), MPI_BYTE, MPI_COMM_WORLD);
+        MPI_Barrier(MPI_COMM_WORLD);
+        MPI_Allgather(&sendHandleB, sizeof(cudaIpcMemHandle_t), MPI_BYTE, recvHandleB, sizeof(cudaIpcMemHandle_t), MPI_BYTE, MPI_COMM_WORLD);
+        MPI_Barrier(MPI_COMM_WORLD);
 
         // Open MemHandles
         if (rank == 0) {
             for (int i=0; i<size; i++)
                 if (i != rank) {
-                    cudaErrorCheck( cudaIpcOpenMemHandle((void**)&peerBufferA[i], recvHandle[2*i], cudaIpcMemLazyEnablePeerAccess) );
-                    cudaErrorCheck( cudaIpcOpenMemHandle((void**)&peerBufferB[i], recvHandle[2*i+1], cudaIpcMemLazyEnablePeerAccess) );
+                    cudaErrorCheck( cudaIpcOpenMemHandle((void**)&peerBufferA[i], recvHandleA[i], cudaIpcMemLazyEnablePeerAccess) );
+                    cudaErrorCheck( cudaIpcOpenMemHandle((void**)&peerBufferB[i], recvHandleB[i], cudaIpcMemLazyEnablePeerAccess) );
                 } else {
                     peerBufferA[i] = d_A; // NOTE this is the self send case
                     peerBufferB[i] = d_B; // NOTE this is the self send case
                 }
         }
+        MPI_Barrier(MPI_COMM_WORLD);
 
         for(int i=1-(WARM_UP); i<=loop_count; i++){
             for (int k=0; k<MICROBENCH_MAX_GPUS; k++) cudaErrorCheck(cudaStreamCreate(&Streams[k]));
@@ -414,7 +405,6 @@ int main(int argc, char *argv[])
                 cudaErrorCheck( cudaIpcCloseMemHandle(peerBufferB[i]) );
             }
         }
-
 
 
         gpu_device_reduce_max(d_B, N, &gpu_check);
@@ -502,8 +492,10 @@ int main(int argc, char *argv[])
     free(inner_elapsed_time);
     free(peerBufferA);
     free(peerBufferB);
-    free(sendHandle);
-    free(recvHandle);
+    if (rank == 0) {
+        free(recvHandleA);
+        free(recvHandleB);
+    }
     MPI_Finalize();
     return(0);
 }
