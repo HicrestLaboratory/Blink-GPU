@@ -30,9 +30,9 @@ do
             continue
         fi
         # ar not available for Nvlink
-        if [[ $name == "ar" && $type == "Nvlink" ]]; then
-            continue
-        fi        
+        #if [[ $name == "ar" && $type == "Nvlink" ]]; then
+        #    continue
+        #fi        
         # a2a on Nccl does not need to be generated
         if [[ $name == "a2a" && $type == "Nccl" ]]; then
             continue
@@ -51,6 +51,7 @@ do
         sed -i 's/hipDeviceProp/hipDeviceProp_t/g' src/${cur_name}.cpp
         sed -i 's/hipFreeHost/hipHostFree/g' src/${cur_name}.cpp # hipFreeHost deprecated
         sed -i 's/!prop.unifiedAddressing/0/g' src/${cur_name}.cpp # We need this because on old ROCM versions the unifiedAddressing property is not available
+	sed -i 's/hipOccupancyMaxPotentialBlockSize(&minGridSize, &blockSize, reductionKernel_0, 0, N);/blockSize = 1024;/g' src/${cur_name}.cpp # For ar_nvlink
         #if [[ $type == "Nvlink" ]]; then
         #    sed -i 's/hipMalloc/hipMallocManaged/g' src/${cur_name}.cpp
         #fi    
