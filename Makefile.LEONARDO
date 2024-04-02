@@ -65,6 +65,7 @@ hlo: $(BINFOLDER)/$(HALONAME)_Baseline $(BINFOLDER)/$(HALONAME)_CudaAware $(BINF
 mpp: $(BINFOLDER)/$(MPPNAME)_Baseline $(BINFOLDER)/$(MPPNAME)_CudaAware $(BINFOLDER)/$(MPPNAME)_Nccl $(BINFOLDER)/$(MPPNAME)_Nvlink $(BINFOLDER)/$(MPPNAME)_Aggregated
 inc: $(BINFOLDER)/$(INCNAME)_Nccl
 otom: $(BINFOLDER)/$(OTOMNAME)_Nccl
+devhostdev: $(BINFOLDER)/testDevHostDev
 
 # --------------- Baseline ---------------
 $(BASELINE_MODULES):
@@ -100,6 +101,11 @@ $(BINFOLDER)/$(HALONAME)_Baseline: src/$(HALONAME)_Baseline.cu $(BASELINE_MODULE
 $(BINFOLDER)/$(MPPNAME)_Baseline: src/$(MPPNAME)_Baseline.cu $(BASELINE_MODULES) $(BASELINE_SN_EXPORTS) $(BASELINE_MN_EXPORTS)
 	mkdir -p $(BINFOLDER) $(OUTFOLDER) $(SOUTFOLDER)
 	source $(BASELINE_MODULES) && $(CC) $(CFLAGS) -o $@ $< $(INCL) $(LIBS) $(LIBFLAGS) $(MPI) $(CUDA) -lstdc++ -lm -Wno-deprecated-gpu-targets $(DBGFLAGS) -DPINNED
+
+$(BINFOLDER)/testDevHostDev: src/testDevHostDev.cu $(BASELINE_MODULES) $(BASELINE_SN_EXPORTS) $(BASELINE_MN_EXPORTS)
+	mkdir -p $(BINFOLDER) $(OUTFOLDER) $(SOUTFOLDER)
+	source $(BASELINE_MODULES) && $(CC) $(CFLAGS) -o $@ $< $(INCL) $(LIBS) $(LIBFLAGS) $(MPI) $(CUDA) -lstdc++ -lm -Wno-deprecated-gpu-targets $(DBGFLAGS) -DPINNED
+
 # ----------------------------------------
 
 
