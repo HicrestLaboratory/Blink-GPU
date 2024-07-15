@@ -9,7 +9,6 @@
 #include <inttypes.h>
 #include <chrono>
 
-
 #define MPI
 
 #include "../include/error.h"
@@ -143,10 +142,10 @@ int main(int argc, char *argv[])
     --------------------------------------------------------------------------------------------*/
     ncclUniqueId Id;
     ncclComm_t NCCL_COMM_WORLD, NCCL_COMM_NODE;
-
+    
     MPI_Barrier(MPI_COMM_WORLD);
     const unsigned long int start_time_nccl_init_us = std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock::now().time_since_epoch()).count();
-
+    
     ncclGroupStart();
     if (rank == 0) { NCCLCHECK( ncclGetUniqueId(&Id) ); }
     MPI_Bcast(&Id, sizeof(ncclUniqueId), MPI_BYTE, 0, MPI_COMM_WORLD);
@@ -160,7 +159,6 @@ int main(int argc, char *argv[])
     MPI_Bcast(&Id, sizeof(ncclUniqueId), MPI_BYTE, 0, nodeComm);
     NCCLCHECK( ncclCommInitRank(&NCCL_COMM_NODE, mynodesize, Id, mynodeid) );
     ncclGroupEnd();
-
 
     int nccl_w_rk;
     int nccl_w_sz;
@@ -182,11 +180,11 @@ int main(int argc, char *argv[])
 #endif
 
     MPI_Barrier(MPI_COMM_WORLD);
-
     const unsigned long int end_time_nccl_init_us = std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock::now().time_since_epoch()).count();
     if (rank == 0)
         printf("NCCL init time: %f (s)\n", (end_time_nccl_init_us-start_time_nccl_init_us)/1e6);
     
+
 
      /* -------------------------------------------------------------------------------------------
         Loop from 8 B to 1 GB
@@ -267,16 +265,13 @@ int main(int argc, char *argv[])
         Implemetantion goes here
 
         */
-        cudaEvent_t start, stop;
-        cudaErrorCheck(cudaEventCreate(&start));
-        cudaErrorCheck(cudaEventCreate(&stop));
 
         for(int i=1-(WARM_UP); i<=loop_count; i++){
             // Quick hack for endless mode
             if(endless){i = 1;}
             
             MPI_Barrier(MPI_COMM_WORLD);
-            cudaErrorCheck(cudaEventRecord(start, NULL));
+            start_time = MPI_Wtime();
 
             ncclGroupStart();
             for (int r=0; r<size; r++) {
@@ -290,9 +285,9 @@ int main(int argc, char *argv[])
             }
             ncclGroupEnd();
 
-            cudaErrorCheck(cudaEventRecord(stop, NULL));
-            cudaErrorCheck(cudaEventSynchronize(stop));
-            if (i>0) {cudaErrorCheck(cudaEventElapsedTime(&(inner_elapsed_time[(j-fix_buff_size)*loop_count+i-1]), start, stop));}
+            cudaErrorCheck( cudaDeviceSynchronize() );
+            stop_time = MPI_Wtime();
+            if (i>0) inner_elapsed_time[(j-fix_buff_size)*loop_count+i-1] = stop_time - start_time;
 
             if (rank == 0 && !endless) {printf("%%"); fflush(stdout);}
         }
@@ -350,7 +345,6 @@ int main(int argc, char *argv[])
 
         double avg_time_per_transfer = 0.0;
         for (int i=0; i<loop_count; i++) {
-            elapsed_time[(j-fix_buff_size)*loop_count+i] *= 0.001;
             avg_time_per_transfer += elapsed_time[(j-fix_buff_size)*loop_count+i];
             if(rank == 0) printf("\tTransfer size (B): %10" PRIu64 ", Transfer Time (s): %15.9f, Bandwidth (GiB/s): %15.9f, Iteration %d\n", num_B, elapsed_time[(j-fix_buff_size)*loop_count+i], num_GB/elapsed_time[(j-fix_buff_size)*loop_count+i], i);
         }

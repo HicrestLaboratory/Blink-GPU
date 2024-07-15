@@ -422,6 +422,7 @@ int main(int argc, char *argv[])
                 }
                 ncclGroupEnd();
 
+                cudaErrorCheck( cudaDeviceSynchronize() );
                 stop_time = MPI_Wtime();
                 if (i>0) inner_elapsed_time[(j-fix_buff_size)*loop_count+i-1] = stop_time - start_time;
 
