@@ -252,20 +252,16 @@ int main(int argc, char *argv[])
         Implemetantion goes here
 
         */
-        cudaEvent_t start, stop;
-        cudaErrorCheck(cudaEventCreate(&start));
-        cudaErrorCheck(cudaEventCreate(&stop));
 
         if (rank == 0) {printf("%i#", j); fflush(stdout);}
         for(int i=1-(WARM_UP); i<=loop_count; i++){
             MPI_Barrier(MPI_COMM_WORLD);
-            cudaErrorCheck(cudaEventRecord(start, NULL));
+            start_time = MPI_Wtime();
 
             ncclAllReduce(d_A, d_B, N, ncclDtype, ncclMax, NCCL_COMM_WORLD, NULL);
 
-            cudaErrorCheck(cudaEventRecord(stop, NULL));
-            cudaErrorCheck(cudaEventSynchronize(stop));
-            if (i>0) {cudaErrorCheck(cudaEventElapsedTime(&(inner_elapsed_time[(j-fix_buff_size)*loop_count+i-1]), start, stop));}
+            stop_time = MPI_Wtime();
+            if (i>0) inner_elapsed_time[(j-fix_buff_size)*loop_count+i-1] = stop_time - start_time;
 
             if (rank == 0) {printf("%%"); fflush(stdout);}
         }
@@ -322,13 +318,12 @@ int main(int argc, char *argv[])
 
         double avg_time_per_transfer = 0.0;
         for (int i=0; i<loop_count; i++) {
-            elapsed_time[(j-fix_buff_size)*loop_count+i] *= 0.001;
             avg_time_per_transfer += elapsed_time[(j-fix_buff_size)*loop_count+i];
-            if(rank == 0) printf("\tTransfer size (B): %10" PRIu64 ", Transfer Time (s): %15.9f, Bandwidth (GB/s): %15.9f, Iteration %d\n", num_B, elapsed_time[(j-fix_buff_size)*loop_count+i], num_GB/elapsed_time[(j-fix_buff_size)*loop_count+i], i);
+            if(rank == 0) printf("\tTransfer size (B): %10" PRIu64 ", Transfer Time (s): %15.9f, Bandwidth (GiB/s): %15.9f, Iteration %d\n", num_B, elapsed_time[(j-fix_buff_size)*loop_count+i], num_GB/elapsed_time[(j-fix_buff_size)*loop_count+i], i);
         }
         avg_time_per_transfer /= ((double)loop_count);
 
-        if(rank == 0) printf("[Average] Transfer size (B): %10" PRIu64 ", Transfer Time (s): %15.9f, Bandwidth (GB/s): %15.9f, Error: %d\n", num_B, avg_time_per_transfer, num_GB/avg_time_per_transfer, error[j] );
+        if(rank == 0) printf("[Average] Transfer size (B): %10" PRIu64 ", Transfer Time (s): %15.9f, Bandwidth (GiB/s): %15.9f, Error: %d\n", num_B, avg_time_per_transfer, num_GB/avg_time_per_transfer, error[j] );
     }
     fflush(stdout);
     MPI_Barrier(MPI_COMM_WORLD);

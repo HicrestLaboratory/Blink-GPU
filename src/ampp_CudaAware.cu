@@ -1,12 +1,10 @@
 #include <stdio.h>
 #include "mpi.h"
 
-#include <nccl.h>
-#include "cuda.h"
-#include "cuda_runtime.h"
+#include <cuda.h>
+#include <cuda_runtime.h>
 #include <unistd.h>
 #include <inttypes.h>
-#include <chrono>
 
 #define MPI
 
@@ -16,15 +14,91 @@
 #include "../include/device_assignment.h"
 #include "../include/prints.h"
 
-#ifdef MPIX_CUDA_AWARE_SUPPORT
+#if !defined(OPEN_MPI) || !OPEN_MPI
+#error This source code uses an Open MPI-specific extension
+#endif
+
 /* Needed for MPIX_Query_cuda_support(), below */
 #include "mpi-ext.h"
-#endif
 
 #define BUFF_CYCLE 31
 #define LOOP_COUNT 50
 
 #define WARM_UP 5
+
+// ---------------------------------------
+void PICO_enable_peer_access(int myrank, int deviceCount, int mydev) {
+    // Pick all the devices that can access each other's memory for this test
+    // Keep in mind that CUDA has minimal support for fork() without a
+    // corresponding exec() in the child process, but in this case our
+    // spawnProcess will always exec, so no need to worry.
+    cudaDeviceProp prop;
+    int allPeers = 1, myIPC = 1, allIPC;
+    cudaErrorCheck(cudaGetDeviceProperties(&prop, mydev));
+
+    int* canAccesPeer = (int*) malloc(sizeof(int)*deviceCount*deviceCount);
+    for (int i = 0; i < deviceCount*deviceCount; i++) canAccesPeer[i] = 0;
+
+    // CUDA IPC is only supported on devices with unified addressing
+    if (!prop.unifiedAddressing) {
+      myIPC = 0;
+    } else {
+    }
+    // This sample requires two processes accessing each device, so we need
+    // to ensure exclusive or prohibited mode is not set
+    if (prop.computeMode != cudaComputeModeDefault) {
+      myIPC = 0;
+    }
+
+    MPI_Allreduce(&myIPC, &allIPC, 1, MPI_INT, MPI_MIN, MPI_COMM_WORLD);
+    if (!allIPC) {
+      exit(__LINE__);
+    }
+
+    if (myrank == 0) {
+      for (int i = 0; i < deviceCount; i++) {
+        for (int j = 0; j < deviceCount; j++) {
+          if (j != i) {
+            int canAccessPeerIJ, canAccessPeerJI;
+            cudaErrorCheck( cudaDeviceCanAccessPeer(&canAccessPeerJI, j, i) );
+            cudaErrorCheck( cudaDeviceCanAccessPeer(&canAccessPeerIJ, i, j) );
+
+            canAccesPeer[i * deviceCount + j] = (canAccessPeerIJ) ? 1 : 0;
+            canAccesPeer[j * deviceCount + i] = (canAccessPeerJI) ? 1 : 0;
+            if (!canAccessPeerIJ || !canAccessPeerJI) allPeers = 0;
+          } else {
+            canAccesPeer[i * deviceCount + j] = -1;
+          }
+        }
+      }
+    }
+
+    MPI_Barrier(MPI_COMM_WORLD);
+    MPI_Bcast(&allPeers, 1, MPI_INT, 0, MPI_COMM_WORLD);
+    MPI_Bcast(canAccesPeer, deviceCount*deviceCount, MPI_INT, 0, MPI_COMM_WORLD);
+
+    if (allPeers) {
+      // Enable peers here.  This isn't necessary for IPC, but it will
+      // setup the peers for the device.  For systems that only allow 8
+      // peers per GPU at a time, this acts to remove devices from CanAccessPeer
+      for (int j = 0; j < deviceCount; j++) {
+        if (j != mydev) {
+          cudaErrorCheck(cudaDeviceEnablePeerAccess(j, 0));
+        }
+      }
+    }
+
+    MPI_Barrier(MPI_COMM_WORLD);
+}
+
+void PICO_disable_peer_access(int deviceCount, int mydev){
+    MPI_Barrier(MPI_COMM_WORLD);
+    for (int j = 0; j < deviceCount; j++) {
+      if (j != mydev) {
+        cudaErrorCheck(cudaDeviceDisablePeerAccess(j));
+      }
+    }
+}
 
 void read_line_parameters (int argc, char *argv[], int myrank,
                            int *flag_b, int *flag_l, int *flag_x, int *flag_p,
@@ -159,9 +233,12 @@ int main(int argc, char *argv[])
     // Map MPI ranks to GPUs
     int num_devices = 0;
     cudaErrorCheck( cudaGetDeviceCount(&num_devices) );
+    //     cudaErrorCheck( cudaSetDevice(rank % num_devices) );
 
     MPI_Comm nodeComm;
     int dev = assignDeviceToProcess(&nodeComm, &nnodes, &mynode);
+    cudaSetDevice(dev);
+
     // print device affiniy
 #ifndef SKIPCPUAFFINITY
     if (0==rank) printf("List device affinity:\n");
@@ -176,7 +253,7 @@ int main(int argc, char *argv[])
 
     // Check that all the nodes has the same size
     int nodesize;
-    MPI_Allreduce(&mynodesize, &nodesize, 1, MPI_INT, MPI_MAX, MPI_COMM_WORLD);
+    MPI_Allreduce(&mynodesize, &nodesize, sizeof(int), MPI_INT, MPI_MAX, MPI_COMM_WORLD);
     if (nodesize != mynodesize) {
         fprintf(stderr, "Error at node %d: mynodesize (%d) does not metch with nodesize (%d)\n", rank, mynodesize, nodesize);
         fflush(stderr);
@@ -206,8 +283,8 @@ int main(int argc, char *argv[])
     read_line_parameters(argc, argv, rank,
                          &flag_b, &flag_l, &flag_x, &flag_p,
                          &loop_count, &buff_cycle, &fix_buff_size, &ncouples);
-    if(flag_x && fix_buff_size >= buff_cycle){buff_cycle = fix_buff_size + 1;}  
-      
+    if(flag_x && fix_buff_size >= buff_cycle){buff_cycle = fix_buff_size + 1;} 
+       
     // Print message based on the flags
     if (flag_p && rank == 0) printf("Flag p was set with argument: %d\n", ncouples);
     if (flag_b && rank == 0) printf("Flag b was set with argument: %d\n", buff_cycle);
@@ -239,10 +316,10 @@ int main(int argc, char *argv[])
         MPI Initialize Peer-to-peer communicators
     --------------------------------------------------------------------------------------------*/
 
-    MPI_Comm ppCouples, ppAllCouples, ppFirstSenders;
-    int ppCouples_rank, ppAllCouples_rank, ppFirstSenders_rank;
-    int ppCouples_size, ppAllCouples_size, ppFirstSenders_size;
-    int colour4ppCouples, colour4ppAllCouples , colour4ppFirstSenders;
+    MPI_Comm ppCouples, ppOutCouple, ppAllCouples, ppAllNodeCouples, ppFirstSenders;
+    int ppCouples_rank, ppOutCouple_rank, ppAllCouples_rank, ppAllNodeCouples_rank, ppFirstSenders_rank;
+    int ppCouples_size, ppOutCouple_size, ppAllCouples_size, ppAllNodeCouples_size, ppFirstSenders_size;
+    int colour4ppCouples, colour4ppOutCouple, colour4ppAllCouples, colour4ppAllNodeCouples, colour4ppFirstSenders;
 
     int my_peer = -1;
     if ((mynode == 0 || mynode == nnodes-1) && mynodeid < ncouples)
@@ -258,6 +335,16 @@ int main(int argc, char *argv[])
         ppCouples_size = -1;
     }
 
+    colour4ppOutCouple = ((mynode == 0 || mynode == nnodes-1) && mynodeid == 0) ? (1) : (MPI_UNDEFINED);
+    MPI_Comm_split(MPI_COMM_WORLD, colour4ppOutCouple, rank, &ppOutCouple);
+    if(ppOutCouple != MPI_COMM_NULL) {
+        MPI_Comm_rank(ppOutCouple, &ppOutCouple_rank);
+        MPI_Comm_size(ppOutCouple, &ppOutCouple_size);
+    } else {
+        ppOutCouple_rank = -1;
+        ppOutCouple_size = -1;
+    }
+
     colour4ppAllCouples = ((mynode == 0 || mynode == nnodes-1) && mynodeid < ncouples) ? (1) : (MPI_UNDEFINED);
     MPI_Comm_split(MPI_COMM_WORLD, colour4ppAllCouples, rank, &ppAllCouples);
     if(ppAllCouples != MPI_COMM_NULL) {
@@ -266,6 +353,16 @@ int main(int argc, char *argv[])
     } else {
         ppAllCouples_rank = -1;
         ppAllCouples_size = -1;
+    }
+
+    colour4ppAllNodeCouples = ((mynode == 0 || mynode == nnodes-1) && mynodeid < ncouples) ? (mynode) : (MPI_UNDEFINED);
+    MPI_Comm_split(MPI_COMM_WORLD, colour4ppAllNodeCouples, rank, &ppAllNodeCouples);
+    if(ppAllNodeCouples != MPI_COMM_NULL) {
+        MPI_Comm_rank(ppAllNodeCouples, &ppAllNodeCouples_rank);
+        MPI_Comm_size(ppAllNodeCouples, &ppAllNodeCouples_size);
+    } else {
+        ppAllNodeCouples_rank = -1;
+        ppAllNodeCouples_size = -1;
     }
 
     colour4ppFirstSenders = (rank < ncouples) ? (mynode) : (MPI_UNDEFINED);
@@ -283,10 +380,20 @@ int main(int argc, char *argv[])
     else
         printf("Process %d took part to the ppCouples (with rank %d and size %d).\n", rank, ppCouples_rank, ppCouples_size);
     fflush(stdout);
+    if(ppOutCouple == MPI_COMM_NULL)
+        printf("Process %d did not take part to the ppOutCouple.\n", rank);
+    else
+        printf("Process %d took part to the ppOutCouple (with rank %d and size %d).\n", rank, ppOutCouple_rank, ppOutCouple_size);
+    fflush(stdout);
     if(ppAllCouples == MPI_COMM_NULL)
         printf("Process %d did not take part to the ppAllCouples.\n", rank);
     else
         printf("Process %d took part to the ppAllCouples (with rank %d and size %d).\n", rank, ppAllCouples_rank, ppAllCouples_size);
+    fflush(stdout);
+    if(ppAllNodeCouples == MPI_COMM_NULL)
+        printf("Process %d did not take part to the ppAllNodeCouples.\n", rank);
+    else
+        printf("Process %d took part to the ppAllNodeCouples (with rank %d and size %d).\n", rank, ppAllNodeCouples_rank, ppAllNodeCouples_size);
     fflush(stdout);
     if(ppFirstSenders == MPI_COMM_NULL)
         printf("Process %d did not take part to the ppFirstSenders.\n", rank);
@@ -294,57 +401,11 @@ int main(int argc, char *argv[])
         printf("Process %d took part to the ppFirstSenders (with rank %d and size %d).\n", rank, ppFirstSenders_rank, ppFirstSenders_size);
     fflush(stdout);
 
-    /* -------------------------------------------------------------------------------------------
-        NCCL Initialization
-    --------------------------------------------------------------------------------------------*/
-    ncclUniqueId Id;
-    ncclComm_t NCCL_COMM_WORLD, NCCL_COMM_NODE;
-    MPI_Barrier(MPI_COMM_WORLD);
-    const unsigned long int start_time_nccl_init_us = std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock::now().time_since_epoch()).count();
-
-    ncclGroupStart();
-    if (rank == 0) { NCCLCHECK( ncclGetUniqueId(&Id) ); }
-    MPI_Bcast(&Id, sizeof(ncclUniqueId), MPI_BYTE, 0, MPI_COMM_WORLD);
-    NCCLCHECK( ncclCommInitRank(&NCCL_COMM_WORLD, size, Id, rank) );
-    ncclGroupEnd();
-
-#ifdef PRINT_NCCL_INTRANODE_INFO
-
-    ncclGroupStart();
-    if (mynodeid == 0) { NCCLCHECK( ncclGetUniqueId(&Id) ); }
-    MPI_Bcast(&Id, sizeof(ncclUniqueId), MPI_BYTE, 0, nodeComm);
-    NCCLCHECK( ncclCommInitRank(&NCCL_COMM_NODE, mynodesize, Id, mynodeid) );
-    ncclGroupEnd();
-
-    int nccl_w_rk;
-    int nccl_w_sz;
-    ncclGroupStart();
-    NCCLCHECK( ncclCommCount(NCCL_COMM_WORLD, &nccl_w_sz)   );
-    NCCLCHECK( ncclCommUserRank(NCCL_COMM_WORLD, &nccl_w_rk) );
-    ncclGroupEnd();
-
-    int nccl_n_rk;
-    int nccl_n_sz;
-    ncclGroupStart();
-    NCCLCHECK( ncclCommCount(NCCL_COMM_NODE, &nccl_n_sz)   );
-    NCCLCHECK( ncclCommUserRank(NCCL_COMM_NODE, &nccl_n_rk) );
-    ncclGroupEnd();
-
-    printf("[%d] NCCL_COMM_WORLD: nccl size = %d, nccl rank = %d\n", rank, nccl_w_sz, nccl_w_rk);
-    printf("[%d] NCCL_COMM_NODE:  nccl size = %d, nccl rank = %d\n", rank, nccl_n_sz, nccl_n_rk);
-    fflush(stdout);
-#endif
-
-    MPI_Barrier(MPI_COMM_WORLD);
-
-    const unsigned long int end_time_nccl_init_us = std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock::now().time_since_epoch()).count();
-    if (rank == 0)
-        printf("NCCL init time: %f (s)\n", (end_time_nccl_init_us-start_time_nccl_init_us)/1e6);
-    
-
      /* -------------------------------------------------------------------------------------------
         Loop from 8 B to 1 GB
     --------------------------------------------------------------------------------------------*/
+
+    PICO_enable_peer_access(mynodeid, nodesize, dev);
 
     SZTYPE N;
     if (fix_buff_size<=30) {
@@ -354,13 +415,18 @@ int main(int argc, char *argv[])
         N <<= (fix_buff_size - 31);
     }
 
-    float start_time, stop_time;
+    MPI_Status IPCstat;
+    dtype *peerBBuffers[ncouples], *peerAggBuffer;
+    cudaEvent_t event;
+    cudaIpcMemHandle_t sendBHandle, recvBHandle[ncouples], sendAggHandle, recvAggHandle;
+
+    double start_time, stop_time;
     int *error = (int*)malloc(sizeof(int)*buff_cycle);
     int *my_error = (int*)malloc(sizeof(int)*buff_cycle);
     cktype *cpu_checks = (cktype*)malloc(sizeof(cktype)*buff_cycle);
     cktype *gpu_checks = (cktype*)malloc(sizeof(cktype)*buff_cycle);
-    float *elapsed_time = (float*)malloc(sizeof(float)*buff_cycle*loop_count);
-    float *inner_elapsed_time = (float*)malloc(sizeof(float)*buff_cycle*loop_count);
+    double *elapsed_time = (double*)malloc(sizeof(double)*buff_cycle*loop_count);
+    double *inner_elapsed_time = (double*)malloc(sizeof(double)*buff_cycle*loop_count);
     if (ppCouples != MPI_COMM_NULL) {
         for(int j=fix_buff_size; j<max_j; j++){
 
@@ -368,14 +434,9 @@ int main(int argc, char *argv[])
             if (rank == 0) {printf("%i#", j); fflush(stdout);}
 
             // Allocate memory for A on CPU
-            dtype *A, *B;
-#ifdef PINNED
-            cudaHostAlloc(&A, N*sizeof(dtype), cudaHostAllocDefault);
-            cudaHostAlloc(&B, N*sizeof(dtype), cudaHostAllocDefault);
-#else
-            A = (dtype*)malloc(N*sizeof(dtype));
-            B = (dtype*)malloc(N*sizeof(dtype));
-#endif
+            dtype *d_Agg;
+            dtype *A = (dtype*)malloc(N*sizeof(dtype));
+            dtype *B = (dtype*)malloc(N*sizeof(dtype));
             cktype my_cpu_check = 0, recv_cpu_check, gpu_check = 0;
 
             // Initialize all elements of A to 0.0
@@ -393,8 +454,14 @@ int main(int argc, char *argv[])
             cudaErrorCheck( cudaMemcpy(d_A, A, N*sizeof(dtype), cudaMemcpyHostToDevice) );
             gpu_device_reduce(d_A, N, &my_cpu_check);
 
+            if (mynodeid == 0) {
+                cudaErrorCheck( cudaMalloc(&d_Agg, N*ncouples*sizeof(dtype)) );
+                cudaErrorCheck( cudaMemset(d_Agg, 0U, N*ncouples*sizeof(dtype)) );
+            }
+
             int tag1 = 10;
             int tag2 = 20;
+            MPI_Request request[2*ncouples];
 
             /*
 
@@ -402,25 +469,65 @@ int main(int argc, char *argv[])
 
             */
 
+            // Generate IPC MemHandle
+            cudaErrorCheck( cudaIpcGetMemHandle((cudaIpcMemHandle_t*)&sendBHandle, d_B) );
+            if (mynodeid==0) { cudaErrorCheck( cudaIpcGetMemHandle((cudaIpcMemHandle_t*)&sendAggHandle, d_Agg) ); }
+
+            // Share IPC MemHandle
+            MPI_Gather(&sendBHandle, sizeof(cudaIpcMemHandle_t), MPI_BYTE, &recvBHandle, sizeof(cudaIpcMemHandle_t), MPI_BYTE, 0, ppAllNodeCouples);
+            if (mynodeid == 0)
+                MPI_Bcast(&sendAggHandle, sizeof(cudaIpcMemHandle_t), MPI_BYTE, 0, ppAllNodeCouples);
+            else
+                MPI_Bcast(&recvAggHandle, sizeof(cudaIpcMemHandle_t), MPI_BYTE, 0, ppAllNodeCouples);
+
+            // Open MemHandles
+            if (mynodeid == 0) {
+                for (int i=0; i<ncouples; i++) {
+                    if (i != 0) {
+                        cudaErrorCheck( cudaIpcOpenMemHandle((void**)&peerBBuffers[i], *(cudaIpcMemHandle_t*)&recvBHandle[i], cudaIpcMemLazyEnablePeerAccess) );
+                    } else {
+                        peerBBuffers[i] = d_B;
+                    }
+                }
+                peerAggBuffer = d_Agg;
+            } else {
+                cudaErrorCheck( cudaIpcOpenMemHandle((void**)&peerAggBuffer, *(cudaIpcMemHandle_t*)&recvAggHandle, cudaIpcMemLazyEnablePeerAccess) );
+            }
+
             for(int i=1-(WARM_UP); i<=loop_count; i++){
-                MPI_Barrier(ppAllCouples);
+                MPI_Barrier(ppCouples);
                 start_time = MPI_Wtime();
 
-                ncclGroupStart();
-                if(rank < my_peer){
-                    ncclSend(d_A, N, ncclDtype, my_peer, NCCL_COMM_WORLD, NULL);
-                } else {
-                    ncclRecv(d_B, N, ncclDtype, my_peer, NCCL_COMM_WORLD, NULL);
+
+                for (int k=0; k<2; k++) {
+                    // Aggregate d_A buffers into mynodeid 0 agg buffer
+                    if (mynode == k*(nnodes-1)) {
+                        cudaErrorCheck( cudaMemcpy(peerAggBuffer + (mynodeid*N), d_A, sizeof(dtype)*N, cudaMemcpyDeviceToDevice) );
+                        cudaErrorCheck( cudaDeviceSynchronize() );
+                    }
+                    MPI_Barrier(ppAllNodeCouples);
+
+                    // Out-node communication
+                    if (ppOutCouple != MPI_COMM_NULL) {
+                        if (mynode == k*(nnodes-1)) {
+                            MPI_Send(d_Agg, ncouples*N, MPI_dtype, my_peer, tag1, MPI_COMM_WORLD);
+                        } else {
+                            MPI_Recv(d_Agg, ncouples*N, MPI_dtype, my_peer, tag1, MPI_COMM_WORLD, &stat);
+                        }
+                        MPI_Barrier(ppOutCouple);
+                    }
+                    MPI_Barrier(ppAllNodeCouples);
+
+                    // Scatter agg buffer into d_B buffers
+                    if (mynode == (1-k)*(nnodes-1) && mynodeid == 0) {
+                        for (int i=0; i<ncouples; i++) {
+                            cudaErrorCheck( cudaMemcpy(peerBBuffers[i], d_Agg + (i*N), sizeof(dtype)*N, cudaMemcpyDeviceToDevice) );
+                        }
+                        cudaErrorCheck( cudaDeviceSynchronize() );
+                    }
+                    MPI_Barrier(ppAllNodeCouples);
+                    MPI_Barrier(ppCouples);
                 }
-                ncclGroupEnd();
-                cudaDeviceSynchronize();
-                ncclGroupStart();
-                if(rank < my_peer){
-                    ncclRecv(d_B, N, ncclDtype, my_peer, NCCL_COMM_WORLD, NULL);
-                } else {
-                    ncclSend(d_A, N, ncclDtype, my_peer, NCCL_COMM_WORLD, NULL);
-                }
-                ncclGroupEnd();
 
                 stop_time = MPI_Wtime();
                 if (i>0) inner_elapsed_time[(j-fix_buff_size)*loop_count+i-1] = stop_time - start_time;
@@ -428,6 +535,7 @@ int main(int argc, char *argv[])
                 if (rank == 0) {printf("%%"); fflush(stdout);}
             }
             if (rank == 0) {printf("#\n"); fflush(stdout);}
+
 
 
 
@@ -444,15 +552,12 @@ int main(int argc, char *argv[])
             cpu_checks[j] = recv_cpu_check;
             my_error[j] = abs(gpu_checks[j] - cpu_checks[j]);
 
+            fflush(stdout);
+            if (mynodeid == 0) cudaErrorCheck( cudaFree(d_Agg) );
             cudaErrorCheck( cudaFree(d_A) );
             cudaErrorCheck( cudaFree(d_B) );
-#ifdef PINNED
-            cudaFreeHost(A);
-            cudaFreeHost(B);
-#else
             free(A);
             free(B);
-#endif
         }
 
         if (fix_buff_size<=30) {
@@ -462,9 +567,9 @@ int main(int argc, char *argv[])
             N <<= (fix_buff_size - 31);
         }
 
-        MPI_Allreduce(my_error, error, buff_cycle, MPI_INT, MPI_MAX, ppAllCouples);
+        MPI_Allreduce(my_error, error, buff_cycle, MPI_INT, MPI_MAX, ppCouples);
         if(ppFirstSenders != MPI_COMM_NULL) {
-            MPI_Allreduce(inner_elapsed_time, elapsed_time, buff_cycle*loop_count, MPI_FLOAT, MPI_MAX, ppFirstSenders);
+            MPI_Allreduce(inner_elapsed_time, elapsed_time, buff_cycle*loop_count, MPI_DOUBLE, MPI_MAX, ppFirstSenders);
         }
         for(int j=fix_buff_size; j<max_j; j++) {
             (j!=0) ? (N <<= 1) : (N = 1);
@@ -472,25 +577,25 @@ int main(int argc, char *argv[])
             SZTYPE num_B, int_num_GB;
             double num_GB;
 
-            num_B = sizeof(dtype)*N*ncouples;
-            // TODO: maybe we can avoid if and just divide always by B_in_GB
             if (j < 31) {
                 SZTYPE B_in_GB = 1 << 30;
+                num_B = sizeof(dtype)*N*((size-1)/(float)size)*2;
                 num_GB = (double)num_B / (double)B_in_GB;
             } else {
-                SZTYPE M = 1 << (j - 30);            
-                num_GB = sizeof(dtype)*M;
+                SZTYPE M = 1 << (j - 30);
+                num_B = N*((size-1)/(float)size)*2*sizeof(dtype);
+                num_GB = sizeof(dtype)*M*((size-1)/(float)size)*2;
             }
 
             double avg_time_per_transfer = 0.0;
             for (int i=0; i<loop_count; i++) {
                 elapsed_time[(j-fix_buff_size)*loop_count+i] /= 2.0;
                 avg_time_per_transfer += elapsed_time[(j-fix_buff_size)*loop_count+i];
-                if(rank == 0) printf("\tTransfer size (B): %10" PRIu64 ", Transfer Time (s): %15.9f, Bandwidth (GiB/s): %15.9f, Iteration %d\n", num_B, elapsed_time[(j-fix_buff_size)*loop_count+i], num_GB/elapsed_time[(j-fix_buff_size)*loop_count+i], i);
+                if(rank == 0) printf("\tTransfer size (B): %10" PRIu64 ", Transfer Time (s): %15.9f, Bandwidth (GB/s): %15.9f, Iteration %d\n", num_B, elapsed_time[(j-fix_buff_size)*loop_count+i], num_GB/elapsed_time[(j-fix_buff_size)*loop_count+i], i);
             }
             avg_time_per_transfer /= (double)loop_count;
 
-            if(rank == 0) printf("[Average] Transfer size (B): %10" PRIu64 ", Transfer Time (s): %15.9f, Bandwidth (GiB/s): %15.9f, Error: %d\n", num_B, avg_time_per_transfer, num_GB/avg_time_per_transfer, error[j] );
+            if(rank == 0) printf("[Average] Transfer size (B): %10" PRIu64 ", Transfer Time (s): %15.9f, Bandwidth (GB/s): %15.9f, Error: %d\n", num_B, avg_time_per_transfer, num_GB/avg_time_per_transfer, error[j] );
             fflush(stdout);
         }
 
@@ -511,7 +616,6 @@ int main(int argc, char *argv[])
         printf("%s", s);
         fflush(stdout);
     }
-
     free(error);
     free(my_error);
     free(cpu_checks);

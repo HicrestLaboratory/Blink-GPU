@@ -215,14 +215,14 @@ int main(int argc, char *argv[])
             large_count = N / 8;
             if (large_count >= ((u_int64_t) (1UL << 32)) - 1) { // If large_count can't be represented on 32 bits
                 if(rank == 0){
-                    printf("\tTransfer size (B): -1, Transfer Time (s): -1, Bandwidth (GB/s): -1, Iteration -1\n");
+                    printf("\tTransfer size (B): -1, Transfer Time (s): -1, Bandwidth (GiB/s): -1, Iteration -1\n");
                 }
                 MPI_Abort(MPI_COMM_WORLD, -1);
             }
         }else{
             if (N >= ((u_int64_t) (1UL << 32)) - 1) { // If N can't be represented on 32 bits
                 if(rank == 0){
-                    printf("\tTransfer size (B): -1, Transfer Time (s): -1, Bandwidth (GB/s): -1, Iteration -1\n");
+                    printf("\tTransfer size (B): -1, Transfer Time (s): -1, Bandwidth (GiB/s): -1, Iteration -1\n");
                 }
                 MPI_Abort(MPI_COMM_WORLD, -1);
             }
@@ -265,16 +265,18 @@ int main(int argc, char *argv[])
         Implemetantion goes here
 
         */
-        cudaEvent_t start, stop;
-        cudaErrorCheck(cudaEventCreate(&start));
-        cudaErrorCheck(cudaEventCreate(&stop));
+
+//	cudaEvent_t start, stop;
+//        cudaErrorCheck(cudaEventCreate(&start));
+//        cudaErrorCheck(cudaEventCreate(&stop));
 
         for(int i=1-(WARM_UP); i<=loop_count; i++){
             // Quick hack for endless mode
             if(endless){i = 1;}
             
             MPI_Barrier(MPI_COMM_WORLD);
-            cudaErrorCheck(cudaEventRecord(start, NULL));
+            start_time = MPI_Wtime();
+//	    cudaErrorCheck(cudaEventRecord(start, NULL));
 
             ncclGroupStart();
             for (int r=0; r<size; r++) {
@@ -288,9 +290,12 @@ int main(int argc, char *argv[])
             }
             ncclGroupEnd();
 
-            cudaErrorCheck(cudaEventRecord(stop, NULL));
-            cudaErrorCheck(cudaEventSynchronize(stop));
-            if (i>0) {cudaErrorCheck(cudaEventElapsedTime(&(inner_elapsed_time[(j-fix_buff_size)*loop_count+i-1]), start, stop));}
+//            cudaErrorCheck(cudaEventRecord(stop, NULL));
+//            cudaErrorCheck(cudaEventSynchronize(stop));
+//            MPI_Barrier(MPI_COMM_WORLD);
+	    cudaErrorCheck(cudaDeviceSynchronize());
+	    stop_time = MPI_Wtime();
+            if (i>0) inner_elapsed_time[(j-fix_buff_size)*loop_count+i-1] = stop_time - start_time;
 
             if (rank == 0 && !endless) {printf("%%"); fflush(stdout);}
         }
@@ -348,13 +353,12 @@ int main(int argc, char *argv[])
 
         double avg_time_per_transfer = 0.0;
         for (int i=0; i<loop_count; i++) {
-            elapsed_time[(j-fix_buff_size)*loop_count+i] *= 0.001;
             avg_time_per_transfer += elapsed_time[(j-fix_buff_size)*loop_count+i];
-            if(rank == 0) printf("\tTransfer size (B): %10" PRIu64 ", Transfer Time (s): %15.9f, Bandwidth (GB/s): %15.9f, Iteration %d\n", num_B, elapsed_time[(j-fix_buff_size)*loop_count+i], num_GB/elapsed_time[(j-fix_buff_size)*loop_count+i], i);
+            if(rank == 0) printf("\tTransfer size (B): %10" PRIu64 ", Transfer Time (s): %15.9f, Bandwidth (GiB/s): %15.9f, Iteration %d\n", num_B, elapsed_time[(j-fix_buff_size)*loop_count+i], num_GB/elapsed_time[(j-fix_buff_size)*loop_count+i], i);
         }
         avg_time_per_transfer /= ((double)loop_count);
 
-        if(rank == 0) printf("[Average] Transfer size (B): %10" PRIu64 ", Transfer Time (s): %15.9f, Bandwidth (GB/s): %15.9f, Error: %d\n", num_B, avg_time_per_transfer, num_GB/avg_time_per_transfer, error[j] );
+        if(rank == 0) printf("[Average] Transfer size (B): %10" PRIu64 ", Transfer Time (s): %15.9f, Bandwidth (GiB/s): %15.9f, Error: %d\n", num_B, avg_time_per_transfer, num_GB/avg_time_per_transfer, error[j] );
         fflush(stdout);
     }
 
