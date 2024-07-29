@@ -49,6 +49,7 @@ EXPORTFOLDER=exportload
 # ------------ Module loading ------------
 SHELL:=/bin/bash
 NCCL_MODULES="${MODULEFOLDER}/load_Nccl_modules.sh"
+NCCL_NEW_MODULES="${MODULEFOLDER}/load_Nccl_new_modules.sh" # RCCL 5.7.1.1 (only used for intra-node point-to-point)
 NCCL_SINGULARITY_MODULES="${MODULEFOLDER}/load_Nccl_Singularity_modules.sh"
 NVLINK_MODULES="${MODULEFOLDER}/load_Nvlink_modules.sh"
 BASELINE_MODULES="${MODULEFOLDER}/load_Baseline_modules.sh"
@@ -66,7 +67,7 @@ CUDA_AWARE_SN_EXPORTS="${EXPORTFOLDER}/load_CudaAware_singlenode_exports.sh"
 
 # =====================================================================================
 all: a2a ar mpp pp otom inc a2am
-pp: $(BINFOLDER)/$(NAME)_Baseline $(BINFOLDER)/$(NAME)_CudaAware $(BINFOLDER)/$(NAME)_Nccl $(BINFOLDER)/$(NAME)_Nvlink
+pp: $(BINFOLDER)/$(NAME)_Baseline $(BINFOLDER)/$(NAME)_CudaAware $(BINFOLDER)/$(NAME)_Nccl $(BINFOLDER)/$(NAME)_Nvlink $(BINFOLDER)/$(NAME)_Nccl_new
 a2a: $(BINFOLDER)/$(A2ANAME)_Baseline $(BINFOLDER)/$(A2ANAME)_CudaAware $(BINFOLDER)/$(A2ANAME)_Nccl $(BINFOLDER)/$(A2ANAME)_Nvlink
 a2am: $(BINFOLDER)/$(A2AMNAME)_Nccl
 ar: $(BINFOLDER)/$(ARNAME)_Baseline $(BINFOLDER)/$(ARNAME)_Nvlink $(BINFOLDER)/$(ARNAME)_CudaAware $(BINFOLDER)/$(ARNAME)_Nccl
@@ -234,6 +235,34 @@ $(BINFOLDER)/$(COMMNAME)_Nccl: src/$(COMMNAME)_Nccl.cpp $(NCCL_MODULES) $(NCCL_S
 	mkdir -p $(BINFOLDER) $(OUTFOLDER) $(SOUTFOLDER)
 	source $(NCCL_MODULES) && $(CC) $(CFLAGS) -o $@ $< $(INCL) $(LIBS) $(LIBFLAGS) $(MPI) $(CUDA) $(NCCL) -lstdc++ -lm $(DBGFLAGS)
 # ----------------------------------------
+
+
+# ----------------- Rccl 5.7.1.1 -----------------
+$(NCCL_NEW_MODULES):
+	mkdir -p ${MODULEFOLDER}
+	@echo "module purge" > $@
+	@echo "module load LUMI/23.09" >> $@
+	@echo "module load partition/G" >> $@
+	@echo "module load rocm/5.6.1" >> $@
+	@echo "module load craype-accel-amd-gfx90a" >> $@
+	@echo "module load PrgEnv-gnu" >> $@
+	@echo "export NCCL_NCHANNELS_PER_PEER=32" >> $@
+	@echo 'export LD_LIBRARY_PATH=/project/project_465000997/rccl_5.7.1.1/rccl-release/rocm-rel-5.7.1.1-test-develop-release/rccl-install/lib/:$$LD_LIBRARY_PATH' >> $@
+	@echo "export HSA_ENABLE_SDMA=0" >> $@
+	@echo "export FI_CXI_ATS=0" >> $@
+	@echo "export FI_CXI_DEFAULT_CQ_SIZE=131072" >> $@
+	@echo "export NCCL_NET_GDR_LEVEL=3" >> $@
+	@echo "export NCCL_BUFFSIZE=33554432" >> $@
+	@echo "export NCCL_SOCKET_IFNAME=hsn0" >> $@
+	@echo "export NCCL_IGNORE_CPU_AFFINITY=1" >> $@
+	@echo "export HIPCC_COMPILE_FLAGS_APPEND=\"--offload-arch=gfx90a $(CC --cray-print-opts=cflags)\"" >> $@
+	@echo 'export HIPCC_LINK_FLAGS_APPEND=$$(CC --cray-print-opts=libs)' >> $@
+	@echo "unset MPICH_GPU_SUPPORT_ENABLED" >> $@
+
+
+$(BINFOLDER)/$(NAME)_Nccl_new: src/$(NAME)_Nccl.cpp $(NCCL_NEW_MODULES)
+	mkdir -p $(BINFOLDER) $(OUTFOLDER) $(SOUTFOLDER)
+	source $(NCCL_NEW_MODULES) && $(CC) $(CFLAGS) -o $@ $< $(INCL) $(LIBS) $(LIBFLAGS) $(MPI) $(CUDA) $(NCCL) -lstdc++ -lm $(DBGFLAGS)       
 
 
 # ----------------- Nccl with Singularity-----------------
