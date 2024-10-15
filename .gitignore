@@ -9,6 +9,7 @@ sout/*
 out/*
 
 sbatch/leonardo/run-leonardo*
+sbatch/snellius/run-snellius*
 
 __pycache__/*
 pytest.py

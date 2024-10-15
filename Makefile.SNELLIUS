@@ -43,14 +43,14 @@ NVLINK_MODULES="${MODULEFOLDER}/load_Nvlink_modules.sh"
 BASELINE_MODULES="${MODULEFOLDER}/load_Baseline_modules.sh"
 CUDA_AWARE_MODULES="${MODULEFOLDER}/load_CudaAware_modules.sh"
 # ------------ Export loading ------------
-NCCL_MN_EXPORTS="${EXPORTFOLDER}/load_Nccl_wholenode_exports.sh"
-NCCL_SN_EXPORTS="${EXPORTFOLDER}/load_Nccl_halfnode_exports.sh"
-NVLINK_MN_EXPORTS="${EXPORTFOLDER}/load_Nvlink_wholenode_exports.sh"
-NVLINK_SN_EXPORTS="${EXPORTFOLDER}/load_Nvlink_halfnode_exports.sh"
-BASELINE_MN_EXPORTS="${EXPORTFOLDER}/load_Baseline_wholenode_exports.sh"
-BASELINE_SN_EXPORTS="${EXPORTFOLDER}/load_Baseline_halfnode_exports.sh"
-CUDA_AWARE_MN_EXPORTS="${EXPORTFOLDER}/load_CudaAware_wholenode_exports.sh"
-CUDA_AWARE_SN_EXPORTS="${EXPORTFOLDER}/load_CudaAware_halfnode_exports.sh"
+NCCL_MN_EXPORTS="${EXPORTFOLDER}/load_Nccl_multinode_exports.sh"
+NCCL_SN_EXPORTS="${EXPORTFOLDER}/load_Nccl_singlenode_exports.sh"
+NVLINK_MN_EXPORTS="${EXPORTFOLDER}/load_Nvlink_multinode_exports.sh"
+NVLINK_SN_EXPORTS="${EXPORTFOLDER}/load_Nvlink_singlenode_exports.sh"
+BASELINE_MN_EXPORTS="${EXPORTFOLDER}/load_Baseline_multinode_exports.sh"
+BASELINE_SN_EXPORTS="${EXPORTFOLDER}/load_Baseline_singlenode_exports.sh"
+CUDA_AWARE_MN_EXPORTS="${EXPORTFOLDER}/load_CudaAware_multinode_exports.sh"
+CUDA_AWARE_SN_EXPORTS="${EXPORTFOLDER}/load_CudaAware_singlenode_exports.sh"
 # ----------------------------------------
 
 
