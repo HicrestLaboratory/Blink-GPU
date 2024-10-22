@@ -4,7 +4,6 @@ moduleload/*
 exportload/*
 bin/*
 
-*.txt
 sout/*
 out/*
 
