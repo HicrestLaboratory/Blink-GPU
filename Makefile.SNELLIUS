@@ -29,7 +29,7 @@ NAME=pp
 ARNAME=ar
 A2ANAME=a2a
 HALONAME=hlo
-NBPPNAME=nbpp
+MPPNAME=mpp
 # --------------- Folders ----------------
 BINFOLDER=bin
 OUTFOLDER=out
@@ -62,7 +62,7 @@ pp: $(BINFOLDER)/$(NAME)_Baseline $(BINFOLDER)/$(NAME)_CudaAware $(BINFOLDER)/$(
 a2a: $(BINFOLDER)/$(A2ANAME)_Baseline $(BINFOLDER)/$(A2ANAME)_CudaAware $(BINFOLDER)/$(A2ANAME)_Nccl $(BINFOLDER)/$(A2ANAME)_Nvlink
 ar: $(BINFOLDER)/$(ARNAME)_Baseline $(BINFOLDER)/$(ARNAME)_CudaAware $(BINFOLDER)/$(ARNAME)_Nccl $(BINFOLDER)/$(ARNAME)_Nvlink
 hlo: $(BINFOLDER)/$(HALONAME)_Baseline $(BINFOLDER)/$(HALONAME)_CudaAware $(BINFOLDER)/$(HALONAME)_Nccl
-mpp: $(BINFOLDER)/$(NBPPNAME)_Baseline $(BINFOLDER)/$(NBPPNAME)_CudaAware $(BINFOLDER)/$(NBPPNAME)_Nccl $(BINFOLDER)/$(NBPPNAME)_Nvlink $(BINFOLDER)/$(NBPPNAME)_Aggregated
+mpp: $(BINFOLDER)/$(MPPNAME)_Baseline $(BINFOLDER)/$(MPPNAME)_CudaAware $(BINFOLDER)/$(MPPNAME)_Nccl $(BINFOLDER)/$(MPPNAME)_Nvlink $(BINFOLDER)/$(MPPNAME)_Aggregated
 inc: $(BINFOLDER)/$(INCNAME)_Nccl
 otom: $(BINFOLDER)/$(OTOMNAME)_Nccl
 
@@ -99,7 +99,7 @@ $(BINFOLDER)/$(HALONAME)_Baseline: src/$(HALONAME)_Baseline.cu $(BASELINE_MODULE
 	mkdir -p $(BINFOLDER) $(OUTFOLDER) $(SOUTFOLDER)
 	source $(BASELINE_MODULES) && $(CC) $(CFLAGS) -o $@ $< $(INCL) $(LIBS) $(LIBFLAGS) $(MPI) $(CUDA) -lstdc++ -lm -Wno-deprecated-gpu-targets $(DBGFLAGS) -DPINNED
 
-$(BINFOLDER)/$(NBPPNAME)_Baseline: src/$(NBPPNAME)_Baseline.cu $(BASELINE_MODULES)
+$(BINFOLDER)/$(MPPNAME)_Baseline: src/$(MPPNAME)_Baseline.cu $(BASELINE_MODULES)
 	mkdir -p $(BINFOLDER) $(OUTFOLDER) $(SOUTFOLDER)
 	source $(BASELINE_MODULES) && $(CC) $(CFLAGS) -o $@ $< $(INCL) $(LIBS) $(LIBFLAGS) $(MPI) $(CUDA) -lstdc++ -lm -Wno-deprecated-gpu-targets $(DBGFLAGS) -DPINNED
 # ----------------------------------------
@@ -138,7 +138,7 @@ $(BINFOLDER)/$(HALONAME)_CudaAware: src/$(HALONAME)_CudaAware.cu $(CUDA_AWARE_MO
 	mkdir -p $(BINFOLDER) $(OUTFOLDER) $(SOUTFOLDER)
 	source $(CUDA_AWARE_MODULES) && $(CC) $(CFLAGS) -o $@ $< $(INCL) $(LIBS) $(LIBFLAGS) $(MPI_CUDA) $(CUDA) -lstdc++ -lm -Wno-deprecated-gpu-targets $(DBGFLAGS)
 
-$(BINFOLDER)/$(NBPPNAME)_CudaAware: src/$(NBPPNAME)_CudaAware.cu $(CUDA_AWARE_MODULES)
+$(BINFOLDER)/$(MPPNAME)_CudaAware: src/$(MPPNAME)_CudaAware.cu $(CUDA_AWARE_MODULES)
 	mkdir -p $(BINFOLDER) $(OUTFOLDER) $(SOUTFOLDER)
 	source $(CUDA_AWARE_MODULES) && $(CC) $(CFLAGS) -o $@ $< $(INCL) $(LIBS) $(LIBFLAGS) $(MPI_CUDA) $(CUDA) -lstdc++ -lm -Wno-deprecated-gpu-targets $(DBGFLAGS)
 # ----------------------------------------

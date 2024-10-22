@@ -20,3 +20,13 @@ sbatch/lumi/*sh
 # tmp
 include/communicators.h
 core
+
+plots4snellius/midfiles
+plots4snellius/csvfiles
+plots4snellius/mergedcsv
+plots4snellius/pngimages
+plots4snellius/*.png
+
+plots4snellius/preliminary
+plots4snellius/tmp
+plots4snellius/sout

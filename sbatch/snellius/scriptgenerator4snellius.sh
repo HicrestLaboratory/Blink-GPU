@@ -6,7 +6,7 @@ stencil_script=$(cat << 'EOF'
 #SBATCH --output=sout/snellius_<exp-name>_<exp-type>_<exp-topo>_%j.out
 #SBATCH --error=sout/snellius_<exp-name>_<exp-type>_<exp-topo>_%j.err
 
-#SBATCH --partition=gpu_a100
+#SBATCH --partition=gpu_h100
 #SBATCH --account=vusei7310
 #SBATCH --time=00:05:00
 #SBATCH --qos=normal
@@ -22,6 +22,8 @@ stencil_script=$(cat << 'EOF'
 echo "-------- Topology Info --------"
 echo "Nnodes = $SLURM_NNODES"
 srun -l bash -c 'if [[ "$SLURM_LOCALID" == "0" ]] ; then t="$SLURM_TOPOLOGY_ADDR" ; echo "Node: $SLURM_NODEID ---> $t" ; echo "$t" > tmp_${SLURM_NODEID}_${SLURM_JOB_ID}.txt ; fi'
+echo "-------------------------------"
+echo "Partition = ${SLURM_JOB_PARTITION}"
 echo "-------------------------------"
 switchesPaths=()
 for i in $( seq 0 $((SLURM_NNODES - 1)) )
@@ -77,8 +79,10 @@ echo "Max distance: $(($maxDist - $y))"
 echo "-------------------------------"
 echo "<sl-export>"
 echo "-------------------------------"
-
-
+srun -l bash -c 'export SLURM_LOCALID'
+srun -l bash -c 'echo "SLURM_LOCALID = ${SLURM_LOCALID}"'
+srun -l bash -c 'export UCX_NET_DEVICES=mlx5_${SLURM_LOCALID}:1 ; echo "UCX_NET_DEVICES: ${UCX_NET_DEVICES}"'
+srun -l bash -c 'echo "UCX_NET_DEVICES: ${UCX_NET_DEVICES}"'
 
 MODULE_PATH="moduleload/load_<exp-type>_modules.sh"
 EXPORT_PATH="exportload/load_<exp-type>_<exp-topo>_exports.sh"
@@ -145,7 +149,7 @@ do
                 else
                     out_script_contenent=$(echo "$tmp_script_contenent" | sed "s/<sl-export>//g" | sed "s/<sl-exp-and>//g")
                 fi
-
+		
                 tmp_script_contenent=$(echo "$out_script_contenent")
                 if [[ "$topo" == "multinode" ]]
                 then

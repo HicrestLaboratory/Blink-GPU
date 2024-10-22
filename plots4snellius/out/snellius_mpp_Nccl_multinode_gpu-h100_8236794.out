@@ -1,0 +1,57 @@
+-------- Topology Info --------
+Nnodes = 2
+4: Node: 1 ---> root.ibsw41.gcn123
+0: Node: 0 ---> root.ibsw41.gcn121
+-------------------------------
+Partition = gpu_h100
+-------------------------------
+switchesPaths:
+root.ibsw41.gcn121
+root.ibsw41.gcn123
+-------------------------------
+gcn121 ---> distance with node 0 (gcn121) = 0
+gcn123 ---> distance with node 0 (gcn121) = 1
+Max distance: 1
+-------------------------------
+export NCCL_IB_SL=1
+-------------------------------
+6: SLURM_LOCALID = 2
+7: SLURM_LOCALID = 3
+4: SLURM_LOCALID = 0
+5: SLURM_LOCALID = 1
+3: SLURM_LOCALID = 3
+2: SLURM_LOCALID = 2
+1: SLURM_LOCALID = 1
+0: SLURM_LOCALID = 0
+3: UCX_NET_DEVICES: mlx5_3:1
+2: UCX_NET_DEVICES: mlx5_2:1
+1: UCX_NET_DEVICES: mlx5_1:1
+0: UCX_NET_DEVICES: mlx5_0:1
+6: UCX_NET_DEVICES: mlx5_2:1
+7: UCX_NET_DEVICES: mlx5_3:1
+5: UCX_NET_DEVICES: mlx5_1:1
+4: UCX_NET_DEVICES: mlx5_0:1
+2: UCX_NET_DEVICES: 
+3: UCX_NET_DEVICES: 
+0: UCX_NET_DEVICES: 
+1: UCX_NET_DEVICES: 
+7: UCX_NET_DEVICES: 
+6: UCX_NET_DEVICES: 
+4: UCX_NET_DEVICES: 
+5: UCX_NET_DEVICES: 
+export NCCL_P2P_DISABLE=1
+8 total processes failed to start
+
+JOB STATISTICS
+==============
+Job ID: 8236794
+Cluster: snellius
+User/Group: lpichetti/lpichetti
+State: FAILED (exit code 132)
+Nodes: 2
+Cores per node: 64
+CPU Utilized: 00:00:01
+CPU Efficiency: 0.04% of 00:38:24 core-walltime
+Job Wall-clock time: 00:00:18
+Memory Utilized: 1.77 MB
+Memory Efficiency: 0.00% of 1.41 TB
