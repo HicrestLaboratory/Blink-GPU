@@ -1,7 +1,7 @@
 # ----------------- Path -----------------
 CUDA_HOME=/sw/arch/RHEL8/EB_production/2023/software/NVHPC/23.7-CUDA-12.1.1
 MPI_HOME=/sw/arch/RHEL8/EB_production/2023/software/OpenMPI/4.1.5-GCC-12.3.0
-MPI_CUDA_HOME=/sw/arch/RHEL8/EB_production/2023/software/NVHPC/23.7-CUDA-12.1.1/Linux_x86_64/2023/comm_libs/12.2/openmpi4/openmpi-4.1.5
+#MPI_CUDA_HOME=/sw/arch/RHEL8/EB_production/2023/software/NVHPC/23.7-CUDA-12.1.1/Linux_x86_64/2023/comm_libs/12.2/openmpi4/openmpi-4.1.5
 NCCL_HOME=/sw/arch/RHEL8/EB_production/2023/software/NVHPC/23.7-CUDA-12.1.1/Linux_x86_64/23.7/comm_libs/12.2/nccl
 # ---------------- Common ----------------
 CC=nvcc
@@ -72,7 +72,7 @@ $(BASELINE_MODULES):
 	@echo "module purge" > $@
 	@echo "module load 2023" >> $@
 	@echo "module load NCCL/2.18.3-GCCcore-12.3.0-CUDA-12.1.1" >> $@
-	@echo "module load gompi/2023a" >> $@
+	@echo "module load OpenMPI/4.1.5-GCC-12.3.0" >> $@
 	@echo "module load NVHPC/23.7-CUDA-12.1.1" >> $@
 
 $(BASELINE_SN_EXPORTS):
@@ -111,8 +111,9 @@ $(CUDA_AWARE_MODULES):
 	@echo "module purge" > $@
 	@echo "module load 2023" >> $@
 	@echo "module load NCCL/2.18.3-GCCcore-12.3.0-CUDA-12.1.1" >> $@
-	@echo "module load OpenMPI/4.1.5-NVHPC-23.7-CUDA-12.1.1" >> $@
 	@echo "module load NVHPC/23.7-CUDA-12.1.1" >> $@
+	@echo "module load OpenMPI/4.1.5-GCC-12.3.0" >> $@
+
 
 $(CUDA_AWARE_SN_EXPORTS):
 	mkdir -p ${EXPORTFOLDER}
@@ -149,7 +150,7 @@ $(NCCL_MODULES):
 	@echo "module purge" > $@
 	@echo "module load 2023" >> $@
 	@echo "module load NCCL/2.18.3-GCCcore-12.3.0-CUDA-12.1.1" >> $@
-	@echo "module load gompi/2023a" >> $@
+	@echo "module load OpenMPI/4.1.5-GCC-12.3.0" >> $@
 	@echo "module load NVHPC/23.7-CUDA-12.1.1" >> $@
 
 $(NCCL_SN_EXPORTS):
