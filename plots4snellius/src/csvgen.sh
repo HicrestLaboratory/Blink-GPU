@@ -40,7 +40,7 @@ for i in ${!staticparams_lables[@]}
 do
 	string+="${staticparams_lables[$i]}, "
 done
-string+="TransferSize(B), TransferTime(s), Bandwidth(GB/s)"
+string+="TransferSize(B), TransferTime(s), Bandwidth(GiB/s)"
 echo "string: ${string}"
 echo "${string}" > ${outcsv}
 
