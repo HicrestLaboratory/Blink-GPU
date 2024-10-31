@@ -18,7 +18,7 @@ key="$2"
 #files=( "pp_Baseline.cu" "pp_CudaAware.cu" "pp_Nccl.cu" "pp_Nvlink.cu" )
 
 # Creating the files array
-benchmarks=( "pp" "a2a" "ar" "hlo" "mpp" )
+benchmarks=( "pp" "a2a" "ar" "mpp" )
 implementations=( "Baseline" "CudaAware" "Nccl" "Nvlink" )
 
 files=()

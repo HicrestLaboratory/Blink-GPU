@@ -257,6 +257,8 @@ void timers_and_checks_alloc(int buff_cycle, int loop_count,
  * How to use print_times<>() function:
  * --------------------------------------------------------------------------------------------------------------
  *
+ *   NOTE! If we want to extend to other benchmark (not pp), we have to modify the inner for loop (like with a function pointer given as input)
+ *
         print_times<TTYPE>(rank, fix_buff_size, max_j, loop_count, elapsed_time, error, NCCL_FLAG);
  *
 */
@@ -282,7 +284,7 @@ void print_times(int myrank, SZTYPE N, int fix_buff_size, int max_j, int loop_co
             double avg_time_per_transfer = 0.0;
             for (int i=0; i<loop_count; i++) {
                 if (nccl_flag) elapsed_time[(j-fix_buff_size)*loop_count+i] *= 0.001; // With NCCL times are token in XX instead of XX
-                elapsed_time[(j-fix_buff_size)*loop_count+i] /= 2.0;
+                elapsed_time[(j-fix_buff_size)*loop_count+i] /= 2.0;                  // This is only for pp
                 avg_time_per_transfer += elapsed_time[(j-fix_buff_size)*loop_count+i];
                 if(myrank == 0) printf("\tTransfer size (B): %10" PRIu64 ", Transfer Time (s): %15.9f, Bandwidth (GiB/s): %15.9f, Iteration %d\n", num_B, elapsed_time[(j-fix_buff_size)*loop_count+i], num_GB/elapsed_time[(j-fix_buff_size)*loop_count+i], i);
             }
@@ -346,4 +348,79 @@ void compute_global_checks(int mpi_size, cktype *all_checks,
     for (int i=0; i<mpi_size; i++)
         if (tmp < all_checks[i]) tmp = all_checks[i];
     *check_on_send = tmp;
+}
+
+// NVLink only
+
+void PICO_enable_peer_access(int myrank, int deviceCount, int mydev) {
+    // Pick all the devices that can access each other's memory for this test
+    // Keep in mind that CUDA has minimal support for fork() without a
+    // corresponding exec() in the child process, but in this case our
+    // spawnProcess will always exec, so no need to worry.
+    cudaDeviceProp prop;
+    int allPeers = 1, myIPC = 1, allIPC;
+    cudaErrorCheck(cudaGetDeviceProperties(&prop, mydev));
+
+    int* canAccesPeer = (int*) malloc(sizeof(int)*deviceCount*deviceCount);
+    for (int i = 0; i < deviceCount*deviceCount; i++) canAccesPeer[i] = 0;
+
+    // CUDA IPC is only supported on devices with unified addressing
+    if (!prop.unifiedAddressing) {
+      myIPC = 0;
+    } else {
+    }
+    // This sample requires two processes accessing each device, so we need
+    // to ensure exclusive or prohibited mode is not set
+    if (prop.computeMode != cudaComputeModeDefault) {
+      myIPC = 0;
+    }
+
+    MPI_Allreduce(&myIPC, &allIPC, 1, MPI_INT, MPI_MIN, MPI_COMM_WORLD);
+    if (!allIPC) {
+      exit(__LINE__);
+    }
+
+    if (myrank == 0) {
+      for (int i = 0; i < deviceCount; i++) {
+        for (int j = 0; j < deviceCount; j++) {
+          if (j != i) {
+            int canAccessPeerIJ, canAccessPeerJI;
+            cudaErrorCheck( cudaDeviceCanAccessPeer(&canAccessPeerJI, j, i) );
+            cudaErrorCheck( cudaDeviceCanAccessPeer(&canAccessPeerIJ, i, j) );
+
+            canAccesPeer[i * deviceCount + j] = (canAccessPeerIJ) ? 1 : 0;
+            canAccesPeer[j * deviceCount + i] = (canAccessPeerJI) ? 1 : 0;
+            if (!canAccessPeerIJ || !canAccessPeerJI) allPeers = 0;
+          } else {
+            canAccesPeer[i * deviceCount + j] = -1;
+          }
+        }
+      }
+    }
+
+    MPI_Barrier(MPI_COMM_WORLD);
+    MPI_Bcast(&allPeers, 1, MPI_INT, 0, MPI_COMM_WORLD);
+    MPI_Bcast(canAccesPeer, deviceCount*deviceCount, MPI_INT, 0, MPI_COMM_WORLD);
+
+    if (allPeers) {
+      // Enable peers here.  This isn't necessary for IPC, but it will
+      // setup the peers for the device.  For systems that only allow 8
+      // peers per GPU at a time, this acts to remove devices from CanAccessPeer
+      for (int j = 0; j < deviceCount; j++) {
+        if (j != mydev) {
+          cudaErrorCheck(cudaDeviceEnablePeerAccess(j, 0));
+        }
+      }
+    }
+
+    MPI_Barrier(MPI_COMM_WORLD);
+}
+
+void PICO_disable_peer_access(int deviceCount, int mydev){
+    MPI_Barrier(MPI_COMM_WORLD);
+    for (int j = 0; j < deviceCount; j++) {
+      if (j != mydev) {
+        cudaErrorCheck(cudaDeviceDisablePeerAccess(j));
+      }
+    }
 }
