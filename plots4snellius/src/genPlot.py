@@ -38,6 +38,7 @@ def line_plot_from_file(input_file, outname, title, xlable='Message Size', ylabl
     # Extract the relevant columns
     collectorname = "TransferSize(B)"
     valuename = "Bandwidth(GB/s)"
+    df[valuename] = df['Bandwidth(GiB/s)'] * 1.07374
 
     df['Transfer size (B)'] = pd.to_numeric(df['TransferSize(B)'])
 
@@ -47,12 +48,13 @@ def line_plot_from_file(input_file, outname, title, xlable='Message Size', ylabl
     else:
         cust_palette = None
     sns.lineplot(data=df, x=collectorname, y=valuename, markers=True, marker='o', dashes=False,
-                 linewidth=my_linewidth, markersize=my_markersize, hue=myhue, palette=cust_palette)
+                 linewidth=my_linewidth, markersize=my_markersize, hue=myhue, 
+                 palette=cust_palette, errorbar=lambda x: (x.min(), x.max()))
 
     # Plot the peak line if provided
     if peaks is not None:
         peaks_vec = peaks.split(':')
-        peaks_vec = list(map(lambda x: x*((10**9)/(2**30)), list(map(float, list(peaks_vec)))))
+        peaks_vec = list(map(float, list(peaks_vec)))
         max_peak = max(peaks_vec)
         print('Type of peaks_vec[0]: ', type(peaks_vec[0]))
         print('peaks_vec:', peaks_vec)
@@ -61,7 +63,7 @@ def line_plot_from_file(input_file, outname, title, xlable='Message Size', ylabl
         for peak_str in peaks_vec:
             peak = float(peak_str)
             plt.axhline(y=peak, color='r', linestyle='--')
-            peak_label = f"Theoretical peak: {peak:.2f} GiB/s"
+            peak_label = f"Theoretical peak: {peak:.2f} GB/s"
             x_min, x_max = plt.gca().get_xlim()
             x_center = (x_min + x_max) / 4
             plt.text(x=20,  y=peak, s=peak_label, color='r', va='center', ha='center', backgroundcolor='w', fontsize=2*my_fontsize/3)
@@ -125,7 +127,7 @@ if __name__ == "__main__":
     parser.add_argument('outname', type=str, help='Path to the output image file')
     parser.add_argument('--title', type=str, default='Bandwidth vs Transfer Size', help='Title of the plot (default: "Bandwidth vs Transfer Size")')
     parser.add_argument('--xlable', type=str, default='Message Size', help='Label for the X-axis (default: "Message Size")')
-    parser.add_argument('--ylable', type=str, default='Bandwidth (GiB/s)', help='Label for the Y-axis (default: "Time")')
+    parser.add_argument('--ylable', type=str, default='Bandwidth (GB/s)', help='Label for the Y-axis (default: "Time")')
     parser.add_argument('--peaks', type=str, default=None, help='Optional peaks value for reference (default: None)')
     parser.add_argument('--hue', type=str, default=None, help='Optional hue value for merged data (default: None)')
 
