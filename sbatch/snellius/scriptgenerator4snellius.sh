@@ -6,7 +6,7 @@ stencil_script=$(cat << 'EOF'
 #SBATCH --output=sout/snellius_<exp-name>_<exp-type>_<exp-topo>_%j.out
 #SBATCH --error=sout/snellius_<exp-name>_<exp-type>_<exp-topo>_%j.err
 
-#SBATCH --partition=gpu_h100
+#SBATCH --partition=gpu_a100
 #SBATCH --account=vusei7310
 #SBATCH --time=00:05:00
 #SBATCH --qos=normal

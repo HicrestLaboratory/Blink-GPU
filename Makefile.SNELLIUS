@@ -176,6 +176,10 @@ $(BINFOLDER)/$(ARNAME)_Nccl: src/$(ARNAME)_Nccl.cu $(NCCL_MODULES) $(NCCL_SN_EXP
 $(BINFOLDER)/$(HALONAME)_Nccl: src/$(HALONAME)_Nccl.cu $(NCCL_MODULES) $(NCCL_SN_EXPORTS) $(NCCL_MN_EXPORTS)
 	mkdir -p $(BINFOLDER) $(OUTFOLDER) $(SOUTFOLDER)
 	source $(NCCL_MODULES) ; $(CC) $(CFLAGS) -o $@ $< $(INCL) $(LIBS) $(LIBFLAGS) $(MPI) $(CUDA) $(NCCL) -lstdc++ -lm -Wno-deprecated-gpu-targets $(DBGFLAGS)
+
+$(BINFOLDER)/$(MPPNAME)_Nccl: src/$(MPPNAME)_Nccl.cu $(NCCL_MODULES) $(NCCL_SN_EXPORTS) $(NCCL_MN_EXPORTS)
+	mkdir -p $(BINFOLDER) $(OUTFOLDER) $(SOUTFOLDER)
+	source $(NCCL_MODULES) ; $(CC) $(CFLAGS) -o $@ $< $(INCL) $(LIBS) $(LIBFLAGS) $(MPI) $(CUDA) $(NCCL) -lstdc++ -lm -Wno-deprecated-gpu-targets $(DBGFLAGS)
 # ----------------------------------------
 
 # ---------------- NVLink ----------------
