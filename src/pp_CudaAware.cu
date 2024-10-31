@@ -27,6 +27,8 @@
 
 #define WARM_UP 5
 
+#define TTYPE double
+
 int main(int argc, char *argv[])
 {
     compile_time_check();
@@ -72,21 +74,13 @@ int main(int argc, char *argv[])
         Loop from 8 B to 1 GB
     --------------------------------------------------------------------------------------------*/
 
-    SZTYPE N;
-    if (fix_buff_size<=30) {
-        N = 1 << (fix_buff_size - 1);
-    } else {
-        N = 1 << 30;
-        N <<= (fix_buff_size - 31);
-    }
+    SZTYPE N = define_buffer_len(fix_buff_size);
 
-    double start_time, stop_time;
-    int *error = (int*)malloc(sizeof(int)*buff_cycle);
-    int *my_error = (int*)malloc(sizeof(int)*buff_cycle);
-    cktype *cpu_checks = (cktype*)malloc(sizeof(cktype)*buff_cycle);
-    cktype *gpu_checks = (cktype*)malloc(sizeof(cktype)*buff_cycle);
-    double *elapsed_time = (double*)malloc(sizeof(double)*buff_cycle*loop_count);
-    double *inner_elapsed_time = (double*)malloc(sizeof(double)*buff_cycle*loop_count);
+    int *error, *my_error;
+    TTYPE start_time, stop_time;
+    cktype *cpu_checks, *gpu_checks;
+    TTYPE *elapsed_time, *inner_elapsed_time;
+    timers_and_checks_alloc<TTYPE>(buff_cycle, loop_count, &error, &my_error, &cpu_checks, &gpu_checks, &elapsed_time, &inner_elapsed_time);
     if (rank == 0 || rank == rank2) {
         for(int j=fix_buff_size; j<max_j; j++){
 
@@ -185,7 +179,7 @@ int main(int argc, char *argv[])
 
         MPI_Allreduce(my_error, error, buff_cycle, MPI_INT, MPI_MAX, ppComm);
         //MPI_Allreduce(inner_elapsed_time, elapsed_time, buff_cycle*loop_count, MPI_DOUBLE, MPI_MAX, firstsenderComm);
-        memcpy(elapsed_time, inner_elapsed_time, buff_cycle*loop_count*sizeof(double)); // No need to do allreduce, there is only one rank in firstsenderComm
+        memcpy(elapsed_time, inner_elapsed_time, buff_cycle*loop_count*sizeof(TTYPE)); // No need to do allreduce, there is only one rank in firstsenderComm
         for(int j=fix_buff_size; j<max_j; j++) {
             (j!=0) ? (N <<= 1) : (N = 1);
 

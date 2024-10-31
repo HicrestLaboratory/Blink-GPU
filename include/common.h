@@ -107,7 +107,7 @@ void print_hostnames (int rank, int size) {
 }
 
 /* --------------------------------------------------------------------------------------------------------------
- * How to use my_pp_mpi_init() function:
+ * How to use my_mpi_init() function:
  * --------------------------------------------------------------------------------------------------------------
  *
 	MPI_Init(&argc, &argv);
@@ -149,7 +149,7 @@ void my_mpi_init(int *ptr_size, int *ptr_nnodes, int *ptr_rank, int *ptr_mynode,
 }
 
 /* --------------------------------------------------------------------------------------------------------------
- * How to define_pp_comm() function:
+ * How to use define_pp_comm() function:
  * --------------------------------------------------------------------------------------------------------------
  *
     int rank2 = size-1;
@@ -203,6 +203,54 @@ void define_pp_comm (int myrank, int rank1, int rank2, MPI_Comm *ppComm, MPI_Com
         printf("Process %d took part to the firstsenderComm.\n", myrank);
     }
     MPI_Barrier(MPI_COMM_WORLD);
+}
+
+/* --------------------------------------------------------------------------------------------------------------
+ * How to use define_buffer_len() function:
+ * --------------------------------------------------------------------------------------------------------------
+ *
+    SZTYPE N = define_buffer_len(fix_buff_size);
+ *
+*/
+
+SZTYPE define_buffer_len(int fix_buff_size) {
+
+    SZTYPE N;
+    if (fix_buff_size<=30) {
+        N = 1 << (fix_buff_size - 1);
+    } else {
+        N = 1 << 30;
+        N <<= (fix_buff_size - 31);
+    }
+
+    return(N);
+}
+
+/* --------------------------------------------------------------------------------------------------------------
+ * How to use timers_and_checks_alloc() function:
+ * --------------------------------------------------------------------------------------------------------------
+ *
+    int *error, *my_error;
+    TTYPE start_time, stop_time;
+    cktype *cpu_checks, *gpu_checks;
+    TTYPE *elapsed_time, *inner_elapsed_time;
+    timers_and_checks_alloc<TTYPE>(buff_cycle, loop_count, error, my_error, cpu_checks, gpu_checks, elapsed_time, inner_elapsed_time);
+
+ *
+*/
+
+template <typename T>
+void timers_and_checks_alloc(int buff_cycle, int loop_count,
+                                int **error, int **my_error,
+                                cktype **cpu_checks, cktype **gpu_checks,
+                                T **elapsed_time, T **inner_elapsed_time) {
+
+    *error = (int*)malloc(sizeof(int)*buff_cycle);
+    *my_error = (int*)malloc(sizeof(int)*buff_cycle);
+    *cpu_checks = (cktype*)malloc(sizeof(cktype)*buff_cycle);
+    *gpu_checks = (cktype*)malloc(sizeof(cktype)*buff_cycle);
+    *elapsed_time = (T*)malloc(sizeof(T)*buff_cycle*loop_count);
+    *inner_elapsed_time = (T*)malloc(sizeof(T)*buff_cycle*loop_count);
 }
 
 void alloc_device_buffers(dtype *sendBuffer, dtype **dev_sendBuffer, SZTYPE sendBufferLen,
