@@ -27,7 +27,15 @@
 
 #define WARM_UP 5
 
+#ifndef MYNCCL
+#define NCCL_FLAG 0
 #define TTYPE double
+#define MPI_TTYPE MPI_DOUBLE
+#else
+#define NCCL_FLAG 1
+#define TTYPE float
+#define MPI_TTYPE MPI_FLOAT
+#endif
 
 // ---------------------------------------
 void PICO_enable_peer_access(int myrank, int deviceCount, int mydev) {
@@ -278,60 +286,15 @@ int main(int argc, char *argv[])
 #endif
         }
 
-        if (fix_buff_size<=30) {
-            N = 1 << (fix_buff_size - 1);
-        } else {
-            N = 1 << 30;
-            N <<= (fix_buff_size - 31);
-        }
+        N = define_buffer_len(fix_buff_size);
 
         MPI_Allreduce(my_error, error, buff_cycle, MPI_INT, MPI_MAX, ppComm);
-        //MPI_Allreduce(inner_elapsed_time, elapsed_time, buff_cycle*loop_count, MPI_DOUBLE, MPI_MAX, firstsenderComm);
+        //MPI_Allreduce(inner_elapsed_time, elapsed_time, buff_cycle*loop_count, MPI_TTYPE, MPI_MAX, firstsenderComm);
         memcpy(elapsed_time, inner_elapsed_time, buff_cycle*loop_count*sizeof(TTYPE)); // No need to do allreduce, there is only one rank in firstsenderComm
-        for(int j=fix_buff_size; j<max_j; j++) {
-            (j!=0) ? (N <<= 1) : (N = 1);
 
-            SZTYPE num_B, int_num_GB;
-            double num_GB;
+        print_times<TTYPE>(rank, N, fix_buff_size, max_j, loop_count, elapsed_time, error, NCCL_FLAG);
 
-            num_B = sizeof(dtype)*N;
-            // TODO: maybe we can avoid if and just divide always by B_in_GB
-            if (j < 31) {
-                SZTYPE B_in_GB = 1 << 30;
-                num_GB = (double)num_B / (double)B_in_GB;
-            } else {
-                SZTYPE M = 1 << (j - 30);            
-                num_GB = sizeof(dtype)*M;
-            }
-
-            double avg_time_per_transfer = 0.0;
-            for (int i=0; i<loop_count; i++) {
-                elapsed_time[(j-fix_buff_size)*loop_count+i] /= 2.0;
-                avg_time_per_transfer += elapsed_time[(j-fix_buff_size)*loop_count+i];
-                if(rank == 0) printf("\tTransfer size (B): %10" PRIu64 ", Transfer Time (s): %15.9f, Bandwidth (GiB/s): %15.9f, Iteration %d\n", num_B, elapsed_time[(j-fix_buff_size)*loop_count+i], num_GB/elapsed_time[(j-fix_buff_size)*loop_count+i], i);
-            }
-            avg_time_per_transfer /= (double)loop_count;
-
-            if(rank == 0) printf("[Average] Transfer size (B): %10" PRIu64 ", Transfer Time (s): %15.9f, Bandwidth (GiB/s): %15.9f, Error: %d\n", num_B, avg_time_per_transfer, num_GB/avg_time_per_transfer, error[j] );
-            fflush(stdout);
-        }
-
-        char *s = (char*)malloc(sizeof(char)*(20*buff_cycle + 100));
-        sprintf(s, "[%d] recv_cpu_check = %u", rank, cpu_checks[0]);
-        for (int i=fix_buff_size; i<max_j; i++) {
-            sprintf(s+strlen(s), " %10d", cpu_checks[i]);
-        }
-        sprintf(s+strlen(s), " (for Error)\n");
-        printf("%s", s);
-        fflush(stdout);
-
-        sprintf(s, "[%d] gpu_checks = %u", rank, gpu_checks[0]);
-        for (int i=fix_buff_size; i<max_j; i++) {
-            sprintf(s+strlen(s), " %10d", gpu_checks[i]);
-        }
-        sprintf(s+strlen(s), " (for Error)\n");
-        printf("%s", s);
-        fflush(stdout);
+        print_errors(rank, buff_cycle, fix_buff_size, max_j, cpu_checks, gpu_checks);
     }
 
     PICO_disable_peer_access(num_devices, my_dev);

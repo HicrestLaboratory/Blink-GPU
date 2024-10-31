@@ -253,6 +253,65 @@ void timers_and_checks_alloc(int buff_cycle, int loop_count,
     *inner_elapsed_time = (T*)malloc(sizeof(T)*buff_cycle*loop_count);
 }
 
+/* --------------------------------------------------------------------------------------------------------------
+ * How to use print_times<>() function:
+ * --------------------------------------------------------------------------------------------------------------
+ *
+        print_times<TTYPE>(rank, fix_buff_size, max_j, loop_count, elapsed_time, error, NCCL_FLAG);
+ *
+*/
+
+template <typename T>
+void print_times(int myrank, SZTYPE N, int fix_buff_size, int max_j, int loop_count, T *elapsed_time, int *error, int nccl_flag) {
+    for(int j=fix_buff_size; j<max_j; j++) {
+            (j!=0) ? (N <<= 1) : (N = 1);
+
+            SZTYPE num_B, int_num_GB;
+            double num_GB;
+
+            num_B = sizeof(dtype)*N;
+            // TODO: maybe we can avoid if and just divide always by B_in_GB
+            if (j < 31) {
+                SZTYPE B_in_GB = 1 << 30;
+                num_GB = (double)num_B / (double)B_in_GB;
+            } else {
+                SZTYPE M = 1 << (j - 30);
+                num_GB = sizeof(dtype)*M;
+            }
+
+            double avg_time_per_transfer = 0.0;
+            for (int i=0; i<loop_count; i++) {
+                if (nccl_flag) elapsed_time[(j-fix_buff_size)*loop_count+i] *= 0.001; // With NCCL times are token in XX instead of XX
+                elapsed_time[(j-fix_buff_size)*loop_count+i] /= 2.0;
+                avg_time_per_transfer += elapsed_time[(j-fix_buff_size)*loop_count+i];
+                if(myrank == 0) printf("\tTransfer size (B): %10" PRIu64 ", Transfer Time (s): %15.9f, Bandwidth (GiB/s): %15.9f, Iteration %d\n", num_B, elapsed_time[(j-fix_buff_size)*loop_count+i], num_GB/elapsed_time[(j-fix_buff_size)*loop_count+i], i);
+            }
+            avg_time_per_transfer /= (double)loop_count;
+
+            if(myrank == 0) printf("[Average] Transfer size (B): %10" PRIu64 ", Transfer Time (s): %15.9f, Bandwidth (GiB/s): %15.9f, Error: %d\n", num_B, avg_time_per_transfer, num_GB/avg_time_per_transfer, error[j] );
+            fflush(stdout);
+        }
+}
+
+void print_errors(int myrank, int buff_cycle, int fix_buff_size, int max_j, cktype* cpu_checks, cktype* gpu_checks) {
+        char *s = (char*)malloc(sizeof(char)*(20*buff_cycle + 100));
+        sprintf(s, "[%d] recv_cpu_check = %u", myrank, cpu_checks[0]);
+        for (int i=fix_buff_size; i<max_j; i++) {
+            sprintf(s+strlen(s), " %10d", cpu_checks[i]);
+        }
+        sprintf(s+strlen(s), " (for Error)\n");
+        printf("%s", s);
+        fflush(stdout);
+
+        sprintf(s, "[%d] gpu_checks = %u", myrank, gpu_checks[0]);
+        for (int i=fix_buff_size; i<max_j; i++) {
+            sprintf(s+strlen(s), " %10d", gpu_checks[i]);
+        }
+        sprintf(s+strlen(s), " (for Error)\n");
+        printf("%s", s);
+        fflush(stdout);
+}
+
 void alloc_device_buffers(dtype *sendBuffer, dtype **dev_sendBuffer, SZTYPE sendBufferLen,
                           dtype *recvBuffer, dtype **dev_recvBuffer, SZTYPE recvBufferLen) {
 
