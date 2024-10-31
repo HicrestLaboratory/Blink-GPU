@@ -75,6 +75,136 @@ void alloc_host_buffers(int rank,
     }                               \
 }
 
+void compile_time_check(void) {
+    printf("Compile time check:\n");
+#if defined(MPIX_CUDA_AWARE_SUPPORT) && MPIX_CUDA_AWARE_SUPPORT
+    printf("This MPI library has CUDA-aware support.\n", MPIX_CUDA_AWARE_SUPPORT);
+#elif defined(MPIX_CUDA_AWARE_SUPPORT) && !MPIX_CUDA_AWARE_SUPPORT
+    printf("This MPI library does not have CUDA-aware support.\n");
+#else
+    printf("This MPI library cannot determine if there is CUDA-aware support.\n");
+#endif /* MPIX_CUDA_AWARE_SUPPORT */
+
+    printf("Run time check:n");
+#if defined(MPIX_CUDA_AWARE_SUPPORT)
+    if (1 == MPIX_Query_cuda_support()) {
+        printf("This MPI library has CUDA-aware support.\n");
+    } else {
+        printf("This MPI library does not have CUDA-aware support.\n");
+    }
+#else /* !defined(MPIX_CUDA_AWARE_SUPPORT) */
+    printf("This MPI library cannot determine if there is CUDA-aware support.\n");
+#endif /* MPIX_CUDA_AWARE_SUPPORT */
+}
+
+void print_hostnames (int rank, int size) {
+    
+    int namelen;
+    char host_name[MPI_MAX_PROCESSOR_NAME];
+    MPI_Get_processor_name(host_name, &namelen);
+    printf("Size = %d, myrank = %d, host_name = %s\n", size, rank, host_name);
+    fflush(stdout);
+}
+
+/* --------------------------------------------------------------------------------------------------------------
+ * How to use my_pp_mpi_init() function:
+ * --------------------------------------------------------------------------------------------------------------
+ *
+	MPI_Init(&argc, &argv);
+	
+	MPI_Status stat;
+	MPI_Comm nodeComm;
+	int num_devices, my_dev;
+	int size, nnodes, rank, mynode, mynodeid, mynodesize;
+
+	my_mpi_init(&size, &nnodes, &rank, &mynode, &num_devices, &my_dev, &nodeComm, &mynodeid, &mynodesize);
+ *
+*/
+
+void my_mpi_init(int *ptr_size, int *ptr_nnodes, int *ptr_rank, int *ptr_mynode, int *ptr_num_devices, int *ptr_my_dev, MPI_Comm *ptr_nodeComm, int *ptr_mynodeid, int *ptr_mynodesize) {
+
+    // Define WORLD ranks and size
+    MPI_Comm_size(MPI_COMM_WORLD, ptr_size);
+    MPI_Comm_rank(MPI_COMM_WORLD, ptr_rank);
+    MPI_Barrier(MPI_COMM_WORLD);
+
+    // Print hostnames
+    print_hostnames (*ptr_rank, *ptr_size);
+    MPI_Barrier(MPI_COMM_WORLD);
+
+    // Map MPI ranks to GPUs and define nodeComm
+    cudaErrorCheck( cudaGetDeviceCount(ptr_num_devices) );
+    *ptr_my_dev = assignDeviceToProcess(ptr_nodeComm, ptr_nnodes, ptr_mynode);
+    MPI_Comm_rank(*ptr_nodeComm, ptr_mynodeid);
+    MPI_Comm_size(*ptr_nodeComm, ptr_mynodesize);
+
+    // Print device affiniy
+#ifndef SKIPCPUAFFINITY
+    if (0==rank) printf("List device affinity:\n");
+    check_cpu_and_gpu_affinity(dev);
+    if (0==rank) printf("List device affinity done.\n\n");
+    MPI_Barrier(MPI_COMM_WORLD);
+#endif
+
+}
+
+/* --------------------------------------------------------------------------------------------------------------
+ * How to define_pp_comm() function:
+ * --------------------------------------------------------------------------------------------------------------
+ *
+    int rank2 = size-1;
+    MPI_Comm ppComm, firstsenderComm;
+    define_pp_comm (rank, 0, rank2, &ppComm, &firstsenderComm);
+
+ *
+*/
+
+void define_pp_comm (int myrank, int rank1, int rank2, MPI_Comm *ppComm, MPI_Comm *firstsenderComm) {
+    //int rank2 = size-1;
+
+    // Get the group or processes of the default communicator
+    MPI_Group world_group;
+    MPI_Comm_group(MPI_COMM_WORLD, &world_group);
+
+    // Define a communicatior with only the two processes who will perform the ping-png
+    int pp_ranks[2];
+    pp_ranks[0] = rank1;
+    pp_ranks[1] = rank2;
+    
+    MPI_Group pp_group;
+    MPI_Group_incl(world_group, 2, pp_ranks, &pp_group);
+    MPI_Comm_create(MPI_COMM_WORLD, pp_group, ppComm);
+
+    // Print if you took part or not in the ppComm
+    if(*ppComm == MPI_COMM_NULL) {
+        // I am not part of the ppComm.
+        printf("Process %d did not take part to the ppComm.\n", myrank);
+    } else {
+        // I am part of the new ppComm.
+        printf("Process %d took part to the ppComm.\n", myrank);
+    }
+
+    // Define a communicator with only the first sender process.
+    int ranks_0[1];
+    ranks_0[0] = 0;
+
+    MPI_Group firstsender_group;
+    if (myrank == rank1)
+        MPI_Group_incl(world_group, 1, ranks_0, &firstsender_group);
+    else
+        MPI_Group_incl(world_group, 0, ranks_0, &firstsender_group);
+
+    MPI_Comm_create(MPI_COMM_WORLD, firstsender_group, firstsenderComm);
+
+    // Print if you took part or not in the firstsenderComm
+    if(*firstsenderComm == MPI_COMM_NULL) {
+        printf("Process %d did not take part to the firstsenderComm.\n", myrank);
+    } else {
+        printf("Process %d took part to the firstsenderComm.\n", myrank);
+    }
+    MPI_Barrier(MPI_COMM_WORLD);
+}
+
 void alloc_device_buffers(dtype *sendBuffer, dtype **dev_sendBuffer, SZTYPE sendBufferLen,
                           dtype *recvBuffer, dtype **dev_recvBuffer, SZTYPE recvBufferLen) {
 

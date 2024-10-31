@@ -20,6 +20,8 @@
 #include "mpi-ext.h"
 #endif
 
+#include "../include/common.h"
+
 #define BUFF_CYCLE 31
 #define LOOP_COUNT 50
 
@@ -27,108 +29,23 @@
 
 int main(int argc, char *argv[])
 {
-    printf("Compile time check:\n");
-#if defined(MPIX_CUDA_AWARE_SUPPORT) && MPIX_CUDA_AWARE_SUPPORT
-    printf("This MPI library has CUDA-aware support.\n", MPIX_CUDA_AWARE_SUPPORT);
-#elif defined(MPIX_CUDA_AWARE_SUPPORT) && !MPIX_CUDA_AWARE_SUPPORT
-    printf("This MPI library does not have CUDA-aware support.\n");
-#else
-    printf("This MPI library cannot determine if there is CUDA-aware support.\n");
-#endif /* MPIX_CUDA_AWARE_SUPPORT */
-
-    printf("Run time check:n");
-#if defined(MPIX_CUDA_AWARE_SUPPORT)
-    if (1 == MPIX_Query_cuda_support()) {
-        printf("This MPI library has CUDA-aware support.\n");
-    } else {
-        printf("This MPI library does not have CUDA-aware support.\n");
-    }
-#else /* !defined(MPIX_CUDA_AWARE_SUPPORT) */
-    printf("This MPI library cannot determine if there is CUDA-aware support.\n");
-#endif /* MPIX_CUDA_AWARE_SUPPORT */
-
-
-
+    compile_time_check();
 
     /* -------------------------------------------------------------------------------------------
         MPI Initialization 
     --------------------------------------------------------------------------------------------*/
     MPI_Init(&argc, &argv);
 
-    int size, nnodes;
-    MPI_Comm_size(MPI_COMM_WORLD, &size);
-
-    int rank, mynode;
-    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-
     MPI_Status stat;
-
-    // Map MPI ranks to GPUs
-    int num_devices = 0;
-    cudaErrorCheck( cudaGetDeviceCount(&num_devices) );
-
     MPI_Comm nodeComm;
-    int dev = assignDeviceToProcess(&nodeComm, &nnodes, &mynode);
-    // print device affiniy
-#ifndef SKIPCPUAFFINITY
-    if (0==rank) printf("List device affinity:\n");
-    check_cpu_and_gpu_affinity(dev);
-    if (0==rank) printf("List device affinity done.\n\n");
-    MPI_Barrier(MPI_COMM_WORLD);
-#endif
+    int num_devices, my_dev;
+    int size, nnodes, rank, mynode, mynodeid, mynodesize;
 
-    int mynodeid = -1, mynodesize = -1;
-    MPI_Comm_rank(nodeComm, &mynodeid);
-    MPI_Comm_size(nodeComm, &mynodesize);
+    my_mpi_init(&size, &nnodes, &rank, &mynode, &num_devices, &my_dev, &nodeComm, &mynodeid, &mynodesize);
 
     int rank2 = size-1;
-
-    // Get the group or processes of the default communicator
-    MPI_Group world_group;
-    MPI_Comm_group(MPI_COMM_WORLD, &world_group);
-
-    // Keep only the processes 0 and 1 in the new group.
-    int ranks[2];
-    ranks[0] = 0;
-    ranks[1] = rank2;
-    MPI_Group pp_group;
-    MPI_Group_incl(world_group, 2, ranks, &pp_group);
-
-    // Create the new communicator from that group of processes.
-    MPI_Comm ppComm;
-    MPI_Comm_create(MPI_COMM_WORLD, pp_group, &ppComm);
-
-    // Do a broadcast only between the processes of the new communicator.
-
-    if(ppComm == MPI_COMM_NULL) {
-        // I am not part of the ppComm.
-        printf("Process %d did not take part to the ppComm.\n", rank);
-    } else {
-        // I am part of the new ppComm.
-        printf("Process %d took part to the ppComm.\n", rank);
-    }
-
-    // Keep only the first sender processe (i.e. 0) in the new group.
-    int ranks_0[1];
-    ranks_0[0] = 0;
-    MPI_Group firstsender_group;
-    if (rank == 0)
-        MPI_Group_incl(world_group, 1, ranks_0, &firstsender_group);
-    else
-        MPI_Group_incl(world_group, 0, ranks_0, &firstsender_group);
-
-    // Create the new communicator from that group of processes.
-    MPI_Comm firstsenderComm;
-    MPI_Comm_create(MPI_COMM_WORLD, firstsender_group, &firstsenderComm);
-
-    // Do a broadcast only between the processes of the new communicator.
-
-    if(firstsenderComm == MPI_COMM_NULL) {
-        printf("Process %d did not take part to the firstsenderComm.\n", rank);
-    } else {
-        printf("Process %d took part to the firstsenderComm.\n", rank);
-    }
-    MPI_Barrier(MPI_COMM_WORLD);
+    MPI_Comm ppComm, firstsenderComm;
+    define_pp_comm (rank, 0, rank2, &ppComm, &firstsenderComm);
 
     /* -------------------------------------------------------------------------------------------
         Reading command line inputs
