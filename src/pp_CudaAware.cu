@@ -61,18 +61,12 @@ int main(int argc, char *argv[])
     int fix_buff_size = 0;
 
     // Parse command-line options
-    read_line_parameters(argc, argv, rank,
+    new_read_line_parameters(argc, argv, rank,
                          &flag_b, &flag_l, &flag_x,
-                         &loop_count, &buff_cycle, &fix_buff_size);
-    if(flag_x && fix_buff_size >= buff_cycle){buff_cycle = fix_buff_size + 1;}    
-    // Print message based on the flags
-    if (flag_b && rank == 0) printf("Flag b was set with argument: %d\n", buff_cycle);
-    if (flag_l && rank == 0) printf("Flag l was set with argument: %d\n", loop_count);
-    if (flag_x && rank == 0) printf("Flag x was set with argument: %d\n", fix_buff_size);
+                         &loop_count, &buff_cycle, &fix_buff_size, &max_j);
 
-    max_j = (flag_x == 0) ? buff_cycle : (fix_buff_size + 1) ;
-    if (rank == 0) printf("buff_cycle: %d loop_count: %d max_j: %d\n", buff_cycle, loop_count, max_j);
-    if (flag_x > 0 && rank == 0) printf("fix_buff_size is set as %d\n", fix_buff_size);
+    // Print message based on the flags
+    print_line_parameters (rank, flag_b, flag_l, flag_x, loop_count, buff_cycle, fix_buff_size, max_j );
 
      /* -------------------------------------------------------------------------------------------
         Loop from 8 B to 1 GB
