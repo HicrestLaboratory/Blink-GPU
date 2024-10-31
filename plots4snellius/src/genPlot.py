@@ -48,7 +48,8 @@ def line_plot_from_file(input_file, outname, title, xlable='Message Size', ylabl
     else:
         cust_palette = None
     sns.lineplot(data=df, x=collectorname, y=valuename, markers=True, marker='o', dashes=False,
-                 linewidth=my_linewidth, markersize=my_markersize, hue=myhue, palette=cust_palette)
+                 linewidth=my_linewidth, markersize=my_markersize, hue=myhue, 
+                 palette=cust_palette, errorbar=lambda x: (x.min(), x.max()))
 
     # Plot the peak line if provided
     if peaks is not None:
