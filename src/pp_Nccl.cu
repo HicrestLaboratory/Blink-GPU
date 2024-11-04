@@ -149,27 +149,14 @@ int main(int argc, char *argv[])
             // Allocate memory for A on CPU
             dtype *A, *B;
             cktype my_cpu_check = 0, recv_cpu_check, gpu_check = 0;
-#ifdef PINNED
-            cudaHostAlloc(&A, N*sizeof(dtype), cudaHostAllocDefault);
-            cudaHostAlloc(&B, N*sizeof(dtype), cudaHostAllocDefault);
-#else
-            A = (dtype*)malloc(N*sizeof(dtype));
-            B = (dtype*)malloc(N*sizeof(dtype));
-#endif
+            alloc_host_buffers(rank, &A, N*sizeof(dtype), &B, N*sizeof(dtype), ppComm);
 
-            // Initialize all elements of A to 0.0
-            for(SZTYPE i=0; i<N; i++){
-                A[i] = 1U * (rank+1);
-                B[i] = 0U;
-            }
+            // Initialize all elements of A to 1*(rank+1) and B to 0.0
+            INIT_HOST_BUFFER(A, N, 1U * (rank+1))
+            INIT_HOST_BUFFER(B, N, 0U )
 
-            dtype *d_B;
-            cudaErrorCheck( cudaMalloc(&d_B, N*sizeof(dtype)) );
-            cudaErrorCheck( cudaMemcpy(d_B, B, N*sizeof(dtype), cudaMemcpyHostToDevice) );
-
-            dtype *d_A;
-            cudaErrorCheck( cudaMalloc(&d_A, N*sizeof(dtype)) );
-            cudaErrorCheck( cudaMemcpy(d_A, A, N*sizeof(dtype), cudaMemcpyHostToDevice) );
+            dtype *d_A, *d_B;
+            alloc_device_buffers(A, &d_A, N*sizeof(dtype), B, &d_B, N*sizeof(dtype));
             gpu_device_reduce(d_A, N, &my_cpu_check);
 
             int tag1 = 10;

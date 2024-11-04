@@ -34,47 +34,6 @@ const int num_colors = sizeof(colors)/sizeof(uint32_t);
 #define POP_RANGE
 #endif
 
-void alloc_host_buffers(int rank,
-                        dtype **sendBuffer, SZTYPE sendBufferLen,
-                        dtype **recvBuffer, SZTYPE recvBufferLen) {
-#ifdef PINNED
-        cudaHostAlloc(sendBuffer, sendBufferLen*sizeof(dtype), cudaHostAllocDefault);
-        cudaHostAlloc(recvBuffer, recvBufferLen*sizeof(dtype), cudaHostAllocDefault);
-#else
-        *sendBuffer = (dtype*)malloc(sendBufferLen*sizeof(dtype));
-        *recvBuffer = (dtype*)malloc(recvBufferLen*sizeof(dtype));
-#endif
-        int errorflag = 0;
-        if (*sendBuffer == NULL) {
-            fprintf(stderr, "[%d] Error while allocating buffers at line %d (%lu Bytes requested)\n", rank, __LINE__, sendBufferLen*sizeof(dtype));
-            fflush(stderr);
-            errorflag = __LINE__;
-
-        }
-        if (*recvBuffer == NULL) {
-            fprintf(stderr, "[%d] Error while allocating buffers at line %d (%lu Bytes requested)\n", rank, __LINE__, recvBufferLen*sizeof(dtype));
-            fflush(stderr);
-            errorflag = __LINE__;
-
-        }
-        MPI_Barrier(MPI_COMM_WORLD);
-        if (errorflag != 0) MPI_Abort(MPI_COMM_WORLD, errorflag);
-        MPI_Barrier(MPI_COMM_WORLD);
-        if (rank == 0) printf("Buffers of size %" PRIu64 " B and %" PRIu64 " B succesfuly allocated by all ranks\n", sendBufferLen*sizeof(dtype), recvBufferLen*sizeof(dtype));
-        fflush(stdout);
-        MPI_Barrier(MPI_COMM_WORLD);
-}
-
-/* Example:
- * Let buff be a buffer of size n to be initialized with value -1
- * INIT_HOST_BUFFER(buff, n, -1)
- */
-#define INIT_HOST_BUFFER(B, L, V) { \
-    for (SZTYPE i=0; i<L; i++) {    \
-        (B)[i] = V;                 \
-    }                               \
-}
-
 void compile_time_check(void) {
     printf("Compile time check:\n");
 #if defined(MPIX_CUDA_AWARE_SUPPORT) && MPIX_CUDA_AWARE_SUPPORT
@@ -312,6 +271,50 @@ void print_errors(int myrank, int buff_cycle, int fix_buff_size, int max_j, ckty
         sprintf(s+strlen(s), " (for Error)\n");
         printf("%s", s);
         fflush(stdout);
+}
+
+// Allocation
+
+void alloc_host_buffers(int rank,
+                        dtype **sendBuffer, SZTYPE sendBufferLen,
+                        dtype **recvBuffer, SZTYPE recvBufferLen,
+                        MPI_Comm MpiCommunicator) {
+#ifdef PINNED
+        cudaHostAlloc(sendBuffer, sendBufferLen*sizeof(dtype), cudaHostAllocDefault);
+        cudaHostAlloc(recvBuffer, recvBufferLen*sizeof(dtype), cudaHostAllocDefault);
+#else
+        *sendBuffer = (dtype*)malloc(sendBufferLen*sizeof(dtype));
+        *recvBuffer = (dtype*)malloc(recvBufferLen*sizeof(dtype));
+#endif
+        int errorflag = 0;
+        if (*sendBuffer == NULL) {
+            fprintf(stderr, "[%d] Error while allocating buffers at line %d (%lu Bytes requested)\n", rank, __LINE__, sendBufferLen*sizeof(dtype));
+            fflush(stderr);
+            errorflag = __LINE__;
+
+        }
+        if (*recvBuffer == NULL) {
+            fprintf(stderr, "[%d] Error while allocating buffers at line %d (%lu Bytes requested)\n", rank, __LINE__, recvBufferLen*sizeof(dtype));
+            fflush(stderr);
+            errorflag = __LINE__;
+
+        }
+        MPI_Barrier(MpiCommunicator);
+        if (errorflag != 0) MPI_Abort(MPI_COMM_WORLD, errorflag);
+        MPI_Barrier(MpiCommunicator);
+        if (rank == 0) printf("Buffers of size %" PRIu64 " B and %" PRIu64 " B succesfuly allocated by all ranks\n", sendBufferLen*sizeof(dtype), recvBufferLen*sizeof(dtype));
+        fflush(stdout);
+        MPI_Barrier(MpiCommunicator);
+}
+
+/* Example:
+ * Let buff be a buffer of size n to be initialized with value -1
+ * INIT_HOST_BUFFER(buff, n, -1)
+ */
+#define INIT_HOST_BUFFER(B, L, V) { \
+    for (SZTYPE i=0; i<L; i++) {    \
+        (B)[i] = V;                 \
+    }                               \
 }
 
 void alloc_device_buffers(dtype *sendBuffer, dtype **dev_sendBuffer, SZTYPE sendBufferLen,
