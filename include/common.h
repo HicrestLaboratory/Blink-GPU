@@ -34,6 +34,9 @@ const int num_colors = sizeof(colors)/sizeof(uint32_t);
 #define POP_RANGE
 #endif
 
+#define TAG1 10
+#define TAG2 20
+
 void compile_time_check(void) {
     printf("Compile time check:\n");
 #if defined(MPIX_CUDA_AWARE_SUPPORT) && MPIX_CUDA_AWARE_SUPPORT
@@ -271,6 +274,27 @@ void print_errors(int myrank, int buff_cycle, int fix_buff_size, int max_j, ckty
         sprintf(s+strlen(s), " (for Error)\n");
         printf("%s", s);
         fflush(stdout);
+}
+
+void share_check_vectors(int my_rank, int rank1, int rank2, dtype *recvBuffer, SZTYPE recvBufferLen,
+                         cktype *ptr_my_cpu_check, cktype *ptr_recv_cpu_check, cktype *ptr_to_gpu_check,
+                         cktype *ptr_to_gpu_checks_value, cktype *ptr_to_cpu_checks_value, int *ptr_to_my_error_value) {
+
+    MPI_Status stat;
+    int tag1 = TAG1, tag2 = TAG2;
+
+    gpu_device_reduce(recvBuffer, recvBufferLen, ptr_to_gpu_check);
+    if(my_rank == rank1){
+        MPI_Send(ptr_my_cpu_check,   1, MPI_cktype, rank2, tag1, MPI_COMM_WORLD);
+        MPI_Recv(ptr_recv_cpu_check, 1, MPI_cktype, rank2, tag2, MPI_COMM_WORLD, &stat);
+    } else if(my_rank == rank2){
+        MPI_Recv(ptr_recv_cpu_check, 1, MPI_cktype, rank1, tag1, MPI_COMM_WORLD, &stat);
+        MPI_Send(ptr_my_cpu_check,   1, MPI_cktype, rank1, tag2, MPI_COMM_WORLD);
+    }
+
+    *(ptr_to_gpu_checks_value) = *(ptr_to_gpu_check);
+    *(ptr_to_cpu_checks_value) = *(ptr_recv_cpu_check);
+    *(ptr_to_my_error_value) = abs(*(ptr_to_gpu_checks_value) - *(ptr_to_cpu_checks_value));
 }
 
 // Allocation

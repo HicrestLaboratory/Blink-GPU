@@ -108,8 +108,8 @@ int main(int argc, char *argv[])
             alloc_device_buffers(A, &d_A, N*sizeof(dtype), B, &d_B, N*sizeof(dtype));
             gpu_device_reduce(d_A, N, &my_cpu_check);
 
-            int tag1 = 10;
-            int tag2 = 20;
+            int tag1 = TAG1;
+            int tag2 = TAG2;
 
             /*
 
@@ -142,18 +142,7 @@ int main(int argc, char *argv[])
             if (rank == 0) {printf("#\n"); fflush(stdout);}
 
 
-            gpu_device_reduce(d_B, N, &gpu_check);
-            if(rank == 0){
-                MPI_Send(&my_cpu_check,   1, MPI_cktype, rank2, tag1, MPI_COMM_WORLD);
-                MPI_Recv(&recv_cpu_check, 1, MPI_cktype, rank2, tag2, MPI_COMM_WORLD, &stat);
-            } else if(rank == rank2){
-                MPI_Recv(&recv_cpu_check, 1, MPI_cktype, 0, tag1, MPI_COMM_WORLD, &stat);
-                MPI_Send(&my_cpu_check,   1, MPI_cktype, 0, tag2, MPI_COMM_WORLD);
-            }
-
-            gpu_checks[j] = gpu_check;
-            cpu_checks[j] = recv_cpu_check;
-            my_error[j] = abs(gpu_checks[j] - cpu_checks[j]);
+            share_check_vectors(rank, 0, rank2, d_B, N, &my_cpu_check, &recv_cpu_check, &gpu_check, &(gpu_checks[j]), &(cpu_checks[j]), &(my_error[j]));
 
             free_device_buffers(d_A, d_B);
             free_host_buffers(A, B);
