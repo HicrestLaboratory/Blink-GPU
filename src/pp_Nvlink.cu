@@ -188,15 +188,8 @@ int main(int argc, char *argv[])
             cpu_checks[j] = recv_cpu_check;
             my_error[j] = abs(gpu_checks[j] - cpu_checks[j]);
 
-            cudaErrorCheck( cudaFree(d_A) );
-            cudaErrorCheck( cudaFree(d_B) );
-#ifdef PINNED
-            cudaFreeHost(A);
-            cudaFreeHost(B);
-#else
-            free(A);
-            free(B);
-#endif
+            free_device_buffers(d_A, d_B);
+            free_host_buffers(A, B);
         }
 
         N = define_buffer_len(fix_buff_size);

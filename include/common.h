@@ -317,6 +317,16 @@ void alloc_host_buffers(int rank,
     }                               \
 }
 
+void free_host_buffers(dtype *sendBuffer, dtype *recvBuffer) {
+#ifdef PINNED
+    cudaFreeHost(sendBuffer);
+    cudaFreeHost(recvBuffer);
+#else
+    free(sendBuffer);
+    free(recvBuffer);
+#endif
+}
+
 void alloc_device_buffers(dtype *sendBuffer, dtype **dev_sendBuffer, SZTYPE sendBufferLen,
                           dtype *recvBuffer, dtype **dev_recvBuffer, SZTYPE recvBufferLen) {
 
@@ -337,6 +347,11 @@ cktype* share_local_checks(int mpi_size, dtype *local_buffer, SZTYPE buffer_len)
     MPI_Allgather(local_check, 1, MPI_cktype, all_checks, 1, MPI_cktype, MPI_COMM_WORLD);
 
     return(all_checks);
+}
+
+void free_device_buffers(dtype *dev_sendBuffer, dtype *dev_recvBuffer) {
+    cudaErrorCheck( cudaFree(dev_sendBuffer) );
+    cudaErrorCheck( cudaFree(dev_recvBuffer) );
 }
 
 void compute_global_checks(int mpi_size, cktype *all_checks,
