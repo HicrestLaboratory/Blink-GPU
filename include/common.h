@@ -37,6 +37,10 @@ const int num_colors = sizeof(colors)/sizeof(uint32_t);
 #define TAG1 10
 #define TAG2 20
 
+#ifdef PICODCGMI
+#include <energy/picoDcgmiWrapper.h>
+#endif
+
 void compile_time_check(void) {
     printf("Compile time check:\n");
 #if defined(MPIX_CUDA_AWARE_SUPPORT) && MPIX_CUDA_AWARE_SUPPORT

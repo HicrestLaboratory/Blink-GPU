@@ -22,6 +22,9 @@
 
 #include "../include/common.h"
 
+#define MYBENCH_CODE "pp"
+#define MYIMPL_CODE "Nvlink"
+
 #define BUFF_CYCLE 31
 #define LOOP_COUNT 50
 
@@ -87,6 +90,11 @@ int main(int argc, char *argv[])
      /* -------------------------------------------------------------------------------------------
         Loop from 8 B to 1 GB
     --------------------------------------------------------------------------------------------*/
+
+#ifdef PICODCGMI
+    PICODCGMI_START( fix_buff_size , loop_count , rank )
+    MPI_Barrier(MPI_COMM_WORLD);
+#endif
 
     PICO_enable_peer_access(rank, num_devices, my_dev);
 
@@ -193,6 +201,11 @@ int main(int argc, char *argv[])
     }
 
     PICO_disable_peer_access(num_devices, my_dev);
+
+#ifdef PICODCGMI
+    PICODCGMI_STOP( rank )
+    MPI_Barrier(MPI_COMM_WORLD);
+#endif
 
     free(error);
     free(my_error);

@@ -25,6 +25,9 @@
 
 #include "../include/common.h"
 
+#define MYBENCH_CODE "pp"
+#define MYIMPL_CODE "Nccl"
+
 #define BUFF_CYCLE 31
 #define LOOP_COUNT 50
 
@@ -133,6 +136,11 @@ int main(int argc, char *argv[])
         Loop from 8 B to 1 GB
     --------------------------------------------------------------------------------------------*/
 
+#ifdef PICODCGMI
+    PICODCGMI_START( fix_buff_size , loop_count , rank )
+    MPI_Barrier(MPI_COMM_WORLD);
+#endif
+
     SZTYPE N = define_buffer_len(fix_buff_size);
 
     int *error, *my_error;
@@ -220,6 +228,12 @@ int main(int argc, char *argv[])
 
         print_errors(rank, buff_cycle, fix_buff_size, max_j, cpu_checks, gpu_checks);
     }
+
+#ifdef PICODCGMI
+    PICODCGMI_STOP( rank )
+    MPI_Barrier(MPI_COMM_WORLD);
+#endif
+
     free(error);
     free(my_error);
     free(cpu_checks);
