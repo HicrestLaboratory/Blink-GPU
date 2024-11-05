@@ -29,3 +29,6 @@ plots4snellius/*.png
 plots4snellius/preliminary
 plots4snellius/tmp
 plots4snellius/sout
+
+energy/results/
+energy/parsed/

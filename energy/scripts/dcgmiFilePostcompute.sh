@@ -1,6 +1,7 @@
 #!/bin/bash
 datafolder="./results/"
 keyname="dcgmiMesures"
+resultfolder="./parsed/"
 parsedkeyname="parsedDcgmiMesures"
 
 parsefile() {
@@ -13,6 +14,8 @@ metavec_imp=()
 metavec_buf=()
 metavec_nlo=()
 metavec_header=()
+
+mkdir -p ${resultfolder}
 
 # Expected structure: <datafolder>/<keyname>_<benchmark>_<implementation>_<rankid>.csv
 for f in ${datafolder}${keyname}_*
@@ -32,8 +35,8 @@ do
 	metavec_header+=( "${header}" )
 
 	parsedfilename="${parsedkeyname}_${benchmark}_${implementation}_${buffsize}_${nloops}.csv"
-	echo "${header}" | tr -s ' ' | tr ' ' ',' | sed 's/.$//' > "${parsedfilename}"
-	parsefile "${f}" >> "${parsedfilename}"
+	echo "${header}" | tr -s ' ' | tr ' ' ',' | sed 's/.$//' > "${resultfolder}${parsedfilename}"
+	parsefile "${f}" >> "${resultfolder}${parsedfilename}"
 done
 
 echo "metavec_ben: ${metavec_ben[*]}"

@@ -23,6 +23,11 @@
 #include "mpi-ext.h"
 #endif
 
+#include "../include/common.h"
+
+#define MYBENCH_CODE "ar"
+#define MYIMPL_CODE "Nccl"
+
 #define BUFF_CYCLE 28
 #define LOOP_COUNT 50
 
@@ -181,6 +186,11 @@ int main(int argc, char *argv[])
      /* -------------------------------------------------------------------------------------------
         Loop from 8 B to 1 GB
     --------------------------------------------------------------------------------------------*/
+
+#ifdef PICODCGMI
+    PICODCGMI_START( fix_buff_size , loop_count , rank )
+    MPI_Barrier(MPI_COMM_WORLD);
+#endif
 
     SZTYPE N;
     if (fix_buff_size<=30) {
@@ -346,6 +356,11 @@ int main(int argc, char *argv[])
     printf("%s", s);
     fflush(stdout);
     MPI_Barrier(MPI_COMM_WORLD);
+
+#ifdef PICODCGMI
+    PICODCGMI_STOP( rank )
+    MPI_Barrier(MPI_COMM_WORLD);
+#endif
 
     free(error);
     free(my_error);
