@@ -37,8 +37,8 @@ const int num_colors = sizeof(colors)/sizeof(uint32_t);
 #define TAG1 10
 #define TAG2 20
 
-#ifdef PICODCGMI
-#include <energy/picoDcgmiWrapper.h>
+#ifdef ENERGY
+#include <energy/picoEnergy.h>
 #endif
 
 void compile_time_check(void) {
@@ -51,7 +51,7 @@ void compile_time_check(void) {
     printf("This MPI library cannot determine if there is CUDA-aware support.\n");
 #endif /* MPIX_CUDA_AWARE_SUPPORT */
 
-    printf("Run time check:n");
+    printf("Run time check\n");
 #if defined(MPIX_CUDA_AWARE_SUPPORT)
     if (1 == MPIX_Query_cuda_support()) {
         printf("This MPI library has CUDA-aware support.\n");

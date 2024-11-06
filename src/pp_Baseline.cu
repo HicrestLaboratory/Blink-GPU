@@ -85,8 +85,9 @@ int main(int argc, char *argv[])
         Loop from 8 B to 1 GB
     --------------------------------------------------------------------------------------------*/
 
-#ifdef PICODCGMI
-    PICODCGMI_START( fix_buff_size , loop_count , rank )
+#ifdef ENERGY
+    PICOENERGY_DEFINE
+    PICOENERGY_START( fix_buff_size , loop_count , rank )
     MPI_Barrier(MPI_COMM_WORLD);
 #endif
 
@@ -167,8 +168,8 @@ int main(int argc, char *argv[])
         print_errors(rank, buff_cycle, fix_buff_size, max_j, cpu_checks, gpu_checks);
     }
 
-#ifdef PICODCGMI
-    PICODCGMI_STOP( rank )
+#ifdef ENERGY
+    PICOENERGY_STOP( rank )
     MPI_Barrier(MPI_COMM_WORLD);
 #endif
 
