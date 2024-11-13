@@ -223,6 +223,9 @@ $(BINFOLDER)/$(MPPNAME)_Nvlink: src/$(MPPNAME)_Nvlink.cu $(NVLINK_MODULES) helpe
 	source $(NVLINK_MODULES) ; $(CC) $(CFLAGS) helper_multiprocess.o -o $@ $< $(INCL) $(LIBS) $(LIBFLAGS) $(MPI) $(CUDA) -lstdc++ -lm -Wno-deprecated-gpu-targets $(DBGFLAGS)
 # ----------------------------------------
 
+$(BINFOLDER)/test_kernel: src/test_kernel.cu
+	$(CC) -o $@ $< $(INCL) $(CFLAGS) $(LIBS) $(LIBFLAGS) $(MPI) $(CUDA)
+
 clean:
 	rm -r $(BINFOLDER)/* ${MODULEFOLDER}/* ${EXPORTFOLDER}/*
 	rm helper_multiprocess.o
