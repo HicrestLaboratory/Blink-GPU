@@ -2,7 +2,7 @@
 stencil_script=$(cat << 'EOF'
 #!/bin/bash
 
-#SBATCH --job-name=blinkGPU_%j
+#SBATCH --job-name=blinkGPU
 #SBATCH --output=sout/slurmInfo/slurmInfo_snellius_%j.out
 #SBATCH --error=sout/slurmInfo/slurmInfo_snellius_%j.err
 
@@ -102,7 +102,7 @@ EOF
 stencil_script_binpart=$(cat << 'EOF'
 
 MODULE_PATH="moduleload/load_<exp-type>_modules.sh"
-EXPORT_PATH="exportload/load_<exp-type>_<exp-topo>_exports.sh"
+EXPORT_PATH="exportload/load_<exp-type>_<exp-topo-short>_exports.sh"
 outfile=sout/snellius_<exp-name>_<exp-type>_<exp-topo>_${SLURM_JOB_ID}.out
 errfile=sout/snellius_<exp-name>_<exp-type>_<exp-topo>_${SLURM_JOB_ID}.err
 
@@ -120,8 +120,8 @@ fixednodeflag="1"
 my_sl="1"
 my_min_sw_distance="3"
 
-names=("pp" "a2a" "ar" "hlo" "mpp")
-types=("Baseline" "CudaAware" "Nccl" "Nvlink" "Aggregated")
+names=("pp" "a2a" "ar" "mpp")
+types=("Baseline" "CudaAware" "Nccl" "Nvlink")
 topos=("1" "2" "4" "8")
 
 firstiterationflag="1"
@@ -147,7 +147,8 @@ do
             if [[
                 ("$topo" == "1" || "$type" != "Nvlink") &&
                 ("$type" != "Aggregated" || "$name" == "mpp") &&
-                ("$name" != "mpp" || "$topo" != "1") &&
+                ("$name" != "pp" || "$topo" -le "2") &&
+		("$name" != "mpp" || "$topo" == "2") &&
                 ("$name" != "hlo" || "$type" != "Nvlink") &&
                 ("$name" != "ar" || "$type" != "Nvlink")
             ]] # BUG TMP since halo and ar now implemented only in Baseline
@@ -164,12 +165,12 @@ do
                     fi
                     tmp_script_contenent=$(echo "$out_script_contenent")
 
-                    out_script_contenent=$(echo "$tmp_script_contenent" | sed "s/<exp-name>/$name/g" | sed "s/<exp-type>/$type/g" | sed "s/<exp-topo>/$topolable/g")
+                    out_script_contenent=$(echo "$tmp_script_contenent" | sed "s/<exp-name>/$name/g" | sed "s/<exp-type>/$type/g" | sed "s/<exp-topo-short>/$topolable/g" | sed "s/<exp-topo>/${topo}node/g" )
                     tmp_script_contenent=$(echo "$out_script_contenent")
 
                     if [[ "$topo" != "1" ]]
                     then
-                        out_script_contenent=$(echo "$tmp_script_contenent" | sed "s/nodes=1/nodes=2/g")
+                        out_script_contenent=$(echo "$tmp_script_contenent" | sed "s/nodes=1/nodes=${topo}/g")
                     fi
                     tmp_script_contenent=$(echo "$out_script_contenent")
 
