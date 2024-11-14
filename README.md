@@ -1,4 +1,4 @@
-# Interconnect Benchmark
+# Blink: A Benchmark for Large-Scale Multi-GPU Interconnects
 
 This repository was created to investigate and benchmark the state-of-the-art interconnections between a source and a target GPU. The code can benchmark both GPUs on the same computation
 node then on different ones.
