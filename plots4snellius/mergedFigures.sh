@@ -2,7 +2,7 @@
 
 plotscript="src/genPlot.py"
 basefolder="mergedcsv/"
-peakfile="sysTopologies/snellius_theoretical_peaks.csv"
+peakfile="sysTopologies/snellius_nopeaks.csv"
 
 . src/utils/utilsLib.sh
 
@@ -37,7 +37,21 @@ do
 	        t="${utils_lib_result_top[$j]}"
         	p="${utils_lib_result_par[$j]}"
 
-		string="${s}, ${b}, ${i}, ${t}, ${p}"
+		if [[ "${t}" != "singlenode" ]] && [[ "${t}" != "multinode" ]]
+	        then
+                	if [[ "${t}" == *"node"* ]]
+        	        then
+	                        nnodes=${t%"node"}
+                        	if [[ "${nnodes}" -gt "1" ]]
+                	        then
+        	                        topo4peaks="singlenode"
+	                        else
+                                	topo4peaks="multinode"
+                        	fi
+                	fi
+        	fi
+
+		string="${s}, ${b}, ${i}, ${topo4peaks}, ${p}"
 		if ! grep "${string}" ${peakfile} -q
 	        then
         	        echo "${string} not found in ${peakfile}"

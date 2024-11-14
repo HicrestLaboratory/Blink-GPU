@@ -32,3 +32,5 @@ plots4snellius/sout
 
 energy/results/
 energy/parsed/
+
+plots4snellius/out/*

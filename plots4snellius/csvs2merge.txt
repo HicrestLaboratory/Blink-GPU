@@ -1,12 +1,24 @@
-./src/aggregateCsv.sh --system snellius --benchmark a2a --implementation Baseline:CudaAware:Nccl:Nvlink --topology singlenode --partition gpu-a100
-./src/aggregateCsv.sh --system snellius --benchmark a2a --implementation Baseline:CudaAware:Nccl:Nvlink --topology singlenode --partition gpu-h100
-./src/aggregateCsv.sh --system snellius --benchmark a2a --implementation Baseline:CudaAware:Nccl --topology multinode --partition gpu-a100
-./src/aggregateCsv.sh --system snellius --benchmark a2a --implementation Baseline:CudaAware:Nccl --topology multinode --partition gpu-h100
+./src/aggregateCsv.sh --system snellius --benchmark a2a --implementation Baseline:CudaAware:Nccl:Nvlink --topology 1node --partition gpu-a100
+./src/aggregateCsv.sh --system snellius --benchmark a2a --implementation Baseline:CudaAware:Nccl:Nvlink --topology 1node --partition gpu-h100
+./src/aggregateCsv.sh --system snellius --benchmark a2a --implementation Baseline:CudaAware:Nccl --topology 2node --partition gpu-a100
+./src/aggregateCsv.sh --system snellius --benchmark a2a --implementation Baseline:CudaAware:Nccl --topology 2node --partition gpu-h100
+./src/aggregateCsv.sh --system snellius --benchmark a2a --implementation Baseline:CudaAware:Nccl --topology 4node --partition gpu-a100
+./src/aggregateCsv.sh --system snellius --benchmark a2a --implementation Baseline:CudaAware:Nccl --topology 4node --partition gpu-h100
+./src/aggregateCsv.sh --system snellius --benchmark a2a --implementation Baseline:CudaAware:Nccl --topology 8node --partition gpu-a100
+./src/aggregateCsv.sh --system snellius --benchmark a2a --implementation Baseline:CudaAware:Nccl --topology 8node --partition gpu-h100
 
-./src/aggregateCsv.sh --system snellius --benchmark mpp --implementation Baseline:CudaAware:Nccl --topology multinode --partition gpu-a100
-./src/aggregateCsv.sh --system snellius --benchmark mpp --implementation Baseline:CudaAware:Nccl --topology multinode --partition gpu-h100
+./src/aggregateCsv.sh --system snellius --benchmark ar --implementation Baseline:CudaAware:Nccl:Nvlink --topology 1node --partition gpu-a100
+./src/aggregateCsv.sh --system snellius --benchmark ar --implementation Baseline:CudaAware:Nccl:Nvlink --topology 1node --partition gpu-h100
+./src/aggregateCsv.sh --system snellius --benchmark ar --implementation Baseline:CudaAware:Nccl --topology 2node --partition gpu-a100
+./src/aggregateCsv.sh --system snellius --benchmark ar --implementation Baseline:CudaAware:Nccl --topology 2node --partition gpu-h100
+./src/aggregateCsv.sh --system snellius --benchmark ar --implementation Baseline:CudaAware:Nccl --topology 4node --partition gpu-a100
+./src/aggregateCsv.sh --system snellius --benchmark ar --implementation Baseline:CudaAware:Nccl --topology 4node --partition gpu-h100
+./src/aggregateCsv.sh --system snellius --benchmark ar --implementation Baseline:CudaAware:Nccl --topology 8node --partition gpu-a100
+./src/aggregateCsv.sh --system snellius --benchmark ar --implementation Baseline:CudaAware:Nccl --topology 8node --partition gpu-h100
 
-./src/aggregateCsv.sh --system snellius --benchmark pp --implementation Baseline:CudaAware:Nccl:Nvlink --topology singlenode --partition gpu-a100
-./src/aggregateCsv.sh --system snellius --benchmark pp --implementation Baseline:CudaAware:Nccl:Nvlink --topology singlenode --partition gpu-h100
-./src/aggregateCsv.sh --system snellius --benchmark pp --implementation Baseline:CudaAware:Nccl --topology multinode --partition gpu-a100
-./src/aggregateCsv.sh --system snellius --benchmark pp --implementation Baseline:CudaAware:Nccl --topology multinode --partition gpu-h100
+./src/aggregateCsv.sh --system snellius --benchmark mpp --implementation Baseline:CudaAware:Nccl --topology 2node --partition gpu-a100
+./src/aggregateCsv.sh --system snellius --benchmark mpp --implementation Baseline:CudaAware:Nccl --topology 2node --partition gpu-h100
+
+./src/aggregateCsv.sh --system snellius --benchmark pp --implementation Baseline:CudaAware:Nccl:Nvlink --topology 1node --partition gpu-h100
+./src/aggregateCsv.sh --system snellius --benchmark pp --implementation Baseline:CudaAware:Nccl --topology 2node --partition gpu-a100
+./src/aggregateCsv.sh --system snellius --benchmark pp --implementation Baseline:CudaAware:Nccl --topology 2node --partition gpu-h100
