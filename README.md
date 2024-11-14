@@ -1,9 +1,26 @@
 # Blink: A Benchmark for Large-Scale Multi-GPU Interconnects
 
-This repository was created to investigate and benchmark the state-of-the-art interconnections between a source and a target GPU. The code can benchmark both GPUs on the same computation
-node then on different ones.
+This repository was created to investigate and benchmark the state-of-the-art interconnections between a source and a target GPU. The code can benchmark both GPUs on the same computation node then on different ones.
 
-The base idea is to first initialize a message on the source device memory and then benchmark the time needed for moving the message to the target GPU/GPUs.
+## Publication
+
+This benchmark has been used for the SC24 paper "Exploring GPU-to-GPU Communication: Insights into Supercomputer Interconnects", where we analyzed inter-GPU communications on three supercomputers (Alps, Leonardo, and LUMI) . All the relevant code used in the paper can be found on the `sc24` branch.
+
+If you use this benchmark please cite us:
+```
+@INPROCEEDINGS {,
+  author = { De Sensi, Daniele and Pichetti, Lorenzo and Vella, Flavio and De Matteis, Tiziano and Ren, Zebin and Fusco, Luigi and Turisini, Matteo and Cesarini, Daniele and Lust, Kurt and Trivedi, Animesh and Roweth, Duncan and Spiga, Filippo and Di Girolamo, Salvatore and Hoefler, Torsten },
+  booktitle = { 2024 SC24: International Conference for High Performance Computing, Networking, Storage and Analysis SC },
+  title = {{ Exploring GPU-to-GPU Communication: Insights into Supercomputer Interconnects }},
+  year = {2024},
+  pages = {513-527},
+  doi = {10.1109/SC41406.2024.00039},
+  url = {https://doi.ieeecomputersociety.org/10.1109/SC41406.2024.00039},
+  publisher = {IEEE Computer Society},
+  address = {Los Alamitos, CA, USA},
+  month =Nov}
+```
+
 
 ## Experiment set-up
 
