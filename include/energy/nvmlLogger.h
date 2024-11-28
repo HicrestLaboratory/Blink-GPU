@@ -54,7 +54,7 @@ class myPowerSampling {
                         if (i >= POWERCHUNKSSIZE ) {
                                 printf("Process %d realloced the buffer (line %d)\n", dev, __LINE__);
                                 nsamples += POWERCHUNKSSIZE ;
-                                power_vec = realloc(power_vec, sizeof(unsigned int)*nsamples);
+                                power_vec = (unsigned int*)realloc(power_vec, sizeof(unsigned int)*nsamples);
                                 i = 0;
                         }
 
