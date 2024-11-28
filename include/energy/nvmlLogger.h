@@ -29,22 +29,21 @@ class myPowerSampling {
                 nrealloc = 0;
                 nsamples = POWERCHUNKSSIZE ;
                 power_vec = (unsigned int*)malloc(sizeof(unsigned int)*nsamples);
+		temperature_vec = (unsigned int*)malloc(sizeof(unsigned int)*nsamples);
 
                 result = nvmlDeviceGetHandleByIndex_v2 ( my_dev, &device );
                 NVML_CHECK( result )
 
                 fpout = fopen(filename, "w");
-		fprintf(fpout, "#deviceId,InstantPower\n");
+		fprintf(fpout, "#deviceId,InstantPower,InstantTemperature\n");
         }
 
         ~myPowerSampling() {
 
-                printf("Power valuses by %d:\n", dev);
-                for (int i=0; i<nsamples; i++) {
-                        //printf("\t%i: %llu\n", dev, power_vec[i]);
-                        fprintf(fpout, "%d,%u\n", dev, power_vec[i]);
-                }
+                for (int i=0; i<nsamples; i++)
+                        fprintf(fpout, "%d,%u,%u\n", dev, power_vec[i], temperature_vec[i]);
                 fclose(fpout);
+		printf("Device %d printed its sampling results on file\n", dev);
         }
 
         void executePowerSampling() {
@@ -59,11 +58,14 @@ class myPowerSampling {
                                 nrealloc += 1;
                                 nsamples += POWERCHUNKSSIZE ;
                                 power_vec = (unsigned int*)realloc(power_vec, sizeof(unsigned int)*nsamples);
+				temperature_vec = (unsigned int*)realloc(temperature_vec, sizeof(unsigned int)*nsamples);
                                 i = 0;
                         }
 
                         result = nvmlDeviceGetPowerUsage ( device, &(power_vec[i]) );
                         NVML_CHECK( result )
+			result = nvmlDeviceGetTemperature ( device, &(temperature_vec[i]) );
+			NVML_CHECK( result )
 
                         std::this_thread::sleep_for(std::chrono::milliseconds(1));
                         i++;
