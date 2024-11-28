@@ -2,7 +2,7 @@
 datafolder="./results/"
 keyname="nvmlMesures"
 resultfolder="./parsed/"
-parsedkeyname="parsedDcgmiMesures"
+parsedkeyname="parsedNvmlMesures"
 
 parsefile() {
 	file=$1
