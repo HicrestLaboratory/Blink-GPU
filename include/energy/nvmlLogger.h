@@ -9,7 +9,7 @@
 
 #define POWERCHUNKSSIZE 1000
 
-#define NVML_CHECK( R ) { if ( R != 0) fprintf(stderr, "Error at line %d: %d\n", __LINE__, R); }
+#define NVML_CHECK( R ) { if ( R != 0) fprintf(stderr, "NVML error at line %d of file %s: %d\n", __LINE__, __FILE__, R); }
 
 
 class myPowerSampling {
