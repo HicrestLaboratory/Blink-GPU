@@ -34,6 +34,7 @@ class myPowerSampling {
                 NVML_CHECK( result )
 
                 fpout = fopen(filename, "w");
+		fprintf(fpout, "#InstantPower\n");
         }
 
         ~myPowerSampling() {
