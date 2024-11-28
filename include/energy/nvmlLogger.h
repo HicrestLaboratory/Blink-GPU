@@ -65,7 +65,7 @@ class myPowerSampling {
 
                         result = nvmlDeviceGetPowerUsage ( device, &(power_vec[i]) );
                         NVML_CHECK( result )
-			result = nvmlDeviceGetTemperature ( device, &(temperature_vec[i]) );
+			result = nvmlDeviceGetTemperature ( device, 0, &(temperature_vec[i]) );
 			NVML_CHECK( result )
 
                         std::this_thread::sleep_for(std::chrono::milliseconds(1));
