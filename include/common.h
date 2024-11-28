@@ -34,50 +34,12 @@ const int num_colors = sizeof(colors)/sizeof(uint32_t);
 #define POP_RANGE
 #endif
 
-#ifdef PICODCGMI
-#include <common/picoDcgmiWrapper.h>
+#define TAG1 10
+#define TAG2 20
+
+#ifdef ENERGY
+#include <energy/picoEnergy.h>
 #endif
-
-void alloc_host_buffers(int rank,
-                        dtype **sendBuffer, SZTYPE sendBufferLen,
-                        dtype **recvBuffer, SZTYPE recvBufferLen) {
-#ifdef PINNED
-        cudaHostAlloc(sendBuffer, sendBufferLen*sizeof(dtype), cudaHostAllocDefault);
-        cudaHostAlloc(recvBuffer, recvBufferLen*sizeof(dtype), cudaHostAllocDefault);
-#else
-        *sendBuffer = (dtype*)malloc(sendBufferLen*sizeof(dtype));
-        *recvBuffer = (dtype*)malloc(recvBufferLen*sizeof(dtype));
-#endif
-        int errorflag = 0;
-        if (*sendBuffer == NULL) {
-            fprintf(stderr, "[%d] Error while allocating buffers at line %d (%lu Bytes requested)\n", rank, __LINE__, sendBufferLen*sizeof(dtype));
-            fflush(stderr);
-            errorflag = __LINE__;
-
-        }
-        if (*recvBuffer == NULL) {
-            fprintf(stderr, "[%d] Error while allocating buffers at line %d (%lu Bytes requested)\n", rank, __LINE__, recvBufferLen*sizeof(dtype));
-            fflush(stderr);
-            errorflag = __LINE__;
-
-        }
-        MPI_Barrier(MPI_COMM_WORLD);
-        if (errorflag != 0) MPI_Abort(MPI_COMM_WORLD, errorflag);
-        MPI_Barrier(MPI_COMM_WORLD);
-        if (rank == 0) printf("Buffers of size %" PRIu64 " B and %" PRIu64 " B succesfuly allocated by all ranks\n", sendBufferLen*sizeof(dtype), recvBufferLen*sizeof(dtype));
-        fflush(stdout);
-        MPI_Barrier(MPI_COMM_WORLD);
-}
-
-/* Example:
- * Let buff be a buffer of size n to be initialized with value -1
- * INIT_HOST_BUFFER(buff, n, -1)
- */
-#define INIT_HOST_BUFFER(B, L, V) { \
-    for (SZTYPE i=0; i<L; i++) {    \
-        (B)[i] = V;                 \
-    }                               \
-}
 
 void compile_time_check(void) {
     printf("Compile time check:\n");
@@ -89,7 +51,7 @@ void compile_time_check(void) {
     printf("This MPI library cannot determine if there is CUDA-aware support.\n");
 #endif /* MPIX_CUDA_AWARE_SUPPORT */
 
-    printf("Run time check:n");
+    printf("Run time check\n");
 #if defined(MPIX_CUDA_AWARE_SUPPORT)
     if (1 == MPIX_Query_cuda_support()) {
         printf("This MPI library has CUDA-aware support.\n");
@@ -318,6 +280,81 @@ void print_errors(int myrank, int buff_cycle, int fix_buff_size, int max_j, ckty
         fflush(stdout);
 }
 
+void share_check_vectors(int my_rank, int rank1, int rank2, dtype *recvBuffer, SZTYPE recvBufferLen,
+                         cktype *ptr_my_cpu_check, cktype *ptr_recv_cpu_check, cktype *ptr_to_gpu_check,
+                         cktype *ptr_to_gpu_checks_value, cktype *ptr_to_cpu_checks_value, int *ptr_to_my_error_value) {
+
+    MPI_Status stat;
+    int tag1 = TAG1, tag2 = TAG2;
+
+    gpu_device_reduce(recvBuffer, recvBufferLen, ptr_to_gpu_check);
+    if(my_rank == rank1){
+        MPI_Send(ptr_my_cpu_check,   1, MPI_cktype, rank2, tag1, MPI_COMM_WORLD);
+        MPI_Recv(ptr_recv_cpu_check, 1, MPI_cktype, rank2, tag2, MPI_COMM_WORLD, &stat);
+    } else if(my_rank == rank2){
+        MPI_Recv(ptr_recv_cpu_check, 1, MPI_cktype, rank1, tag1, MPI_COMM_WORLD, &stat);
+        MPI_Send(ptr_my_cpu_check,   1, MPI_cktype, rank1, tag2, MPI_COMM_WORLD);
+    }
+
+    *(ptr_to_gpu_checks_value) = *(ptr_to_gpu_check);
+    *(ptr_to_cpu_checks_value) = *(ptr_recv_cpu_check);
+    *(ptr_to_my_error_value) = abs(*(ptr_to_gpu_checks_value) - *(ptr_to_cpu_checks_value));
+}
+
+// Allocation
+
+void alloc_host_buffers(int rank,
+                        dtype **sendBuffer, SZTYPE sendBufferLen,
+                        dtype **recvBuffer, SZTYPE recvBufferLen,
+                        MPI_Comm MpiCommunicator) {
+#ifdef PINNED
+        cudaHostAlloc(sendBuffer, sendBufferLen*sizeof(dtype), cudaHostAllocDefault);
+        cudaHostAlloc(recvBuffer, recvBufferLen*sizeof(dtype), cudaHostAllocDefault);
+#else
+        *sendBuffer = (dtype*)malloc(sendBufferLen*sizeof(dtype));
+        *recvBuffer = (dtype*)malloc(recvBufferLen*sizeof(dtype));
+#endif
+        int errorflag = 0;
+        if (*sendBuffer == NULL) {
+            fprintf(stderr, "[%d] Error while allocating buffers at line %d (%lu Bytes requested)\n", rank, __LINE__, sendBufferLen*sizeof(dtype));
+            fflush(stderr);
+            errorflag = __LINE__;
+
+        }
+        if (*recvBuffer == NULL) {
+            fprintf(stderr, "[%d] Error while allocating buffers at line %d (%lu Bytes requested)\n", rank, __LINE__, recvBufferLen*sizeof(dtype));
+            fflush(stderr);
+            errorflag = __LINE__;
+
+        }
+        MPI_Barrier(MpiCommunicator);
+        if (errorflag != 0) MPI_Abort(MPI_COMM_WORLD, errorflag);
+        MPI_Barrier(MpiCommunicator);
+        if (rank == 0) printf("Buffers of size %" PRIu64 " B and %" PRIu64 " B succesfuly allocated by all ranks\n", sendBufferLen*sizeof(dtype), recvBufferLen*sizeof(dtype));
+        fflush(stdout);
+        MPI_Barrier(MpiCommunicator);
+}
+
+/* Example:
+ * Let buff be a buffer of size n to be initialized with value -1
+ * INIT_HOST_BUFFER(buff, n, -1)
+ */
+#define INIT_HOST_BUFFER(B, L, V) { \
+    for (SZTYPE i=0; i<L; i++) {    \
+        (B)[i] = V;                 \
+    }                               \
+}
+
+void free_host_buffers(dtype *sendBuffer, dtype *recvBuffer) {
+#ifdef PINNED
+    cudaFreeHost(sendBuffer);
+    cudaFreeHost(recvBuffer);
+#else
+    free(sendBuffer);
+    free(recvBuffer);
+#endif
+}
+
 void alloc_device_buffers(dtype *sendBuffer, dtype **dev_sendBuffer, SZTYPE sendBufferLen,
                           dtype *recvBuffer, dtype **dev_recvBuffer, SZTYPE recvBufferLen) {
 
@@ -338,6 +375,11 @@ cktype* share_local_checks(int mpi_size, dtype *local_buffer, SZTYPE buffer_len)
     MPI_Allgather(local_check, 1, MPI_cktype, all_checks, 1, MPI_cktype, MPI_COMM_WORLD);
 
     return(all_checks);
+}
+
+void free_device_buffers(dtype *dev_sendBuffer, dtype *dev_recvBuffer) {
+    cudaErrorCheck( cudaFree(dev_sendBuffer) );
+    cudaErrorCheck( cudaFree(dev_recvBuffer) );
 }
 
 void compute_global_checks(int mpi_size, cktype *all_checks,

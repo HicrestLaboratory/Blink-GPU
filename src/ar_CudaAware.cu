@@ -20,6 +20,11 @@
 #include "mpi-ext.h"
 #endif
 
+#include "../include/common.h"
+
+#define MYBENCH_CODE "ar"
+#define MYIMPL_CODE "CudaAware"
+
 #define BUFF_CYCLE 28
 #define LOOP_COUNT 50
 
@@ -124,6 +129,12 @@ int main(int argc, char *argv[])
      /* -------------------------------------------------------------------------------------------
         Loop from 8 B to 1 GB
     --------------------------------------------------------------------------------------------*/
+
+#ifdef ENERGY
+    PICOENERGY_DEFINE
+    PICOENERGY_START( fix_buff_size , loop_count , rank )
+    MPI_Barrier(MPI_COMM_WORLD);
+#endif
 
     SZTYPE N;
     if (fix_buff_size<=30) {
@@ -270,6 +281,11 @@ int main(int argc, char *argv[])
     sprintf(s+strlen(s), " (for Error)\n");
     printf("%s", s);
     fflush(stdout);
+
+#ifdef ENERGY
+    PICOENERGY_STOP( rank )
+    MPI_Barrier(MPI_COMM_WORLD);
+#endif
 
     free(error);
     free(my_error);

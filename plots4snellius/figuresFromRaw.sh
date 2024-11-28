@@ -16,6 +16,20 @@ do
 	topology=$( echo ${filename} | awk -F_ '{ print $4 }' )
 	partition=$( echo ${filename} | awk -F_ '{ print $5 }' )
 	
+	if [[ "${topology}" != "singlenode" ]] && [[ "${topology}" != "multinode" ]]
+	then
+		if [[ "${topology}" == *"node"* ]]
+		then
+			nnodes=${topology%"node"}
+			if [[ "${nnodes}" -gt "1" ]]
+			then
+				topo4peaks="singlenode"
+			else
+				topo4peaks="multinode"
+			fi
+		fi
+	fi	
+
 	echo "------------------------------------------------------"
 	echo "filename: ${filename}"
 	echo "system: ${system}"
@@ -33,7 +47,7 @@ do
 		./${csvgenfile} ${midfolder}${filename}.txt ${csvfolder}${filename}.csv "system:${system}" "benchmark:${benchmark}" "implementation:${implementation}" "topology:${topology}" "partition:${partition}"
 	fi
 	
-	string="${system}, ${benchmark}, ${implementation}, ${topology}, ${partition}"
+	string="${system}, ${benchmark}, ${implementation}, ${topo4peaks}, ${partition}"
         echo "string: ${string}"
 	if ! grep "${string}" ${peakfile} -q
 	then

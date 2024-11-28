@@ -23,6 +23,11 @@
 #include "mpi-ext.h"
 #endif
 
+#include "../include/common.h"
+
+#define MYBENCH_CODE "ar"
+#define MYIMPL_CODE "Nccl"
+
 #define BUFF_CYCLE 28
 #define LOOP_COUNT 50
 
@@ -182,6 +187,12 @@ int main(int argc, char *argv[])
         Loop from 8 B to 1 GB
     --------------------------------------------------------------------------------------------*/
 
+#ifdef ENERGY
+    PICOENERGY_DEFINE
+    PICOENERGY_START( fix_buff_size , loop_count , rank )
+    MPI_Barrier(MPI_COMM_WORLD);
+#endif
+
     SZTYPE N;
     if (fix_buff_size<=30) {
         N = 1 << (fix_buff_size - 1);
@@ -258,8 +269,11 @@ int main(int argc, char *argv[])
             MPI_Barrier(MPI_COMM_WORLD);
             start_time = MPI_Wtime();
 
+            ncclGroupStart();
             ncclAllReduce(d_A, d_B, N, ncclDtype, ncclMax, NCCL_COMM_WORLD, NULL);
+            ncclGroupEnd();
 
+	    cudaErrorCheck(cudaDeviceSynchronize());
             stop_time = MPI_Wtime();
             if (i>0) inner_elapsed_time[(j-fix_buff_size)*loop_count+i-1] = stop_time - start_time;
 
@@ -346,6 +360,11 @@ int main(int argc, char *argv[])
     printf("%s", s);
     fflush(stdout);
     MPI_Barrier(MPI_COMM_WORLD);
+
+#ifdef ENERGY
+    PICOENERGY_STOP( rank )
+    MPI_Barrier(MPI_COMM_WORLD);
+#endif
 
     free(error);
     free(my_error);

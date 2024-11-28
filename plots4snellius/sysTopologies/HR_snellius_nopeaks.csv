@@ -1,0 +1,25 @@
+system, benchmark, implementation, topology, partition, peak(GB/s)
+snellius, pp, Baseline, singlenode, gpu-a100:gpu-h100, None
+snellius, pp, Baseline:CudaAware:Nccl, multinode, gpu-a100, None
+snellius, pp, Baseline:CudaAware:Nccl, multinode, gpu-h100, None
+snellius, pp, CudaAware:Nccl:Nvlink, singlenode, gpu-a100, None
+snellius, pp, CudaAware:Nccl:Nvlink, singlenode, gpu-h100, None
+
+snellius, mpp, Baseline:CudaAware:Nccl:Nvlink, singlenode, gpu-a100:gpu-h100, None
+snellius, mpp, Baseline:CudaAware:Nccl, multinode, gpu-a100, None
+snellius, mpp, Baseline:CudaAware:Nccl, multinode, gpu-h100, None
+
+snellius, a2a, Baseline, singlenode, gpu-a100:gpu-h100, None
+snellius, a2a, CudaAware:Nccl:Nvlink, singlenode, gpu-a100, None
+snellius, a2a, CudaAware:Nccl:Nvlink, singlenode, gpu-h100, None
+snellius, a2a, Baseline:CudaAware:Nccl, multinode, gpu-a100, None
+snellius, a2a, Baseline:CudaAware:Nccl, multinode, gpu-h100, None
+
+snellius, ar, Baseline, singlenode, gpu-a100:gpu-h100, None
+snellius, ar, Baseline:CudaAware:Nccl, multinode, gpu-a100:gpu-h100, None
+snellius, ar, CudaAware:Nccl:Nvlink, singlenode, gpu-a100, None
+snellius, ar, CudaAware:Nccl:Nvlink, singlenode, gpu-h100, None
+
+snellius, pp:mpp:a2a:ar, Nvlink, multinode, gpu-a100:gpu-h100, None
+snellius, hlo, Baseline:CudaAware:Nccl:Nvlink, singlenode:multinode, gpu-a100:gpu-h100, None
+snellius, mpp, Aggregated, singlenode:multinode, gpu-a100:gpu-h100, None

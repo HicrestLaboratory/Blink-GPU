@@ -22,6 +22,9 @@
 
 #include "../include/common.h"
 
+#define MYBENCH_CODE "pp"
+#define MYIMPL_CODE "Nvlink"
+
 #define BUFF_CYCLE 31
 #define LOOP_COUNT 50
 
@@ -88,6 +91,12 @@ int main(int argc, char *argv[])
         Loop from 8 B to 1 GB
     --------------------------------------------------------------------------------------------*/
 
+#ifdef ENERGY
+    PICOENERGY_DEFINE
+    PICOENERGY_START( fix_buff_size , loop_count , rank )
+    MPI_Barrier(MPI_COMM_WORLD);
+#endif
+
     PICO_enable_peer_access(rank, num_devices, my_dev);
 
     SZTYPE N = define_buffer_len(fix_buff_size);
@@ -112,27 +121,14 @@ int main(int argc, char *argv[])
             // Allocate memory for A on CPU
             dtype *A, *B;
             cktype my_cpu_check = 0, recv_cpu_check, gpu_check = 0;
-#ifdef PINNED
-            cudaHostAlloc(&A, N*sizeof(dtype), cudaHostAllocDefault);
-            cudaHostAlloc(&B, N*sizeof(dtype), cudaHostAllocDefault);
-#else
-            A = (dtype*)malloc(N*sizeof(dtype));
-            B = (dtype*)malloc(N*sizeof(dtype));
-#endif
+            alloc_host_buffers(rank, &A, N*sizeof(dtype), &B, N*sizeof(dtype), ppComm);
 
-            // Initialize all elements of A to 0.0
-            for(SZTYPE i=0; i<N; i++){
-                A[i] = 1U * (rank+1);
-                B[i] = 0U;
-            }
+            // Initialize all elements of A to 1*(rank+1) and B to 0.0
+            INIT_HOST_BUFFER(A, N, 1U * (rank+1))
+            INIT_HOST_BUFFER(B, N, 0U )
 
-            dtype *d_B;
-            cudaErrorCheck( cudaMalloc(&d_B, N*sizeof(dtype)) );
-            cudaErrorCheck( cudaMemcpy(d_B, B, N*sizeof(dtype), cudaMemcpyHostToDevice) );
-
-            dtype *d_A;
-            cudaErrorCheck( cudaMalloc(&d_A, N*sizeof(dtype)) );
-            cudaErrorCheck( cudaMemcpy(d_A, A, N*sizeof(dtype), cudaMemcpyHostToDevice) );
+            dtype *d_A, *d_B;
+            alloc_device_buffers(A, &d_A, N*sizeof(dtype), B, &d_B, N*sizeof(dtype));
             gpu_device_reduce(d_A, N, &my_cpu_check);
 
             int tag1 = 10;
@@ -188,28 +184,10 @@ int main(int argc, char *argv[])
 
 
 
-            gpu_device_reduce(d_B, N, &gpu_check);
-            if(rank == 0){
-                MPI_Send(&my_cpu_check,   1, MPI_cktype, rank2, tag1, MPI_COMM_WORLD);
-                MPI_Recv(&recv_cpu_check, 1, MPI_cktype, rank2, tag2, MPI_COMM_WORLD, &stat);
-            } else if(rank == rank2){
-                MPI_Recv(&recv_cpu_check, 1, MPI_cktype, 0, tag1, MPI_COMM_WORLD, &stat);
-                MPI_Send(&my_cpu_check,   1, MPI_cktype, 0, tag2, MPI_COMM_WORLD);
-            }
+            share_check_vectors(rank, 0, rank2, d_B, N, &my_cpu_check, &recv_cpu_check, &gpu_check, &(gpu_checks[j]), &(cpu_checks[j]), &(my_error[j]));
 
-            gpu_checks[j] = gpu_check;
-            cpu_checks[j] = recv_cpu_check;
-            my_error[j] = abs(gpu_checks[j] - cpu_checks[j]);
-
-            cudaErrorCheck( cudaFree(d_A) );
-            cudaErrorCheck( cudaFree(d_B) );
-#ifdef PINNED
-            cudaFreeHost(A);
-            cudaFreeHost(B);
-#else
-            free(A);
-            free(B);
-#endif
+            free_device_buffers(d_A, d_B);
+            free_host_buffers(A, B);
         }
 
         N = define_buffer_len(fix_buff_size);
@@ -224,6 +202,11 @@ int main(int argc, char *argv[])
     }
 
     PICO_disable_peer_access(num_devices, my_dev);
+
+#ifdef ENERGY
+    PICOENERGY_STOP( rank )
+    MPI_Barrier(MPI_COMM_WORLD);
+#endif
 
     free(error);
     free(my_error);
