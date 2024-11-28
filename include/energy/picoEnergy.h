@@ -79,16 +79,24 @@ void energyCompileTimeCheck(void) {
         unsigned long long PICONVML_ENERGYCOUNTER_START;	\
         unsigned long long PICONVML_ENERGYCOUNTER_STOP;
 
-#define PICONVML_ENERGY_START( BS, LC, DV )						\
-		PICOENERGY_DEFINE_FILENAME( BS, LC )					\
-		picoNvmlTotalEnergy(DV, &PICONVML_ENERGYCOUNTER_START);
+#define PICONVML_ENERGY_START( BS, LC, DV )						                              \
+		PICOENERGY_DEFINE_FILENAME( BS, LC )					                              \
+		picoNvmlTotalEnergy(DV, &PICONVML_ENERGYCOUNTER_START);                               \
+		std::thread threadStart;                                                              \
+		myPowerSampling power_samples ( RK , PICOENERGY_FILENAME_VAR );                       \
+		threadStart = std::thread( &myPowerSampling::executePowerSampling, &power_samples );  \
+		sleep(10);
+
 
 #define PICONVML_ENERGY PICONVML_ENERGYCOUNTER_STOP - PICONVML_ENERGYCOUNTER_START
 
-#define PICONVML_ENERGY_STOP( DV )  							\
-		picoNvmlTotalEnergy(DV, &PICONVML_ENERGYCOUNTER_STOP);	\
-		MPI_Barrier(MPI_COMM_WORLD);							\
-		if (rank == 0) printf("Delta power for device:\n");		\
+#define PICONVML_ENERGY_STOP( DV )  							                \
+        std::thread threadKill( &myPowerSampling::killThread, &power_samples);  \
+        threadStart.join( );                                                    \
+        threadKill.join( );                                                     \
+		picoNvmlTotalEnergy(DV, &PICONVML_ENERGYCOUNTER_STOP);	                \
+		MPI_Barrier(MPI_COMM_WORLD);							                \
+		if (rank == 0) printf("Delta power for device:\n");		                \
 		printf("\t%i: %u\n", DV, PICONVML_ENERGY);
 
 void picoNvmlTotalEnergy(int my_dev, unsigned long long* energy) {
