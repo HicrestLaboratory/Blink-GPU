@@ -269,8 +269,11 @@ int main(int argc, char *argv[])
             MPI_Barrier(MPI_COMM_WORLD);
             start_time = MPI_Wtime();
 
+            ncclGroupStart();
             ncclAllReduce(d_A, d_B, N, ncclDtype, ncclMax, NCCL_COMM_WORLD, NULL);
+            ncclGroupEnd();
 
+	    cudaErrorCheck(cudaDeviceSynchronize());
             stop_time = MPI_Wtime();
             if (i>0) inner_elapsed_time[(j-fix_buff_size)*loop_count+i-1] = stop_time - start_time;
 

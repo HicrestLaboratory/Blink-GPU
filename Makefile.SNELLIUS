@@ -5,7 +5,7 @@ MPI_HOME=/sw/arch/RHEL8/EB_production/2023/software/OpenMPI/4.1.5-GCC-12.3.0
 NCCL_HOME=/sw/arch/RHEL8/EB_production/2023/software/NVHPC/23.7-CUDA-12.1.1/Linux_x86_64/23.7/comm_libs/12.2/nccl
 # ---------------- Common ----------------
 CC=nvcc
-CFLAGS=-std=c++14 -DSKIPCPUAFFINITY -DENERGY -DPICONVML -lnvidia-ml
+CFLAGS=-std=c++14 -DSKIPCPUAFFINITY
 #-O3
 LIBS=
 INCL= -Iinclude/
