@@ -34,6 +34,10 @@ const int num_colors = sizeof(colors)/sizeof(uint32_t);
 #define POP_RANGE
 #endif
 
+#ifdef PICODCGMI
+#include <common/picoDcgmiWrapper.h>
+#endif
+
 void alloc_host_buffers(int rank,
                         dtype **sendBuffer, SZTYPE sendBufferLen,
                         dtype **recvBuffer, SZTYPE recvBufferLen) {
