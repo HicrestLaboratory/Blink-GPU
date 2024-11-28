@@ -62,7 +62,7 @@ class myPowerSampling {
                                 nsamples += POWERCHUNKSSIZE ;
                                 power_vec = (unsigned int*)realloc(power_vec, sizeof(unsigned int)*nsamples);
 				temperature_vec = (unsigned int*)realloc(temperature_vec, sizeof(unsigned int)*nsamples);
-				energy_vec = (unsigned long long*)realloc(temperature_vec, sizeof(unsigned long long)*nsamples);
+				energy_vec = (unsigned long long*)realloc(energy_vec, sizeof(unsigned long long)*nsamples);
                                 i = 0;
                         }
 
