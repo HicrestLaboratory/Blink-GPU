@@ -6,7 +6,7 @@ import os
 
 mypalette={0: 'b', 1: 'y', 2: 'g', 3: 'r'}
 
-Resources_grp = ['InstantPower', 'InstantTemperature']
+Resources_grp = ['InstantPower', 'InstantTemperature', 'TotalEnergy']
 
 MetricsGroups = {'ResourcesGrp': Resources_grp}
 

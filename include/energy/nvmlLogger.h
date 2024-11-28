@@ -24,6 +24,7 @@ class myPowerSampling {
         nvmlReturn_t result;
 	unsigned int *temperature_vec;
         unsigned int *power_vec;
+	unsigned long long *energy_vec;
 
         myPowerSampling(int my_dev, char* filename) {
                 dev = my_dev;
@@ -31,18 +32,19 @@ class myPowerSampling {
                 nsamples = POWERCHUNKSSIZE ;
                 power_vec = (unsigned int*)malloc(sizeof(unsigned int)*nsamples);
 		temperature_vec = (unsigned int*)malloc(sizeof(unsigned int)*nsamples);
+		energy_vec = (unsigned long long*)malloc(sizeof(unsigned long long)*nsamples);
 
                 result = nvmlDeviceGetHandleByIndex_v2 ( my_dev, &device );
                 NVML_CHECK( result )
 
                 fpout = fopen(filename, "w");
-		fprintf(fpout, "#deviceId,InstantPower,InstantTemperature\n");
+		fprintf(fpout, "#deviceId,InstantPower,InstantTemperature,TotalEnergy\n");
         }
 
         ~myPowerSampling() {
 
                 for (int i=0; i<nsamples; i++)
-                        fprintf(fpout, "%d,%u,%u\n", dev, power_vec[i], temperature_vec[i]);
+                        fprintf(fpout, "%d,%u,%u,%llu\n", dev, power_vec[i], temperature_vec[i], energy_vec[i]);
                 fclose(fpout);
 		printf("Device %d printed its sampling results on file\n", dev);
         }
@@ -60,12 +62,15 @@ class myPowerSampling {
                                 nsamples += POWERCHUNKSSIZE ;
                                 power_vec = (unsigned int*)realloc(power_vec, sizeof(unsigned int)*nsamples);
 				temperature_vec = (unsigned int*)realloc(temperature_vec, sizeof(unsigned int)*nsamples);
+				energy_vec = (unsigned long long*)realloc(temperature_vec, sizeof(unsigned long long)*nsamples);
                                 i = 0;
                         }
 
                         result = nvmlDeviceGetPowerUsage ( device, &(power_vec[i]) );
                         NVML_CHECK( result )
 			result = nvmlDeviceGetTemperature ( device, NVML_TEMPERATURE_GPU, &(temperature_vec[i]) );
+			NVML_CHECK( result )
+			result = nvmlDeviceGetTotalEnergyConsumption(device, &(energy_vec[i]));
 			NVML_CHECK( result )
 
                         std::this_thread::sleep_for(std::chrono::milliseconds(1));
