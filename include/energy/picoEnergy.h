@@ -65,6 +65,7 @@ void energyCompileTimeCheck(void) {
  */
 
 #include <nvml.h>
+#include <energy/nvmlLogger.h>
 
 #define CONCAT_(a, b) a##b
 #define CONCAT(a, b) CONCAT_(a, b)
@@ -83,7 +84,7 @@ void energyCompileTimeCheck(void) {
 		PICOENERGY_DEFINE_FILENAME( BS, LC )					                              \
 		picoNvmlTotalEnergy(DV, &PICONVML_ENERGYCOUNTER_START);                               \
 		std::thread threadStart;                                                              \
-		myPowerSampling power_samples ( RK , PICOENERGY_FILENAME_VAR );                       \
+		myPowerSampling power_samples ( DV , PICOENERGY_FILENAME_VAR );                       \
 		threadStart = std::thread( &myPowerSampling::executePowerSampling, &power_samples );  \
 		sleep(10);
 

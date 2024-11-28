@@ -19,12 +19,14 @@ class myPowerSampling {
         int flag;
         FILE *fpout;
         int nsamples;
+        int nrealloc;
         nvmlDevice_t device;
         nvmlReturn_t result;
         unsigned int *power_vec;
 
         myPowerSampling(int my_dev, char* filename) {
                 dev = my_dev;
+                nrealloc = 0;
                 nsamples = POWERCHUNKSSIZE ;
                 power_vec = (unsigned int*)malloc(sizeof(unsigned int)*nsamples);
 
@@ -52,9 +54,10 @@ class myPowerSampling {
                 int i = 0;
                 while (flag) {
                         if (i >= POWERCHUNKSSIZE ) {
-                                printf("Process %d realloced the buffer (line %d)\n", dev, __LINE__);
+//                                 printf("Process %d realloced the buffer (line %d)\n", dev, __LINE__);
+                                nrealloc += 1;
                                 nsamples += POWERCHUNKSSIZE ;
-                                power_vec = realloc(power_vec, sizeof(unsigned int)*nsamples);
+                                power_vec = (unsigned int*) realloc(power_vec, sizeof(unsigned int)*nsamples);
                                 i = 0;
                         }
 
@@ -68,7 +71,7 @@ class myPowerSampling {
                 if ( i < POWERCHUNKSSIZE )
                         nsamples -= (POWERCHUNKSSIZE - i);
 
-                printf("Process %d stopped sampling (line %d): %d samples kept\n", dev, __LINE__, nsamples);
+                printf("Process %d stopped sampling (line %d): %d reallocations, %d samples kept\n", dev, __LINE__, nrealloc, nsamples);
         }
 
         void killThread() {
