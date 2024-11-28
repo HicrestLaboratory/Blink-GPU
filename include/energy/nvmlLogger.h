@@ -22,6 +22,7 @@ class myPowerSampling {
         int nrealloc;
         nvmlDevice_t device;
         nvmlReturn_t result;
+	unsigned int *temperature_vec;
         unsigned int *power_vec;
 
         myPowerSampling(int my_dev, char* filename) {
