@@ -34,7 +34,7 @@ class myPowerSampling {
                 NVML_CHECK( result )
 
                 fpout = fopen(filename, "w");
-		fprintf(fpout, "#InstantPower\n");
+		fprintf(fpout, "#deviceId,InstantPower\n");
         }
 
         ~myPowerSampling() {
@@ -42,7 +42,7 @@ class myPowerSampling {
                 printf("Power valuses by %d:\n", dev);
                 for (int i=0; i<nsamples; i++) {
                         //printf("\t%i: %llu\n", dev, power_vec[i]);
-                        fprintf(fpout, "%u\n", power_vec[i]);
+                        fprintf(fpout, "%d,%u\n", dev, power_vec[i]);
                 }
                 fclose(fpout);
         }
