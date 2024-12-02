@@ -9,6 +9,8 @@
 
 #define POWERCHUNKSSIZE 1000
 
+#define MAXCHECKPOINTS 100
+
 #define NVML_CHECK( R ) { if ( R != 0) fprintf(stderr, "NVML error at line %d of file %s: %d\n", __LINE__, __FILE__, R); }
 
 
@@ -20,15 +22,20 @@ class myPowerSampling {
         FILE *fpout;
         int nsamples;
         int nrealloc;
+	int currentsample;
         nvmlDevice_t device;
         nvmlReturn_t result;
 	unsigned int *temperature_vec;
         unsigned int *power_vec;
 	unsigned long long *energy_vec;
+	
+	int currentcheckpoint;
+	int checkpointvalues[MAXCHECKPOINTS];
 
         myPowerSampling(int my_dev, char* filename) {
                 dev = my_dev;
                 nrealloc = 0;
+		currentsample = 0;
                 nsamples = POWERCHUNKSSIZE ;
                 power_vec = (unsigned int*)malloc(sizeof(unsigned int)*nsamples);
 		temperature_vec = (unsigned int*)malloc(sizeof(unsigned int)*nsamples);
@@ -39,6 +46,8 @@ class myPowerSampling {
 
                 fpout = fopen(filename, "w");
 		fprintf(fpout, "#deviceId,InstantPower(mW),InstantTemperature(C),TotalEnergy(mJ)\n");
+
+		currentcheckpoint = 0;
         }
 
         ~myPowerSampling() {
@@ -47,6 +56,8 @@ class myPowerSampling {
                         fprintf(fpout, "%d,%u,%u,%llu\n", dev, power_vec[i], temperature_vec[i], energy_vec[i]);
                 fclose(fpout);
 		printf("Device %d printed its sampling results on file\n", dev);
+		for (int i=0; i<currentcheckpoint; i++)
+			printf("Device %d checkpoint %d is %d\n", dev, i, checkpointvalues[currentcheckpoint]);
         }
 
         void executePowerSampling() {
@@ -74,7 +85,8 @@ class myPowerSampling {
 			NVML_CHECK( result )
 
                         std::this_thread::sleep_for(std::chrono::milliseconds(1));
-                        i++;
+                        currentsample++;
+			i++;
                 }
 
                 if ( i < POWERCHUNKSSIZE )
@@ -82,6 +94,16 @@ class myPowerSampling {
 
                 printf("Process %d stopped sampling (line %d): %d reallocations, %d samples kept\n", dev, __LINE__, nrealloc, nsamples);
         }
+
+	void putCheckpoint (void) {
+		if(currentsample < MAXCHECKPOINTS ) {
+			int value = currentsample;
+			checkpointvalues[currentcheckpoint] = value;
+			currentcheckpoint++;
+		} else {
+			fprintf(stderr, "Error: you reached the maximum number of checkpoints.\n");
+		}
+	}
 
         void killThread() {
                 // Retrieve a few empty samples

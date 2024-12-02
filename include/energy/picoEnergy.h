@@ -74,9 +74,9 @@ void energyCompileTimeCheck(void) {
 #define PICONVML_ENERGYCOUNTER_START CONCAT(PICONVML_ENERGYCOUNTER_NAME, _start)
 #define PICONVML_ENERGYCOUNTER_STOP  CONCAT(PICONVML_ENERGYCOUNTER_NAME, _stop)
 
-#define PICONVML_DEFINE                                     \
-		nvmlInit();											\
-		energyCompileTimeCheck();							\
+#define PICONVML_DEFINE						\
+		nvmlInit();					\
+		energyCompileTimeCheck();			\
         unsigned long long PICONVML_ENERGYCOUNTER_START;	\
         unsigned long long PICONVML_ENERGYCOUNTER_STOP;
 
@@ -90,6 +90,11 @@ void energyCompileTimeCheck(void) {
 
 
 #define PICONVML_ENERGY PICONVML_ENERGYCOUNTER_STOP - PICONVML_ENERGYCOUNTER_START
+
+#define PICONVML_CHECKPOINT \
+	std::thread threadCheckpoint( &myPowerSampling::putCheckpoint, &power_samples); \
+	threadStart.join( ); \
+	threadCheckpoint.join( );
 
 #define PICONVML_ENERGY_STOP( DV ) 						\
         std::thread threadKill( &myPowerSampling::killThread, &power_samples);  \
@@ -131,8 +136,10 @@ void picoNvmlInstantPower(int my_dev, unsigned int* power) {
 #define PICOENERGY_DEFINE energyCompileTimeCheck();
 #define PICOENERGY_START( BS, LC, RK ) PICODCGMI_START( BS , LC , RK )
 #define PICOENERGY_STOP( RK ) PICODCGMI_STOP(RK)
+#define PICOENERGY_CHECKPOINT { }
 #else
 #define PICOENERGY_DEFINE PICONVML_DEFINE
 #define PICOENERGY_START( BS, LC, RK ) PICONVML_ENERGY_START( BS , LC , RK )
 #define PICOENERGY_STOP( RK ) PICONVML_ENERGY_STOP(RK)
+#define PICOENERGY_CHECKPOINT PICONVML_CHECKPOINT
 #endif
