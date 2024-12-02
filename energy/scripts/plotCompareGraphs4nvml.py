@@ -18,6 +18,9 @@ def findImplFromFilename ( filename ):
             return imp
     return 'Unknown'
 
+def checkpointfileFromFile ( filename ):
+    return filename.replace("NvmlMesures", "NvmlCheckpoints")
+
 # Set Seaborn style for better visuals
 sns.set(style="whitegrid")
 
@@ -30,18 +33,28 @@ if len(sys.argv) < 2:
 gpus = []
 files = []
 datas = []
+checkpointdatas = []
 for i in range(1, len(sys.argv)):
     file = sys.argv[i]
+    checkpointfile = checkpointfileFromFile(file)
     print('file: ', file)
+    print("checkpointfile: ", checkpointfile)
+    
     data = pd.read_csv(file)
+    checkpointdata = pd.read_csv(checkpointfile)
     data['Occurrence'] = data.groupby('#deviceId').cumcount()
+    
     print(str(file), data)
+    print(str(checkpointfile), checkpointdata)
 
     files.append(file)
     datas.append(data)
+    checkpointdatas.append(checkpointdata)
 
     filegpus = data['#deviceId'].unique()
+    checkpointgpus = checkpointdata['#deviceId'].unique()
     print('%s GPUs: ' % file, filegpus)
+    print('%s GPUs: ' % checkpointfile, checkpointgpus)
     if len(gpus) == 0:
         gpus = filegpus
     else:
@@ -54,10 +67,15 @@ print('GPUs: ', gpus)
 for gpu in gpus:
 
     subDatas = []
+    subCheckpointDatas = []
     for data in datas:
         subData = data.loc[data['#deviceId'] == gpu]
-        print(subData)
+        print("subData", subData)
         subDatas.append(subData)
+    for checkpointdata in checkpointdatas:
+        subCheckpointData = checkpointdata.loc[checkpointdata['#deviceId'] == gpu]
+        print("subCheckpointData", subCheckpointData)
+        subCheckpointDatas.append(subCheckpointData)
 
     for group in MetricsGroups.items():
         output_file = os.path.splitext(files[0])[0] + '_' + group[0] + '_' + str(gpu) + ".png"
@@ -77,10 +95,13 @@ for gpu in gpus:
         for i, metric in enumerate(group[1]):
             print("    i: ", i, ", metric: ", metric)
             for j, subData in enumerate(subDatas):
+                subCheckpointData = subCheckpointDatas[j]
                 print("    j: ", j, ", data: ", files[j])
                 if i == 0:
                     axes[0,j].set_title( findImplFromFilename( files[j] ) )
                 sns.lineplot(data=subData, x='Occurrence', y=metric, hue='#deviceId', ax=axes[i,j], linewidth=2, palette=mypalette)
+                #for k in subCheckpointData['sample']:
+                #    axes[i,j].axvline(x=k, color='red', linestyle='--', linewidth=0.8)
                 axes[i,j].legend(title="#deviceId", loc="upper right")
             axes[i,0].set_ylabel(metric)
 
