@@ -16,7 +16,8 @@ snellius, a2a, Baseline:CudaAware:Nccl, multinode, gpu-a100, None
 snellius, a2a, Baseline:CudaAware:Nccl, multinode, gpu-h100, None
 
 snellius, ar, Baseline, singlenode, gpu-a100:gpu-h100, None
-snellius, ar, Baseline:CudaAware:Nccl, multinode, gpu-a100:gpu-h100, None
+snellius, ar, Baseline:CudaAware:Nccl, multinode, gpu-a100, 12.5
+snellius, ar, Baseline:CudaAware:Nccl, multinode, gpu-h100, 25
 snellius, ar, CudaAware:Nccl:Nvlink, singlenode, gpu-a100, 300
 snellius, ar, CudaAware:Nccl:Nvlink, singlenode, gpu-h100, 450
 

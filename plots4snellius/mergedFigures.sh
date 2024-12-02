@@ -2,7 +2,7 @@
 
 plotscript="src/genPlot.py"
 basefolder="mergedcsv/"
-peakfile="sysTopologies/snellius_nopeaks.csv"
+peakfile="sysTopologies/snellius_theoretical_peaks.csv"
 
 . src/utils/utilsLib.sh
 
