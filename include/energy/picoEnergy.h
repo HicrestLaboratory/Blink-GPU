@@ -105,10 +105,7 @@ void energyCompileTimeCheck(void) {
         std::thread threadKill( &myPowerSampling::killThread, &power_samples);  \
         threadStart.join( );                                                    \
         threadKill.join( );                                                     \
-	picoNvmlTotalEnergy(DV, &PICONVML_ENERGYCOUNTER_STOP);	                \
-	MPI_Barrier(MPI_COMM_WORLD);				                \
-	if (rank == 0) printf("Delta power for device:\n");		        \
-	printf("\t%i: %u\n", DV, PICONVML_ENERGY);
+	picoNvmlTotalEnergy(DV, &PICONVML_ENERGYCOUNTER_STOP);
 
 void picoNvmlTotalEnergy(int my_dev, unsigned long long* energy) {
 
