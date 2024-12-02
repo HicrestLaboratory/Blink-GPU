@@ -6,9 +6,17 @@ import os
 
 mypalette={0: 'b', 1: 'y', 2: 'g', 3: 'r'}
 
-Resources_grp = ['InstantPower', 'InstantTemperature', 'TotalEnergy']
+Resources_grp = ['InstantPower(mW)', 'InstantTemperature(C)', 'TotalEnergy(mJ)']
 
 MetricsGroups = {'ResourcesGrp': Resources_grp}
+
+Implementations = {'Baseline', 'CudaAware', 'Nccl', 'Nvlink'}
+
+def findImplFromFilename ( filename ):
+    for imp in Implementations:
+        if '_' + imp + '_' in filename:
+            return imp
+    return 'Unknown'
 
 # Set Seaborn style for better visuals
 sns.set(style="whitegrid")
@@ -71,7 +79,7 @@ for gpu in gpus:
             for j, subData in enumerate(subDatas):
                 print("    j: ", j, ", data: ", files[j])
                 if i == 0:
-                    axes[0,j].set_title(files[j])
+                    axes[0,j].set_title( findImplFromFilename( files[j] ) )
                 sns.lineplot(data=subData, x='Occurrence', y=metric, hue='#deviceId', ax=axes[i,j], linewidth=2, palette=mypalette)
                 axes[i,j].legend(title="#deviceId", loc="upper right")
             axes[i,0].set_ylabel(metric)

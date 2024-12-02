@@ -38,7 +38,7 @@ class myPowerSampling {
                 NVML_CHECK( result )
 
                 fpout = fopen(filename, "w");
-		fprintf(fpout, "#deviceId,InstantPower,InstantTemperature,TotalEnergy\n");
+		fprintf(fpout, "#deviceId,InstantPower(mW),InstantTemperature(C),TotalEnergy(mJ)\n");
         }
 
         ~myPowerSampling() {
