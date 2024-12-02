@@ -136,12 +136,6 @@ int main(int argc, char *argv[])
         Loop from 8 B to 1 GB
     --------------------------------------------------------------------------------------------*/
 
-#ifdef ENERGY
-    PICOENERGY_DEFINE
-    PICOENERGY_START( fix_buff_size , loop_count , rank )
-    MPI_Barrier(MPI_COMM_WORLD);
-#endif
-
     SZTYPE N = define_buffer_len(fix_buff_size);
 
     int *error, *my_error;
@@ -176,7 +170,10 @@ int main(int argc, char *argv[])
             Implemetantion goes here
 
             */
-
+#ifdef ENERGY
+            PICOENERGY_DEFINE
+            PICOENERGY_START( fix_buff_size , loop_count , rank )
+#endif
 	    cudaEvent_t start, stop;
 	    cudaErrorCheck(cudaEventCreate(&start));
             cudaErrorCheck(cudaEventCreate(&stop));
@@ -213,7 +210,9 @@ int main(int argc, char *argv[])
                 if (rank == 0) {printf("%%"); fflush(stdout);}
             }
             if (rank == 0) {printf("#\n"); fflush(stdout);}
-
+#ifdef ENERGY
+            PICOENERGY_STOP( rank )
+#endif
 
 
             share_check_vectors(rank, 0, rank2, d_B, N, &my_cpu_check, &recv_cpu_check, &gpu_check, &(gpu_checks[j]), &(cpu_checks[j]), &(my_error[j]));
@@ -233,10 +232,6 @@ int main(int argc, char *argv[])
         print_errors(rank, buff_cycle, fix_buff_size, max_j, cpu_checks, gpu_checks);
     }
 
-#ifdef ENERGY
-    PICOENERGY_STOP( rank )
-    MPI_Barrier(MPI_COMM_WORLD);
-#endif
 
     free(error);
     free(my_error);

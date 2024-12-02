@@ -91,12 +91,6 @@ int main(int argc, char *argv[])
         Loop from 8 B to 1 GB
     --------------------------------------------------------------------------------------------*/
 
-#ifdef ENERGY
-    PICOENERGY_DEFINE
-    PICOENERGY_START( fix_buff_size , loop_count , rank )
-    MPI_Barrier(MPI_COMM_WORLD);
-#endif
-
     PICO_enable_peer_access(rank, num_devices, my_dev);
 
     SZTYPE N = define_buffer_len(fix_buff_size);
@@ -155,6 +149,10 @@ int main(int argc, char *argv[])
             // Open MemHandle
             cudaErrorCheck( cudaIpcOpenMemHandle((void**)&peerBuffer, *(cudaIpcMemHandle_t*)&recvHandle, cudaIpcMemLazyEnablePeerAccess) );
 
+#ifdef ENERGY
+            PICOENERGY_DEFINE
+            PICOENERGY_START( fix_buff_size , loop_count , rank )
+#endif
 
             for(int i=1-(WARM_UP); i<=loop_count; i++){
                 MPI_Barrier(ppComm);
@@ -181,7 +179,9 @@ int main(int argc, char *argv[])
                 if (rank == 0) {printf("%%"); fflush(stdout);}
             }
             if (rank == 0) {printf("#\n"); fflush(stdout);}
-
+#ifdef ENERGY
+            PICOENERGY_STOP( rank )
+#endif
             // Close MemHandle
             cudaErrorCheck( cudaIpcCloseMemHandle(peerBuffer) );
 
@@ -206,10 +206,6 @@ int main(int argc, char *argv[])
 
     PICO_disable_peer_access(num_devices, my_dev);
 
-#ifdef ENERGY
-    PICOENERGY_STOP( rank )
-    MPI_Barrier(MPI_COMM_WORLD);
-#endif
 
     free(error);
     free(my_error);
