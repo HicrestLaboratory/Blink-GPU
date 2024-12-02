@@ -5,16 +5,22 @@
 
 #ifdef PICODCGMI
 #define ENERGY_FILENAME_PREFIX "dcgmiMesures"
+#define CHECKPOINT_FILENAME_PREFIX "dcgmiCheckpoints"
 #else
 #define ENERGY_FILENAME_PREFIX "nvmlMesures"
+#define CHECKPOINT_FILENAME_PREFIX "nvmlCheckpoints"
 #endif
 
 #define PICOENERGY_FILENAME_VAR energymesures_filename
+#define PICOCHECKPOINT_FILENAME_VAR energycheckpoint_filename
 
-#define PICOENERGY_DEFINE_FILENAME( BS, LC, RK )                                         \
-    char PICOENERGY_FILENAME_VAR[ENERGY_FILENAME_LENGHT];                                \
-    sprintf(PICOENERGY_FILENAME_VAR, "%s%s_%s_%s_%d_%d_%d.csv",                          \
-            ENERGY_PATH, ENERGY_FILENAME_PREFIX, MYBENCH_CODE, MYIMPL_CODE, BS, LC, RK);
+#define PICOENERGY_DEFINE_FILENAME( BS, LC, RK )						\
+    char PICOENERGY_FILENAME_VAR[ENERGY_FILENAME_LENGHT];					\
+    sprintf(PICOENERGY_FILENAME_VAR, "%s%s_%s_%s_%d_%d_%d.csv",					\
+            ENERGY_PATH, ENERGY_FILENAME_PREFIX, MYBENCH_CODE, MYIMPL_CODE, BS, LC, RK);	\
+    char PICOCHECKPOINT_FILENAME_VAR[ENERGY_FILENAME_LENGHT];					\
+    sprintf(PICOCHECKPOINT_FILENAME_VAR, "%s%s_%s_%s_%d_%d_%d.csv",				\
+            ENERGY_PATH, CHECKPOINT_FILENAME_PREFIX, MYBENCH_CODE, MYIMPL_CODE, BS, LC, RK);
 
 void energyCompileTimeCheck(void) {
 #if !defined(PICODCGMI) && !defined(PICONVML)
@@ -80,20 +86,19 @@ void energyCompileTimeCheck(void) {
         unsigned long long PICONVML_ENERGYCOUNTER_START;	\
         unsigned long long PICONVML_ENERGYCOUNTER_STOP;
 
-#define PICONVML_ENERGY_START( BS, LC, DV )								\
-		PICOENERGY_DEFINE_FILENAME( BS, LC, DV )					      	\
-		picoNvmlTotalEnergy(DV, &PICONVML_ENERGYCOUNTER_START);                               	\
-		std::thread threadStart;                                                              	\
-		myPowerSampling power_samples ( DV , PICOENERGY_FILENAME_VAR );                       	\
-		threadStart = std::thread( &myPowerSampling::executePowerSampling, &power_samples );  	\
+#define PICONVML_ENERGY_START( BS, LC, DV )									\
+		PICOENERGY_DEFINE_FILENAME( BS, LC, DV )					      		\
+		picoNvmlTotalEnergy(DV, &PICONVML_ENERGYCOUNTER_START);                               		\
+		std::thread threadStart;                                                              		\
+		myPowerSampling power_samples ( DV , PICOENERGY_FILENAME_VAR, PICOCHECKPOINT_FILENAME_VAR );	\
+		threadStart = std::thread( &myPowerSampling::executePowerSampling, &power_samples );  		\
 		sleep(10);
 
 
 #define PICONVML_ENERGY PICONVML_ENERGYCOUNTER_STOP - PICONVML_ENERGYCOUNTER_START
 
 #define PICONVML_CHECKPOINT \
-	std::thread threadCheckpoint( &myPowerSampling::putCheckpoint, &power_samples); \
-	threadStart.join( ); \
+	std::thread threadCheckpoint( &myPowerSampling::putCheckpoint, &power_samples);\
 	threadCheckpoint.join( );
 
 #define PICONVML_ENERGY_STOP( DV ) 						\

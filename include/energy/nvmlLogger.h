@@ -23,6 +23,7 @@ class myPowerSampling {
         int nsamples;
         int nrealloc;
 	int currentsample;
+	FILE *fpcheckpoint;
         nvmlDevice_t device;
         nvmlReturn_t result;
 	unsigned int *temperature_vec;
@@ -32,7 +33,7 @@ class myPowerSampling {
 	int currentcheckpoint;
 	int checkpointvalues[MAXCHECKPOINTS];
 
-        myPowerSampling(int my_dev, char* filename) {
+        myPowerSampling(int my_dev, char* filename, char* checkpointfilename) {
                 dev = my_dev;
                 nrealloc = 0;
 		currentsample = 0;
@@ -47,6 +48,9 @@ class myPowerSampling {
                 fpout = fopen(filename, "w");
 		fprintf(fpout, "#deviceId,InstantPower(mW),InstantTemperature(C),TotalEnergy(mJ)\n");
 
+		fpcheckpoint = fopen(checkpointfilename, "w");
+		fprintf(fpcheckpoint, "#checkpointId,sample\n");
+
 		currentcheckpoint = 0;
         }
 
@@ -57,7 +61,8 @@ class myPowerSampling {
                 fclose(fpout);
 		printf("Device %d printed its sampling results on file\n", dev);
 		for (int i=0; i<currentcheckpoint; i++)
-			printf("Device %d checkpoint %d is %d\n", dev, i, checkpointvalues[currentcheckpoint]);
+			fprintf(fpcheckpoint, "%d,%d\n", i, checkpointvalues[i]);
+		printf("Device %d printed its checkpoints on file\n", dev);
         }
 
         void executePowerSampling() {
@@ -96,7 +101,7 @@ class myPowerSampling {
         }
 
 	void putCheckpoint (void) {
-		if(currentsample < MAXCHECKPOINTS ) {
+		if(currentcheckpoint < MAXCHECKPOINTS ) {
 			int value = currentsample;
 			checkpointvalues[currentcheckpoint] = value;
 			currentcheckpoint++;
