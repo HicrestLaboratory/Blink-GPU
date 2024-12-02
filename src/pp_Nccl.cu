@@ -205,6 +205,9 @@ int main(int argc, char *argv[])
 
 		cudaErrorCheck(cudaEventRecord(stop, NULL));
 		cudaErrorCheck(cudaEventSynchronize(stop));
+#ifdef ENERGY
+                PICOENERGY_CHECKPOINT
+#endif
 		if (i>0) {cudaErrorCheck(cudaEventElapsedTime(&(inner_elapsed_time[(j-fix_buff_size)*loop_count+i-1]), start, stop));}
 
                 if (rank == 0) {printf("%%"); fflush(stdout);}
