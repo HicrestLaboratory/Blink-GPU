@@ -49,7 +49,7 @@ class myPowerSampling {
 		fprintf(fpout, "#deviceId,InstantPower(mW),InstantTemperature(C),TotalEnergy(mJ)\n");
 
 		fpcheckpoint = fopen(checkpointfilename, "w");
-		fprintf(fpcheckpoint, "#checkpointId,sample\n");
+		fprintf(fpcheckpoint, "#deviceId,checkpointId,sample\n");
 
 		currentcheckpoint = 0;
         }
@@ -61,7 +61,7 @@ class myPowerSampling {
                 fclose(fpout);
 		printf("Device %d printed its sampling results on file\n", dev);
 		for (int i=0; i<currentcheckpoint; i++)
-			fprintf(fpcheckpoint, "%d,%d\n", i, checkpointvalues[i]);
+			fprintf(fpcheckpoint, "%d,%d,%d\n", dev, i, checkpointvalues[i]);
 		printf("Device %d printed its checkpoints on file\n", dev);
         }
 
