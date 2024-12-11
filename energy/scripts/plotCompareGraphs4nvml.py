@@ -19,7 +19,7 @@ def findImplFromFilename ( filename ):
     return 'Unknown'
 
 def checkpointfileFromFile ( filename ):
-    return filename.replace("NvmlMesures", "NvmlCheckpoints")
+    return filename.replace("nvmlMesures", "nvmlCheckpoints")
 
 # Set Seaborn style for better visuals
 sns.set(style="whitegrid")
@@ -87,7 +87,7 @@ for gpu in gpus:
             mysharedy = 'row'
 
         print('len(group[1]): ', len(group[1]))
-        fig, axes = plt.subplots(len(group[1]), len(datas), figsize=(20, 32), sharex=True, sharey=mysharedy)
+        fig, axes = plt.subplots(len(group[1]), len(datas), figsize=(40, 64), sharex=True, sharey=mysharedy)
         fig.suptitle("Line Plots for %s" %  group[0], y=0.93)
         print('axes: ', axes)
 
@@ -100,8 +100,8 @@ for gpu in gpus:
                 if i == 0:
                     axes[0,j].set_title( findImplFromFilename( files[j] ) )
                 sns.lineplot(data=subData, x='Occurrence', y=metric, hue='#deviceId', ax=axes[i,j], linewidth=2, palette=mypalette)
-                #for k in subCheckpointData['sample']:
-                #    axes[i,j].axvline(x=k, color='red', linestyle='--', linewidth=0.8)
+                for k in subCheckpointData['sample']:
+                    axes[i,j].axvline(x=k, color='red', linestyle='--', linewidth=0.8)
                 axes[i,j].legend(title="#deviceId", loc="upper right")
             axes[i,0].set_ylabel(metric)
 
