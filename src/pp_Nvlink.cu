@@ -91,6 +91,11 @@ int main(int argc, char *argv[])
         Loop from 8 B to 1 GB
     --------------------------------------------------------------------------------------------*/
 
+#ifdef ENERGY
+    PICOENERGY_DEFINE
+    PICOENERGY_START( fix_buff_size , loop_count , rank )
+#endif
+
     PICO_enable_peer_access(rank, num_devices, my_dev);
 
     SZTYPE N = define_buffer_len(fix_buff_size);
@@ -101,6 +106,10 @@ int main(int argc, char *argv[])
     TTYPE *elapsed_time, *inner_elapsed_time;
     timers_and_checks_alloc<TTYPE>(buff_cycle, loop_count, &error, &my_error, &cpu_checks, &gpu_checks, &elapsed_time, &inner_elapsed_time);
     if (rank == 0 || rank == rank2) {
+
+#ifdef ENERGY
+            PICOENERGY_CHECKPOINT
+#endif
 
         MPI_Status IPCstat;
         dtype *peerBuffer;
@@ -150,8 +159,7 @@ int main(int argc, char *argv[])
             cudaErrorCheck( cudaIpcOpenMemHandle((void**)&peerBuffer, *(cudaIpcMemHandle_t*)&recvHandle, cudaIpcMemLazyEnablePeerAccess) );
 
 #ifdef ENERGY
-            PICOENERGY_DEFINE
-            PICOENERGY_START( fix_buff_size , loop_count , rank )
+            PICOENERGY_CHECKPOINT
 #endif
 
             for(int i=1-(WARM_UP); i<=loop_count; i++){

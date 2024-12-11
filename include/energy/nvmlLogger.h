@@ -22,13 +22,13 @@ class myPowerSampling {
         FILE *fpout;
         int nsamples;
         int nrealloc;
-	int currentsample;
 	FILE *fpcheckpoint;
         nvmlDevice_t device;
         nvmlReturn_t result;
+	unsigned int *power_vec;
 	unsigned int *temperature_vec;
-        unsigned int *power_vec;
 	unsigned long long *energy_vec;
+	std::atomic<unsigned int> currentsample;
 	
 	int currentcheckpoint;
 	int checkpointvalues[MAXCHECKPOINTS];
@@ -41,6 +41,10 @@ class myPowerSampling {
                 power_vec = (unsigned int*)malloc(sizeof(unsigned int)*nsamples);
 		temperature_vec = (unsigned int*)malloc(sizeof(unsigned int)*nsamples);
 		energy_vec = (unsigned long long*)malloc(sizeof(unsigned long long)*nsamples);
+
+		memset( power_vec, 0, sizeof(unsigned int)*nsamples);
+		memset( temperature_vec, 0, sizeof(unsigned int)*nsamples);
+		memset( energy_vec, 0, sizeof(unsigned long long)*nsamples);
 
                 result = nvmlDeviceGetHandleByIndex_v2 ( my_dev, &device );
                 NVML_CHECK( result )
@@ -71,27 +75,36 @@ class myPowerSampling {
 
                 flag = 1;
                 int i = 0;
+		int j = 0;
                 while (flag) {
                         if (i >= POWERCHUNKSSIZE ) {
+
+				// !!!! BUG HERE !!!!
 //                                 printf("Process %d realloced the buffer (line %d)\n", dev, __LINE__);
                                 nrealloc += 1;
-                                nsamples += POWERCHUNKSSIZE ;
-                                power_vec = (unsigned int*)realloc(power_vec, sizeof(unsigned int)*nsamples);
-				temperature_vec = (unsigned int*)realloc(temperature_vec, sizeof(unsigned int)*nsamples);
-				energy_vec = (unsigned long long*)realloc(energy_vec, sizeof(unsigned long long)*nsamples);
-                                i = 0;
+                                power_vec = (unsigned int*)realloc(power_vec, sizeof(unsigned int)*(nsamples+POWERCHUNKSSIZE));
+				temperature_vec = (unsigned int*)realloc(temperature_vec, sizeof(unsigned int)*(nsamples+POWERCHUNKSSIZE));
+				energy_vec = (unsigned long long*)realloc(energy_vec, sizeof(unsigned long long)*(nsamples+POWERCHUNKSSIZE));
+
+				memset( &(power_vec[nsamples]), 0, sizeof(unsigned int)*POWERCHUNKSSIZE);
+        		        memset( &(temperature_vec[nsamples]), 0, sizeof(unsigned int)*POWERCHUNKSSIZE);
+	                	memset( &(energy_vec[nsamples]), 0, sizeof(unsigned long long)*POWERCHUNKSSIZE);
+
+				i = 0;
+				nsamples += POWERCHUNKSSIZE ;
                         }
 
-                        result = nvmlDeviceGetPowerUsage ( device, &(power_vec[i]) );
+                        result = nvmlDeviceGetPowerUsage ( device, &(power_vec[j]) );
                         NVML_CHECK( result )
-			result = nvmlDeviceGetTemperature ( device, NVML_TEMPERATURE_GPU, &(temperature_vec[i]) );
+			result = nvmlDeviceGetTemperature ( device, NVML_TEMPERATURE_GPU, &(temperature_vec[j]) );
 			NVML_CHECK( result )
-			result = nvmlDeviceGetTotalEnergyConsumption(device, &(energy_vec[i]));
+			result = nvmlDeviceGetTotalEnergyConsumption(device, &(energy_vec[j]));
 			NVML_CHECK( result )
 
                         std::this_thread::sleep_for(std::chrono::milliseconds(1));
                         currentsample++;
 			i++;
+			j++;
                 }
 
                 if ( i < POWERCHUNKSSIZE )

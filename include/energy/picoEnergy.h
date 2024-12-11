@@ -91,17 +91,22 @@ void energyCompileTimeCheck(void) {
 		picoNvmlTotalEnergy(DV, &PICONVML_ENERGYCOUNTER_START);                               		\
 		std::thread threadStart;                                                              		\
 		myPowerSampling power_samples ( DV , PICOENERGY_FILENAME_VAR, PICOCHECKPOINT_FILENAME_VAR );	\
+		std::thread threadCheckpoint( &myPowerSampling::putCheckpoint, &power_samples); 		\
+        	threadCheckpoint.join( );                                                       		\
 		threadStart = std::thread( &myPowerSampling::executePowerSampling, &power_samples );  		\
 		sleep(10);
 
 
 #define PICONVML_ENERGY PICONVML_ENERGYCOUNTER_STOP - PICONVML_ENERGYCOUNTER_START
 
-#define PICONVML_CHECKPOINT \
+#define PICONVML_CHECKPOINT {\
 	std::thread threadCheckpoint( &myPowerSampling::putCheckpoint, &power_samples);\
-	threadCheckpoint.join( );
+	threadCheckpoint.join( );\
+}
 
 #define PICONVML_ENERGY_STOP( DV ) 						\
+	std::thread threadCheckpoint( &myPowerSampling::putCheckpoint, &power_samples);	\
+        threadCheckpoint.join( );							\
         std::thread threadKill( &myPowerSampling::killThread, &power_samples);  \
         threadStart.join( );                                                    \
         threadKill.join( );                                                     \
