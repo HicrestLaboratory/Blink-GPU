@@ -23,94 +23,104 @@ class myPowerSampling {
         FILE *fpout;
         int nsamples;
         int nrealloc;
-	FILE *fpcheckpoint;
+		FILE *fpcheckpoint;
         nvmlDevice_t device;
         nvmlReturn_t result;
-	unsigned int *power_vec;
-	unsigned int *temperature_vec;
-	unsigned long long *energy_vec;
-	std::atomic<unsigned int> currentsample;
+		unsigned int *power_vec;
+		unsigned int *temperature_vec;
+		unsigned long long *energy_vec;
+		std::atomic<unsigned int> currentsample;
 	
-	int currentcheckpoint;
-	int checkpointvalues[MAXCHECKPOINTS];
-	char* checkpointclass[MAXCHECKPOINTS];
+		int currentcheckpoint;
+		int checkpointvalues[MAXCHECKPOINTS];
+		char* checkpointclass[MAXCHECKPOINTS];
+
+		double *time_vec;
+		struct timeval temp_start={0,0}, temp_get={0,0};
 
         myPowerSampling(int my_dev, char* filename, char* checkpointfilename) {
                 dev = my_dev;
                 nrealloc = 0;
-		currentsample = 0;
+				currentsample = 0;
                 nsamples = POWERCHUNKSSIZE ;
+				time_vec = (double*)malloc(sizeof(double)*nsamples);
                 power_vec = (unsigned int*)malloc(sizeof(unsigned int)*nsamples);
-		temperature_vec = (unsigned int*)malloc(sizeof(unsigned int)*nsamples);
-		energy_vec = (unsigned long long*)malloc(sizeof(unsigned long long)*nsamples);
+				temperature_vec = (unsigned int*)malloc(sizeof(unsigned int)*nsamples);
+				energy_vec = (unsigned long long*)malloc(sizeof(unsigned long long)*nsamples);
 
-		memset( power_vec, 0, sizeof(unsigned int)*nsamples);
-		memset( temperature_vec, 0, sizeof(unsigned int)*nsamples);
-		memset( energy_vec, 0, sizeof(unsigned long long)*nsamples);
+				memset( time_vec, 0, sizeof(double)*nsamples);
+				memset( power_vec, 0, sizeof(unsigned int)*nsamples);
+				memset( temperature_vec, 0, sizeof(unsigned int)*nsamples);
+				memset( energy_vec, 0, sizeof(unsigned long long)*nsamples);
 
                 result = nvmlDeviceGetHandleByIndex_v2 ( my_dev, &device );
                 NVML_CHECK( result )
 
                 fpout = fopen(filename, "w");
-		fprintf(fpout, "#deviceId,InstantPower(mW),InstantTemperature(C),TotalEnergy(mJ)\n");
+				fprintf(fpout, "#deviceId,Time(s),InstantPower(mW),InstantTemperature(C),TotalEnergy(mJ)\n");
 
-		fpcheckpoint = fopen(checkpointfilename, "w");
-		fprintf(fpcheckpoint, "#deviceId,checkpointId,sample,class\n");
+				fpcheckpoint = fopen(checkpointfilename, "w");
+				fprintf(fpcheckpoint, "#deviceId,checkpointId,sample,class\n");
 
-		currentcheckpoint = 0;
-		for (int i=0; i<MAXCHECKPOINTS; i++) {
-			checkpointclass[i] = (char*)malloc(sizeof(char)*CHECKPOINTCLASSLENGHT);
-			sprintf(checkpointclass[i], "NULL");
-		}
+				currentcheckpoint = 0;
+				for (int i=0; i<MAXCHECKPOINTS; i++) {
+					checkpointclass[i] = (char*)malloc(sizeof(char)*CHECKPOINTCLASSLENGHT);
+					sprintf(checkpointclass[i], "NULL");
+				}
         }
 
         ~myPowerSampling() {
 
                 for (int i=0; i<nsamples; i++)
-                        fprintf(fpout, "%d,%u,%u,%llu\n", dev, power_vec[i], temperature_vec[i], energy_vec[i]);
+                        fprintf(fpout, "%d,%lf,%u,%u,%llu\n", dev, time_vec[i], power_vec[i], temperature_vec[i], energy_vec[i]);
                 fclose(fpout);
-		printf("Device %d printed its sampling results on file\n", dev);
-		for (int i=0; i<currentcheckpoint; i++)
-			fprintf(fpcheckpoint, "%d,%d,%d,%s\n", dev, i, checkpointvalues[i], checkpointclass[i]);
-		printf("Device %d printed its checkpoints on file\n", dev);
+				printf("Device %d printed its sampling results on file\n", dev);
+				for (int i=0; i<currentcheckpoint; i++)
+					fprintf(fpcheckpoint, "%d,%d,%d,%s\n", dev, i, checkpointvalues[i], checkpointclass[i]);
+				printf("Device %d printed its checkpoints on file\n", dev);
         }
 
         void executePowerSampling() {
 
                 printf("Process %d launched %s (line %d)\n", dev, __func__, __LINE__);
+				gettimeofday(&temp_start, (struct timezone*)0);
 
                 flag = 1;
                 int i = 0;
-		int j = 0;
+				int j = 0;
                 while (flag) {
                         if (i >= POWERCHUNKSSIZE ) {
 
 				// !!!! BUG HERE !!!!
 //                                 printf("Process %d realloced the buffer (line %d)\n", dev, __LINE__);
-                                nrealloc += 1;
-                                power_vec = (unsigned int*)realloc(power_vec, sizeof(unsigned int)*(nsamples+POWERCHUNKSSIZE));
-				temperature_vec = (unsigned int*)realloc(temperature_vec, sizeof(unsigned int)*(nsamples+POWERCHUNKSSIZE));
-				energy_vec = (unsigned long long*)realloc(energy_vec, sizeof(unsigned long long)*(nsamples+POWERCHUNKSSIZE));
+							nrealloc += 1;
+							time_vec = (double*)realloc(time_vec, sizeof(double)*(nsamples+POWERCHUNKSSIZE));
+							power_vec = (unsigned int*)realloc(power_vec, sizeof(unsigned int)*(nsamples+POWERCHUNKSSIZE));
+							temperature_vec = (unsigned int*)realloc(temperature_vec, sizeof(unsigned int)*(nsamples+POWERCHUNKSSIZE));
+							energy_vec = (unsigned long long*)realloc(energy_vec, sizeof(unsigned long long)*(nsamples+POWERCHUNKSSIZE));
 
-				memset( &(power_vec[nsamples]), 0, sizeof(unsigned int)*POWERCHUNKSSIZE);
-        		        memset( &(temperature_vec[nsamples]), 0, sizeof(unsigned int)*POWERCHUNKSSIZE);
-	                	memset( &(energy_vec[nsamples]), 0, sizeof(unsigned long long)*POWERCHUNKSSIZE);
+							memset( &(time_vec[nsamples]), 0, sizeof(double)*POWERCHUNKSSIZE);
+							memset( &(power_vec[nsamples]), 0, sizeof(unsigned int)*POWERCHUNKSSIZE);
+							memset( &(temperature_vec[nsamples]), 0, sizeof(unsigned int)*POWERCHUNKSSIZE);
+							memset( &(energy_vec[nsamples]), 0, sizeof(unsigned long long)*POWERCHUNKSSIZE);
 
-				i = 0;
-				nsamples += POWERCHUNKSSIZE ;
+							i = 0;
+							nsamples += POWERCHUNKSSIZE ;
                         }
 
                         result = nvmlDeviceGetPowerUsage ( device, &(power_vec[j]) );
                         NVML_CHECK( result )
-			result = nvmlDeviceGetTemperature ( device, NVML_TEMPERATURE_GPU, &(temperature_vec[j]) );
-			NVML_CHECK( result )
-			result = nvmlDeviceGetTotalEnergyConsumption(device, &(energy_vec[j]));
-			NVML_CHECK( result )
+						result = nvmlDeviceGetTemperature ( device, NVML_TEMPERATURE_GPU, &(temperature_vec[j]) );
+						NVML_CHECK( result )
+						result = nvmlDeviceGetTotalEnergyConsumption(device, &(energy_vec[j]));
+						NVML_CHECK( result )
+						gettimeofday(&temp_get, (struct timezone*)0);
+						time_vec[j] = ((temp_get.tv_sec-temp_start.tv_sec)+(temp_get.tv_usec-temp_start.tv_usec)*1.0e-6);
 
                         std::this_thread::sleep_for(std::chrono::milliseconds(1));
                         currentsample++;
-			i++;
-			j++;
+						i++;
+						j++;
                 }
 
                 if ( i < POWERCHUNKSSIZE )
