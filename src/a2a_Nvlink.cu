@@ -275,7 +275,9 @@ int main(int argc, char *argv[])
             for (int k=0; k<MICROBENCH_MAX_GPUS; k++) cudaErrorCheck(cudaStreamDestroy(Streams[k]));
         }
         if (rank == 0) {printf("#\n"); fflush(stdout);}
-
+#ifdef ENERGY
+	    PICOENERGY_STOP( rank )
+#endif
 
         // Close MemHandle
         for (int i=0; i<size; i++)
@@ -362,10 +364,6 @@ int main(int argc, char *argv[])
 
     PICO_disable_peer_access(num_devices, dev);
 
-#ifdef ENERGY
-    PICOENERGY_STOP( rank )
-    MPI_Barrier(MPI_COMM_WORLD);
-#endif
 
     free(error);
     free(my_error);

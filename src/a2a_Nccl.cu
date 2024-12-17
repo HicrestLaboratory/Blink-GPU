@@ -321,7 +321,9 @@ int main(int argc, char *argv[])
             if (rank == 0 && !endless) {printf("%%"); fflush(stdout);}
         }
         if (rank == 0) {printf("#\n"); fflush(stdout);}
-
+#ifdef ENERGY
+	    PICOENERGY_STOP( rank )
+#endif
 
 
 
@@ -400,10 +402,6 @@ int main(int argc, char *argv[])
     printf("%s", s);
     fflush(stdout);
 
-#ifdef ENERGY
-    PICOENERGY_STOP( rank )
-    MPI_Barrier(MPI_COMM_WORLD);
-#endif
 
     free(error);
     free(my_error);
