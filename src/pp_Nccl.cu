@@ -135,6 +135,10 @@ int main(int argc, char *argv[])
      /* -------------------------------------------------------------------------------------------
         Loop from 8 B to 1 GB
     --------------------------------------------------------------------------------------------*/
+#ifdef ENERGY
+    PICOENERGY_DEFINE
+    PICOENERGY_START( fix_buff_size , loop_count , rank )
+#endif
 
     SZTYPE N = define_buffer_len(fix_buff_size);
 
@@ -145,6 +149,10 @@ int main(int argc, char *argv[])
     timers_and_checks_alloc<TTYPE>(buff_cycle, loop_count, &error, &my_error, &cpu_checks, &gpu_checks, &elapsed_time, &inner_elapsed_time);
     if (rank == 0 || rank == rank2) {
         for(int j=fix_buff_size; j<max_j; j++){
+
+#ifdef ENERGY
+            PICOENERGY_CHECKPOINT
+#endif
 
             (j!=0) ? (N <<= 1) : (N = 1);
             if (rank == 0) {printf("%i#", j); fflush(stdout);}
@@ -171,8 +179,7 @@ int main(int argc, char *argv[])
 
             */
 #ifdef ENERGY
-            PICOENERGY_DEFINE
-            PICOENERGY_START( fix_buff_size , loop_count , rank )
+        PICOENERGY_CHECKPOINT
 #endif
 	    cudaEvent_t start, stop;
 	    cudaErrorCheck(cudaEventCreate(&start));
