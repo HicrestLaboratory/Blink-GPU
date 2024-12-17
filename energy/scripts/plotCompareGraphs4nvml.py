@@ -102,7 +102,7 @@ for gpu in gpus:
             print("    i: ", i, ", metric: ", metric)
             for j, subData in enumerate(subDatas):
                 bbox = axes[i,j].get_position()
-                new_bbox = (bbox.x0 + bbox.width*0.1, bbox.y0 + bbox.height*0.55, bbox.width*0.5, bbox.height*0.3)
+                new_bbox = (bbox.x0 + bbox.width*0.1, bbox.y0 + bbox.height*0.75, bbox.width*0.5, bbox.height*0.2)
                 axestmp=fig.add_axes(new_bbox)
 
                 subCheckpointData = subCheckpointDatas[j]
@@ -110,7 +110,7 @@ for gpu in gpus:
                 if i == 0:
                     axes[0,j].set_title( findImplFromFilename( files[j] ) )
                 #sns.lineplot(data=subData, x='Occurrence', y=metric, hue='#deviceId', ax=axes[i,j], linewidth=2, palette=mypalette)
-                sns.lineplot(data=subData, x='Occurrence', y=metric, hue='#deviceId', ax=axestmp, linewidth=2, palette=mypalette)
+                sns.lineplot(data=subData, x='Occurrence', y=metric, hue='#deviceId', ax=axestmp, linewidth=2, palette=mypalette, legend=False)
                
                 filteredCheckpointData =  subCheckpointData [ subCheckpointData['class'] == 'cycle' ]
                 print('subCheckpointData:', subCheckpointData)
@@ -130,17 +130,23 @@ for gpu in gpus:
                     #axes[i,j].axvline(x=k, color=CheckpointColors[h], linestyle='--', linewidth=2.0)
                     if h == 'cycle':
                         myaxe=axes[i,j]
-                        #myaxe.axvline(x=k, color='lavender', linestyle='--', linewidth=2.0)
-                        myaxe.vlines(k, min_value, max_value, color='lavender', linestyle='--')
+                        #myaxe.vlines(k, min_value, max_value, color='lavender', linestyle='--')
                     if h != 'cycle' or cycleCount == 0 or cycleCount == cycleLast-1:
                         myaxe=axestmp
                         myaxe.axvline(x=k, color=CheckpointColors[h], linestyle='--', linewidth=2.0)
                         if h == 'cycle':
                             cycleCount += 1
-                axes[i,j].legend(title="#deviceId", loc="upper right")
+                #axes[i,j].legend(title="#deviceId", loc="upper right")
                 
+                if metric == 'TotalEnergy(J)':
+                    filteredData['DeltaCycleTotalEnergy(J)'] = filteredData['TotalEnergy(J)'].apply(lambda x: x - min_value)
+                    tmpmetric = 'DeltaCycleTotalEnergy(J)'
+                    print('min_value: ' , min_value)
+                else:
+                    tmpmetric = metric
+
                 #sns.lineplot(data=filteredData, x='Occurrence', y=metric, hue='#deviceId', ax=axestmp, linewidth=2, palette=mypalette)
-                sns.lineplot(data=filteredData, x='Occurrence', y=metric, hue='#deviceId', ax=axes[i,j], linewidth=2, palette=mypalette)
+                sns.lineplot(data=filteredData, x='Occurrence', y=tmpmetric, hue='#deviceId', ax=axes[i,j], linewidth=2, palette=mypalette, legend=False)
                 
 
             axes[i,0].set_ylabel(metric)

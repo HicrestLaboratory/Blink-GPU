@@ -33,6 +33,7 @@ plots4snellius/sout
 energy/results/
 energy/parsed/
 energy/old_energy_results/*
+old_energy_2/*
 
 plots4snellius/out/*
 plots4snellius/sysTopologies/snellius_theoretical_peaks.csv

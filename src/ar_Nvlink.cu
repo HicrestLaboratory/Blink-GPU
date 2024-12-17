@@ -167,7 +167,6 @@ int main(int argc, char *argv[])
 #ifdef ENERGY
     PICOENERGY_DEFINE
     PICOENERGY_START( fix_buff_size , loop_count , rank )
-    MPI_Barrier(MPI_COMM_WORLD);
 #endif
 
     PICO_enable_peer_access(rank, num_devices, dev);
@@ -198,6 +197,10 @@ int main(int argc, char *argv[])
     double *elapsed_time = (double*)malloc(sizeof(double)*buff_cycle*loop_count);
     double *inner_elapsed_time = (double*)malloc(sizeof(double)*buff_cycle*loop_count);
     for(int j=fix_buff_size; j<max_j; j++){
+
+#ifdef ENERGY
+	    PICOENERGY_CHECKPOINT("start")
+#endif
 
         (j!=0) ? (N <<= 1) : (N = 1);
         if (rank == 0) {printf("%i#", j); fflush(stdout);}
@@ -266,6 +269,10 @@ int main(int argc, char *argv[])
 
         */
 
+#ifdef ENERGY
+        PICOENERGY_CHECKPOINT("allocd")
+#endif
+
         // Generate IPC MemHandle
         cudaErrorCheck( cudaIpcGetMemHandle((cudaIpcMemHandle_t*)&sendHandleA, d_A) );
         cudaErrorCheck( cudaIpcGetMemHandle((cudaIpcMemHandle_t*)&sendHandleB, d_B) );
@@ -326,6 +333,9 @@ int main(int argc, char *argv[])
             cudaErrorCheck( cudaDeviceSynchronize() );
 
             stop_time = MPI_Wtime();
+#ifdef ENERGY
+            PICOENERGY_CHECKPOINT("cycle")
+#endif
             if (i>0) inner_elapsed_time[(j-fix_buff_size)*loop_count+i-1] = stop_time - start_time;
 
             if (rank == 0) {printf("%%"); fflush(stdout);}
@@ -333,6 +343,9 @@ int main(int argc, char *argv[])
             for (int k=0; k<MICROBENCH_MAX_GPUS; k++) cudaErrorCheck(cudaStreamDestroy(Streams[k]));
         }
         if (rank == 0) {printf("#\n"); fflush(stdout);}
+#ifdef ENERGY
+	    PICOENERGY_STOP( rank )
+#endif
 
 
         // Close MemHandle
@@ -420,11 +433,6 @@ int main(int argc, char *argv[])
     fflush(stdout);
 
     PICO_disable_peer_access(num_devices, dev);
-
-#ifdef ENERGY
-    PICOENERGY_STOP( rank )
-    MPI_Barrier(MPI_COMM_WORLD);
-#endif
 
     free(error);
     free(my_error);

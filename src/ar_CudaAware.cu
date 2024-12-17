@@ -133,7 +133,6 @@ int main(int argc, char *argv[])
 #ifdef ENERGY
     PICOENERGY_DEFINE
     PICOENERGY_START( fix_buff_size , loop_count , rank )
-    MPI_Barrier(MPI_COMM_WORLD);
 #endif
 
     SZTYPE N;
@@ -152,6 +151,10 @@ int main(int argc, char *argv[])
     double *elapsed_time = (double*)malloc(sizeof(double)*buff_cycle*loop_count);
     double *inner_elapsed_time = (double*)malloc(sizeof(double)*buff_cycle*loop_count);
     for(int j=fix_buff_size; j<max_j; j++){
+
+#ifdef ENERGY
+	    PICOENERGY_CHECKPOINT("start")
+#endif
 
         (j!=0) ? (N <<= 1) : (N = 1);
         if (rank == 0) {printf("%i#", j); fflush(stdout);}
@@ -192,6 +195,10 @@ int main(int argc, char *argv[])
 
         */
 
+#ifdef ENERGY
+        PICOENERGY_CHECKPOINT("allocd")
+#endif
+
         for(int i=1-(WARM_UP); i<=loop_count; i++){
             MPI_Barrier(MPI_COMM_WORLD);
             start_time = MPI_Wtime();
@@ -199,11 +206,17 @@ int main(int argc, char *argv[])
             MPI_Allreduce(d_A, d_B, N, MPI_dtype, MPI_MAX, MPI_COMM_WORLD);
 
             stop_time = MPI_Wtime();
+#ifdef ENERGY
+            PICOENERGY_CHECKPOINT("cycle")
+#endif
             if (i>0) inner_elapsed_time[(j-fix_buff_size)*loop_count+i-1] = stop_time - start_time;
 
             if (rank == 0) {printf("%%"); fflush(stdout);}
         }
         if (rank == 0) {printf("#\n"); fflush(stdout);}
+#ifdef ENERGY
+	    PICOENERGY_STOP( rank )
+#endif
 
 
 
@@ -281,11 +294,6 @@ int main(int argc, char *argv[])
     sprintf(s+strlen(s), " (for Error)\n");
     printf("%s", s);
     fflush(stdout);
-
-#ifdef ENERGY
-    PICOENERGY_STOP( rank )
-    MPI_Barrier(MPI_COMM_WORLD);
-#endif
 
     free(error);
     free(my_error);
