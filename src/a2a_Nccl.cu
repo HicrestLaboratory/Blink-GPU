@@ -198,7 +198,6 @@ int main(int argc, char *argv[])
 #ifdef ENERGY
     PICOENERGY_DEFINE
     PICOENERGY_START( fix_buff_size , loop_count , rank )
-    MPI_Barrier(MPI_COMM_WORLD);
 #endif
 
     SZTYPE N;
@@ -217,6 +216,10 @@ int main(int argc, char *argv[])
     float *elapsed_time = (float*)malloc(sizeof(float)*buff_cycle*loop_count);
     float *inner_elapsed_time = (float*)malloc(sizeof(float)*buff_cycle*loop_count);
     for(int j=fix_buff_size; j<max_j; j++){
+
+#ifdef ENERGY
+        PICOENERGY_CHECKPOINT("start")
+#endif
 
         (j!=0) ? (N <<= 1) : (N = 1);
         if (rank == 0) {printf("%i#", j); fflush(stdout);}
@@ -277,6 +280,10 @@ int main(int argc, char *argv[])
 
         */
 
+#ifdef ENERGY
+        PICOENERGY_CHECKPOINT("allocd")
+#endif
+
 //	cudaEvent_t start, stop;
 //        cudaErrorCheck(cudaEventCreate(&start));
 //        cudaErrorCheck(cudaEventCreate(&stop));
@@ -304,8 +311,11 @@ int main(int argc, char *argv[])
 //            cudaErrorCheck(cudaEventRecord(stop, NULL));
 //            cudaErrorCheck(cudaEventSynchronize(stop));
 //            MPI_Barrier(MPI_COMM_WORLD);
-	    cudaErrorCheck(cudaDeviceSynchronize());
-	    stop_time = MPI_Wtime();
+            cudaErrorCheck(cudaDeviceSynchronize());
+            stop_time = MPI_Wtime();
+#ifdef ENERGY
+            PICOENERGY_CHECKPOINT("cycle")
+#endif
             if (i>0) inner_elapsed_time[(j-fix_buff_size)*loop_count+i-1] = stop_time - start_time;
 
             if (rank == 0 && !endless) {printf("%%"); fflush(stdout);}
