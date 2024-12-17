@@ -6,11 +6,14 @@ import os
 
 mypalette={0: 'b', 1: 'y', 2: 'g', 3: 'r'}
 
-Resources_grp = ['InstantPower(mW)', 'InstantTemperature(C)', 'TotalEnergy(mJ)']
+#Resources_grp = ['InstantPower(mW)', 'InstantTemperature(C)', 'TotalEnergy(mJ)']
+Resources_grp = ['InstantPower(W)', 'InstantTemperature(C)', 'TotalEnergy(J)']
 
 MetricsGroups = {'ResourcesGrp': Resources_grp}
 
 Implementations = {'Baseline', 'CudaAware', 'Nccl', 'Nvlink'}
+
+CheckpointColors = {'start': 'g', 'allocd': 'k', 'alloc': 'k', 'wait': 'k', 'cycle': 'r', 'stop': 'g'}
 
 def findImplFromFilename ( filename ):
     for imp in Implementations:
@@ -43,6 +46,8 @@ for i in range(1, len(sys.argv)):
     data = pd.read_csv(file)
     checkpointdata = pd.read_csv(checkpointfile)
     data['Occurrence'] = data.groupby('#deviceId').cumcount()
+    data['InstantPower(W)'] = data['InstantPower(mW)'].apply(lambda x: x/1000)
+    data['TotalEnergy(J)'] = data['TotalEnergy(mJ)'].apply(lambda x: x/1000)
     
     print(str(file), data)
     print(str(checkpointfile), checkpointdata)
@@ -87,7 +92,8 @@ for gpu in gpus:
             mysharedy = 'row'
 
         print('len(group[1]): ', len(group[1]))
-        fig, axes = plt.subplots(len(group[1]), len(datas), figsize=(40, 64), sharex=True, sharey=mysharedy)
+        #fig, axes = plt.subplots(len(group[1]), len(datas), figsize=(40, 64), sharex=True, sharey=mysharedy)
+        fig, axes = plt.subplots(len(group[1]), len(datas), figsize=(40, 64), sharex='col', sharey=mysharedy)
         fig.suptitle("Line Plots for %s" %  group[0], y=0.93)
         print('axes: ', axes)
 
@@ -95,18 +101,53 @@ for gpu in gpus:
         for i, metric in enumerate(group[1]):
             print("    i: ", i, ", metric: ", metric)
             for j, subData in enumerate(subDatas):
+                bbox = axes[i,j].get_position()
+                new_bbox = (bbox.x0 + bbox.width*0.1, bbox.y0 + bbox.height*0.55, bbox.width*0.5, bbox.height*0.3)
+                axestmp=fig.add_axes(new_bbox)
+
                 subCheckpointData = subCheckpointDatas[j]
                 print("    j: ", j, ", data: ", files[j])
                 if i == 0:
                     axes[0,j].set_title( findImplFromFilename( files[j] ) )
-                sns.lineplot(data=subData, x='Occurrence', y=metric, hue='#deviceId', ax=axes[i,j], linewidth=2, palette=mypalette)
-                for k in subCheckpointData['sample']:
-                    axes[i,j].axvline(x=k, color='red', linestyle='--', linewidth=0.8)
+                #sns.lineplot(data=subData, x='Occurrence', y=metric, hue='#deviceId', ax=axes[i,j], linewidth=2, palette=mypalette)
+                sns.lineplot(data=subData, x='Occurrence', y=metric, hue='#deviceId', ax=axestmp, linewidth=2, palette=mypalette)
+               
+                filteredCheckpointData =  subCheckpointData [ subCheckpointData['class'] == 'cycle' ]
+                print('subCheckpointData:', subCheckpointData)
+                cyclemin = filteredCheckpointData['sample'].min()
+                cyclemax = filteredCheckpointData['sample'].max()
+                print('min, max: ' , cyclemin, cyclemax)
+                filteredData =  subData [ cyclemax >= subData['Occurrence'] ]
+                filteredData =  filteredData [ filteredData['Occurrence'] >= cyclemin ]
+                min_value = filteredData[metric].min()
+                max_value = filteredData[metric].max()
+
+                cycleCount=0
+                cycleLast=len(filteredCheckpointData)
+                for index, row in subCheckpointData.iterrows():
+                    k = row['sample']
+                    h = row['class']
+                    #axes[i,j].axvline(x=k, color=CheckpointColors[h], linestyle='--', linewidth=2.0)
+                    if h == 'cycle':
+                        myaxe=axes[i,j]
+                        #myaxe.axvline(x=k, color='lavender', linestyle='--', linewidth=2.0)
+                        myaxe.vlines(k, min_value, max_value, color='lavender', linestyle='--')
+                    if h != 'cycle' or cycleCount == 0 or cycleCount == cycleLast-1:
+                        myaxe=axestmp
+                        myaxe.axvline(x=k, color=CheckpointColors[h], linestyle='--', linewidth=2.0)
+                        if h == 'cycle':
+                            cycleCount += 1
                 axes[i,j].legend(title="#deviceId", loc="upper right")
+                
+                #sns.lineplot(data=filteredData, x='Occurrence', y=metric, hue='#deviceId', ax=axestmp, linewidth=2, palette=mypalette)
+                sns.lineplot(data=filteredData, x='Occurrence', y=metric, hue='#deviceId', ax=axes[i,j], linewidth=2, palette=mypalette)
+                
+
             axes[i,0].set_ylabel(metric)
 
         axes[-1,0].set_xlabel("Occurrence")
 
-        plt.savefig(output_file)
+        
+        fig.savefig(output_file)
         plt.close()
         print(f"Plot saved as {output_file}")
