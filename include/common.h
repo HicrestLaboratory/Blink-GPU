@@ -38,6 +38,7 @@ const int num_colors = sizeof(colors)/sizeof(uint32_t);
 #define TAG2 20
 
 #ifdef ENERGY
+#include <atomic>
 #include <energy/picoEnergy.h>
 #endif
 

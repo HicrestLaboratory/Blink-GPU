@@ -151,7 +151,7 @@ int main(int argc, char *argv[])
         for(int j=fix_buff_size; j<max_j; j++){
 
 #ifdef ENERGY
-            PICOENERGY_CHECKPOINT
+	PICOENERGY_CHECKPOINT("start")
 #endif
 
             (j!=0) ? (N <<= 1) : (N = 1);
@@ -179,7 +179,7 @@ int main(int argc, char *argv[])
 
             */
 #ifdef ENERGY
-        PICOENERGY_CHECKPOINT
+        PICOENERGY_CHECKPOINT("allocd")
 #endif
 	    cudaEvent_t start, stop;
 	    cudaErrorCheck(cudaEventCreate(&start));
@@ -210,7 +210,7 @@ int main(int argc, char *argv[])
 		cudaErrorCheck(cudaEventRecord(stop, NULL));
 		cudaErrorCheck(cudaEventSynchronize(stop));
 #ifdef ENERGY
-                PICOENERGY_CHECKPOINT
+                PICOENERGY_CHECKPOINT("cycle")
 #endif
 		if (i>0) {cudaErrorCheck(cudaEventElapsedTime(&(inner_elapsed_time[(j-fix_buff_size)*loop_count+i-1]), start, stop));}
 

@@ -10,6 +10,7 @@
 #define POWERCHUNKSSIZE 1000
 
 #define MAXCHECKPOINTS 100
+#define CHECKPOINTCLASSLENGHT 10
 
 #define NVML_CHECK( R ) { if ( R != 0) fprintf(stderr, "NVML error at line %d of file %s: %d\n", __LINE__, __FILE__, R); }
 
@@ -32,6 +33,7 @@ class myPowerSampling {
 	
 	int currentcheckpoint;
 	int checkpointvalues[MAXCHECKPOINTS];
+	char* checkpointclass[MAXCHECKPOINTS];
 
         myPowerSampling(int my_dev, char* filename, char* checkpointfilename) {
                 dev = my_dev;
@@ -53,9 +55,13 @@ class myPowerSampling {
 		fprintf(fpout, "#deviceId,InstantPower(mW),InstantTemperature(C),TotalEnergy(mJ)\n");
 
 		fpcheckpoint = fopen(checkpointfilename, "w");
-		fprintf(fpcheckpoint, "#deviceId,checkpointId,sample\n");
+		fprintf(fpcheckpoint, "#deviceId,checkpointId,sample,class\n");
 
 		currentcheckpoint = 0;
+		for (int i=0; i<MAXCHECKPOINTS; i++) {
+			checkpointclass[i] = (char*)malloc(sizeof(char)*CHECKPOINTCLASSLENGHT);
+			sprintf(checkpointclass[i], "NULL");
+		}
         }
 
         ~myPowerSampling() {
@@ -65,7 +71,7 @@ class myPowerSampling {
                 fclose(fpout);
 		printf("Device %d printed its sampling results on file\n", dev);
 		for (int i=0; i<currentcheckpoint; i++)
-			fprintf(fpcheckpoint, "%d,%d,%d\n", dev, i, checkpointvalues[i]);
+			fprintf(fpcheckpoint, "%d,%d,%d,%s\n", dev, i, checkpointvalues[i], checkpointclass[i]);
 		printf("Device %d printed its checkpoints on file\n", dev);
         }
 
@@ -113,10 +119,12 @@ class myPowerSampling {
                 printf("Process %d stopped sampling (line %d): %d reallocations, %d samples kept\n", dev, __LINE__, nrealloc, nsamples);
         }
 
-	void putCheckpoint (void) {
+	void putCheckpoint (const char* name) {
 		if(currentcheckpoint < MAXCHECKPOINTS ) {
 			int value = currentsample;
 			checkpointvalues[currentcheckpoint] = value;
+			if (name != NULL)
+				sprintf(checkpointclass[currentcheckpoint], "%s\0", name);
 			currentcheckpoint++;
 		} else {
 			fprintf(stderr, "Error: you reached the maximum number of checkpoints.\n");

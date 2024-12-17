@@ -91,7 +91,7 @@ void energyCompileTimeCheck(void) {
 		picoNvmlTotalEnergy(DV, &PICONVML_ENERGYCOUNTER_START);                               		\
 		std::thread threadStart;                                                              		\
 		myPowerSampling power_samples ( DV , PICOENERGY_FILENAME_VAR, PICOCHECKPOINT_FILENAME_VAR );	\
-		std::thread threadCheckpoint( &myPowerSampling::putCheckpoint, &power_samples); 		\
+		std::thread threadCheckpoint( &myPowerSampling::putCheckpoint, &power_samples, "wait"); 	\
         	threadCheckpoint.join( );                                                       		\
 		threadStart = std::thread( &myPowerSampling::executePowerSampling, &power_samples );  		\
 		sleep(10);
@@ -99,13 +99,13 @@ void energyCompileTimeCheck(void) {
 
 #define PICONVML_ENERGY PICONVML_ENERGYCOUNTER_STOP - PICONVML_ENERGYCOUNTER_START
 
-#define PICONVML_CHECKPOINT {\
-	std::thread threadCheckpoint( &myPowerSampling::putCheckpoint, &power_samples);\
+#define PICONVML_CHECKPOINT( NM ) {\
+	std::thread threadCheckpoint( &myPowerSampling::putCheckpoint, &power_samples, NM );\
 	threadCheckpoint.join( );\
 }
 
 #define PICONVML_ENERGY_STOP( DV ) 						\
-	std::thread threadCheckpoint( &myPowerSampling::putCheckpoint, &power_samples);	\
+	std::thread threadCheckpoint( &myPowerSampling::putCheckpoint, &power_samples, "stop");	\
         threadCheckpoint.join( );							\
         std::thread threadKill( &myPowerSampling::killThread, &power_samples);  \
         threadStart.join( );                                                    \
@@ -143,10 +143,10 @@ void picoNvmlInstantPower(int my_dev, unsigned int* power) {
 #define PICOENERGY_DEFINE energyCompileTimeCheck();
 #define PICOENERGY_START( BS, LC, RK ) PICODCGMI_START( BS , LC , RK )
 #define PICOENERGY_STOP( RK ) PICODCGMI_STOP(RK)
-#define PICOENERGY_CHECKPOINT { }
+#define PICOENERGY_CHECKPOINT( NM ) { }
 #else
 #define PICOENERGY_DEFINE PICONVML_DEFINE
 #define PICOENERGY_START( BS, LC, RK ) PICONVML_ENERGY_START( BS , LC , RK )
 #define PICOENERGY_STOP( RK ) PICONVML_ENERGY_STOP(RK)
-#define PICOENERGY_CHECKPOINT PICONVML_CHECKPOINT
+#define PICOENERGY_CHECKPOINT( NM ) PICONVML_CHECKPOINT( NM )
 #endif

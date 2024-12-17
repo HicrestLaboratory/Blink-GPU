@@ -101,7 +101,7 @@ int main(int argc, char *argv[])
         for(int j=fix_buff_size; j<max_j; j++) {
 
 #ifdef ENERGY
-	    PICOENERGY_CHECKPOINT
+	    PICOENERGY_CHECKPOINT("start")
 #endif
 
             (j!=0) ? (N <<= 1) : (N = 1);
@@ -130,7 +130,7 @@ int main(int argc, char *argv[])
             */
 
 #ifdef ENERGY
-                PICOENERGY_CHECKPOINT
+                PICOENERGY_CHECKPOINT("allocd")
 #endif
 
             for(int i=1-(WARM_UP); i<=loop_count; i++){
@@ -152,7 +152,7 @@ int main(int argc, char *argv[])
 
                 stop_time = MPI_Wtime();
 #ifdef ENERGY
-            	PICOENERGY_CHECKPOINT
+            	PICOENERGY_CHECKPOINT("cycle")
 #endif
                 if (i>0) inner_elapsed_time[(j-fix_buff_size)*loop_count+i-1] = stop_time - start_time;
 

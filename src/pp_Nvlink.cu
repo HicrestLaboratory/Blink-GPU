@@ -108,7 +108,7 @@ int main(int argc, char *argv[])
     if (rank == 0 || rank == rank2) {
 
 #ifdef ENERGY
-            PICOENERGY_CHECKPOINT
+            PICOENERGY_CHECKPOINT("start")
 #endif
 
         MPI_Status IPCstat;
@@ -159,7 +159,7 @@ int main(int argc, char *argv[])
             cudaErrorCheck( cudaIpcOpenMemHandle((void**)&peerBuffer, *(cudaIpcMemHandle_t*)&recvHandle, cudaIpcMemLazyEnablePeerAccess) );
 
 #ifdef ENERGY
-            PICOENERGY_CHECKPOINT
+            PICOENERGY_CHECKPOINT("alloc")
 #endif
 
             for(int i=1-(WARM_UP); i<=loop_count; i++){
@@ -180,7 +180,7 @@ int main(int argc, char *argv[])
 
                 stop_time = MPI_Wtime();
 #ifdef ENERGY
-                PICOENERGY_CHECKPOINT
+                PICOENERGY_CHECKPOINT("cycle")
 #endif
 		if (i>0) inner_elapsed_time[(j-fix_buff_size)*loop_count+i-1] = stop_time - start_time;
 
