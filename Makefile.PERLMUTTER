@@ -30,6 +30,7 @@ MPPNAME=mpp
 HALONAME=hlo
 INCNAME=inc
 OTOMNAME=otom
+ONESIDED=putget
 # --------------- Folders ----------------
 BINFOLDER=bin
 OUTFOLDER=out
@@ -57,7 +58,7 @@ CUDA_AWARE_SN_EXPORTS="${EXPORTFOLDER}/load_CudaAware_singlenode_exports.sh"
 # =====================================================================================
 
 
-all: pp a2a ar hlo mpp inc otom
+all: pp a2a ar hlo mpp inc otom onesided
 pp: $(BINFOLDER)/$(NAME)_Baseline $(BINFOLDER)/$(NAME)_CudaAware $(BINFOLDER)/$(NAME)_Nccl $(BINFOLDER)/$(NAME)_Nvlink
 a2a: $(BINFOLDER)/$(A2ANAME)_Baseline $(BINFOLDER)/$(A2ANAME)_CudaAware $(BINFOLDER)/$(A2ANAME)_Nccl $(BINFOLDER)/$(A2ANAME)_Nvlink
 ar: $(BINFOLDER)/$(ARNAME)_Baseline $(BINFOLDER)/$(ARNAME)_CudaAware $(BINFOLDER)/$(ARNAME)_Nccl $(BINFOLDER)/$(ARNAME)_Nvlink
@@ -66,6 +67,7 @@ mpp: $(BINFOLDER)/$(MPPNAME)_Baseline $(BINFOLDER)/$(MPPNAME)_CudaAware $(BINFOL
 inc: $(BINFOLDER)/$(INCNAME)_Nccl
 otom: $(BINFOLDER)/$(OTOMNAME)_Nccl
 devhostdev: $(BINFOLDER)/testDevHostDev
+onesided: $(BINFOLDER)/$(ONESIDED)_CudaAware
 
 # --------------- Baseline ---------------
 $(BASELINE_MODULES):
@@ -141,6 +143,10 @@ $(BINFOLDER)/$(MPPNAME)_CudaAware: src/$(MPPNAME)_CudaAware.cu $(CUDA_AWARE_MODU
 	source $(CUDA_AWARE_MODULES) && $(CC) $(CFLAGS) -o $@ $< $(INCL) $(LIBS) $(LIBFLAGS) $(MPI_CUDA) $(CUDA) -lstdc++ -lm -Wno-deprecated-gpu-targets $(DBGFLAGS)
 
 $(BINFOLDER)/$(MPPNAME)_Aggregated: src/$(MPPNAME)_Aggregated.cu $(CUDA_AWARE_MODULES) $(CUDA_AWARE_SN_EXPORTS) $(CUDA_AWARE_MN_EXPORTS)
+	mkdir -p $(BINFOLDER) $(OUTFOLDER) $(SOUTFOLDER)
+	source $(CUDA_AWARE_MODULES) && $(CC) $(CFLAGS) -o $@ $< $(INCL) $(LIBS) $(LIBFLAGS) $(MPI_CUDA) $(CUDA) -lstdc++ -lm -Wno-deprecated-gpu-targets $(DBGFLAGS)
+
+$(BINFOLDER)/$(ONESIDED)_CudaAware: src/$(ONESIDED)_CudaAware.cu $(CUDA_AWARE_MODULES) $(CUDA_AWARE_SN_EXPORTS) $(CUDA_AWARE_MN_EXPORTS)
 	mkdir -p $(BINFOLDER) $(OUTFOLDER) $(SOUTFOLDER)
 	source $(CUDA_AWARE_MODULES) && $(CC) $(CFLAGS) -o $@ $< $(INCL) $(LIBS) $(LIBFLAGS) $(MPI_CUDA) $(CUDA) -lstdc++ -lm -Wno-deprecated-gpu-targets $(DBGFLAGS)
 # ----------------------------------------
