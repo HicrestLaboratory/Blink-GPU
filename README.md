@@ -245,3 +245,36 @@ Moreover, we have two different types of result lines:
 *Notes*:
 1. Some iteration has a negative iteration number; those ones represent the warm-up iteration and are not involved in the average computation.
 2. the reported times are always referred to as the max time over all the involved MPI process time.
+
+# Refactor 2026 (to integrate in the previous part of the readme)
+
+## Set-up and build the project
+Since the communication benchmarks are extremely sensitive to the communication library version, we decided to keep the building process explicit. To do so, to perform the set-up phase the user will have to explicitlly write the communication library module and path. In particular, the following variable should be populated:
+
+	cuda_home, nccl_home, mpi_home, mpicuda_home
+    cuda_module, nccl_module, mpi_module, mpicuda_module
+
+If you have to add a new system or a new configuration, you have to populate the previous variable by adding to 'init.sh' file a block like the following:
+	
+	SYSTEM_NAME:CONFIGURATION_NAME)
+    	echo "Generating exports for ${SYSTEM} system and ${CONFIGURATION} configuration"
+    	# Home directories
+    	cuda_home="/path/to/cuda/home"
+    	nccl_home="/path/to/nccl/home"
+    	mpi_home="/path/to/mpi/home"
+	    mpicuda_home="/path/to/cudampi/home"
+
+    	# Module name
+    	cuda_module="cuda/module"
+    	nccl_module="nccl/module"
+    	mpi_module="mpi/module"
+		mpicuda_module="cudampi/module"
+    	;;
+
+Once you do this, you can generate your configuration file by running "source init.sh --system <systemname> --configuration <configurationname>"; note that, to reduce ambiguity, every input is automatically converted to all-uppercases, making the inputs case insensitive. While the "--system" input is mandatory, the "--configuration" one is optional and set to "default" when not set.
+
+init.sh will generate your configuration file, which will be found as "configure/<SYSTEM>_<CONF>.conf"; source this file to set up your environment:
+	
+	source configure/<SYSTEM>_<CONF>.conf
+	
+After the environment is configured, you can simply run "make". The Makefile will explicitly link the path provided in the "init.sh" script. If the building procedure does not work, please adjust the environment variable in "init.sh".
