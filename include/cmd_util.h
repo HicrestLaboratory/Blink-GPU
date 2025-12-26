@@ -3,6 +3,9 @@
 
 #include "common.h"
 #include <functional>
+#include <string>
+#include <vector>
+#include <iostream>
 
 void read_line_parameters (int argc, char *argv[], int myrank,
                            int *flag_b, int *flag_l, int *flag_x,
@@ -166,6 +169,66 @@ void init_mympicomm (MPI_Comm comm, MyMpiComm *mympicomm) {
     MPI_Comm_rank(mympicomm->comm, &(mympicomm->rank));
 }
 
+typedef struct process_env {
+
+    char* home = nullptr;
+    char* slurm_addr = nullptr;
+    char* slurm_node = nullptr;
+
+    /*
+    // parsed copies / containers (C++ types owned by this struct)
+    std::string slurm_hostname;
+    std::vector<std::string> switch_names;
+
+    // Parse slurm_addr (copy to std::string locally), fill slurm_hostname
+    // and switch_names (in reverse order of the dotted fields, excluding hostname).
+    void splitSlurmAddr() {
+        switch_names.clear();
+        slurm_hostname.clear();
+
+        if (!slurm_addr) return;
+
+        // copy to std::string for safe parsing
+        std::string s{slurm_addr};
+
+        if (s.empty()) return;
+
+        std::vector<std::string> parts;
+        size_t start = 0;
+        while (true) {
+            size_t pos = s.find('.', start);
+            if (pos == std::string::npos) {
+                parts.push_back(s.substr(start));
+                break;
+            }
+            parts.push_back(s.substr(start, pos - start));
+            start = pos + 1;
+        }
+
+        if (parts.empty()) return;
+
+        // last part is hostname
+        slurm_hostname = parts.back();
+
+        // remaining parts (all except last) go into switch_names in reverse order
+        for (int i = static_cast<int>(parts.size()) - 2; i >= 0; --i) {
+            switch_names.push_back(parts[i]);
+        }
+    }
+    */
+
+    // Initialize pointers from environment; slurm_addr remains a char*
+    // (points into environment memory - do NOT free it).
+    void init_processenv(void) {
+        home = std::getenv("HOME");
+        slurm_node = std::getenv("SLURM_NODEID");
+        slurm_addr = std::getenv("SLURM_TOPOLOGY_ADDR");
+
+        // if (slurm_addr != nullptr) splitSlurmAddr();
+    }
+
+} ProcessEnv;
+
 typedef struct mpi_comms
 {
     MyMpiComm world;
@@ -175,6 +238,8 @@ typedef struct mpi_comms
     int n_tree_comms;
     MyMpiComm *tree_comms;
     MyMpiComm *cross_comms;
+
+    ProcessEnv myenv;
 } MpiComms;
 
 void init_comms (Config * config, MpiComms * communicators) {
@@ -223,9 +288,11 @@ void init_comms (Config * config, MpiComms * communicators) {
         snprintf(comm_name, 50, "CrossLevel%dComm", i);
         MPI_Comm_set_name(tmp_comm, comm_name);
     }
+
+    communicators->myenv.init_processenv();
 }
 
-static void print_comm_info(const char *label, const MyMpiComm *c)
+static void print_comm_info(const char *label, const MyMpiComm *c, FILE *fp)
 {
     char name[MPI_MAX_OBJECT_NAME];
     int name_len = 0;
@@ -244,37 +311,54 @@ static void print_comm_info(const char *label, const MyMpiComm *c)
         snprintf(host_name, MPI_MAX_PROCESSOR_NAME, "<unnamed>");
     }
 
-    printf("[%-12s] hostname=%-20s commname=%-20s rank=%4d size=%4d\n",
+    fprintf(fp, "[%-12s] hostname=%-20s commname=%-20s rank=%4d size=%4d\n",
            label, host_name, name, c->rank, c->size);
 }
 
-void comms_info(const MpiComms *communicators) {
+void comms_info(const MpiComms *communicators, FILE *fp=stdout) {
     int world_rank = communicators->world.rank;
+
+    if (world_rank == 0) {
+        int len;
+        char version[MPI_MAX_LIBRARY_VERSION_STRING];
+        MPI_Get_library_version(version, &len);
+        printf("%s\n", version);
+    }
 
     /* Optional: make output readable by rank */
     MPI_Barrier(MPI_COMM_WORLD);
     for (int r = 0; r < communicators->world.size; r++) {
         if (r == world_rank) {
 
-            printf("\n=== Communicator info (world rank %d) ===\n", r);
+            fprintf(fp, "\n=== Communicator info (world rank %d) ===\n", r);
 
-            print_comm_info("WORLD",      &communicators->world);
-            print_comm_info("NODE",       &communicators->node_comm);
-            print_comm_info("CROSS-NODE", &communicators->cross_comm);
+            print_comm_info("WORLD",      &communicators->world, fp);
+            print_comm_info("NODE",       &communicators->node_comm, fp);
+            print_comm_info("CROSS-NODE", &communicators->cross_comm, fp);
 
             for (int i = 0; i < communicators->n_tree_comms; i++) {
                 char label[32];
                 snprintf(label, sizeof(label), "TREE[%d]", i);
-                print_comm_info(label, &communicators->tree_comms[i]);
+                print_comm_info(label, &communicators->tree_comms[i], fp);
             }
 
             for (int i = 0; i < communicators->n_tree_comms; i++) {
                 char label[32];
                 snprintf(label, sizeof(label), "CROSS[%d]", i);
-                print_comm_info(label, &communicators->cross_comms[i]);
+                print_comm_info(label, &communicators->cross_comms[i], fp);
             }
 
-            fflush(stdout);
+            fprintf(fp, "[%-12s] HOME=%-20s\n",
+                   "ENV-VARS", communicators->myenv.home);
+
+            fprintf(fp, "[%-12s] SLURM_NODEID=%-5s, SLURM_TOPOLOGY_ADDR=%-20s\n",
+                "SLURM-ENV", communicators->myenv.slurm_node, communicators->myenv.slurm_addr);
+            fflush(fp);
+
+            // if (communicators->myenv.slurm_addr != nullptr) {
+            //     printf("slurm_hostname: %s\n", communicators->myenv.slurm_hostname.c_str());
+            //     for (auto &p : communicators->myenv.switch_names) std::cout << p << '\n';
+            // }
         }
         MPI_Barrier(MPI_COMM_WORLD);
     }
