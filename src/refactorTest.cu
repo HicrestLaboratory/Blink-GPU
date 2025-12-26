@@ -14,12 +14,11 @@ int main(int argc, char ** argv) {
     init_comms(config, communicators);
 
     if (communicators->world.rank == 0) {
-        fprintf(stdout, "%d x %d x (tree high %d)\n", communicators->node_comm.size, communicators->group_comm.size, communicators->n_tree_comms);
+        fprintf(stdout, "%d x %d x (tree high %d)\n", config->ppn, config->npl, config->tree_high);
     }
     MPI_Barrier(MPI_COMM_WORLD);
 
-    fprintf(stdout, "[%d] static_coordinates: [%d, %d]\n", rank, communicators->node_comm.rank, communicators->group_comm.rank);
-    for (int i=0; i<communicators->n_tree_comms; i++) fprintf(stdout, "[%d] (%d: %d)\n", rank, i, communicators->tree_comms[i].rank);
+    comms_info(communicators);
 
     MPI_Finalize();
 }

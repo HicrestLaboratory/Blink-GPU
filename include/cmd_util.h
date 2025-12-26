@@ -194,12 +194,15 @@ void init_comms (Config * config, MpiComms * communicators) {
 
     MPI_Comm_split(MPI_COMM_WORLD, node_id,  wrank, &tmp_comm);
     init_mympicomm(tmp_comm, &(communicators->node_comm));
+    MPI_Comm_set_name(tmp_comm, "NodeComm");
 
     MPI_Comm_split(MPI_COMM_WORLD, group_id, wrank, &tmp_comm);
     init_mympicomm(tmp_comm, &(communicators->group_comm));
+    MPI_Comm_set_name(tmp_comm, "GroupComm");
 
     MPI_Comm_split(MPI_COMM_WORLD, cross_id, wrank, &tmp_comm);
     init_mympicomm(tmp_comm, &(communicators->cross_comm));
+    MPI_Comm_set_name(tmp_comm, "CrossComm");
 
     int process_per_leaf = (config->ppn * config->npg);
     communicators->n_tree_comms = config->tree_high;
@@ -209,6 +212,53 @@ void init_comms (Config * config, MpiComms * communicators) {
         int subtree_id = wrank / subtree_size;
         MPI_Comm_split(MPI_COMM_WORLD, subtree_id, wrank, &tmp_comm);
         init_mympicomm(tmp_comm, &(communicators->tree_comms[i]));
+
+        char comm_name[50];
+        snprintf(comm_name, 50, "Level%dTreeComm", i);
+        MPI_Comm_set_name(tmp_comm, comm_name);
+    }
+}
+
+static void print_comm_info(const char *label, const MyMpiComm *c)
+{
+    char name[MPI_MAX_OBJECT_NAME];
+    int name_len = 0;
+
+    MPI_Comm_get_name(c->comm, name, &name_len);
+
+    if (name_len == 0) {
+        snprintf(name, MPI_MAX_OBJECT_NAME, "<unnamed>");
+    }
+
+    printf("[%-12s] name=%-20s rank=%4d size=%4d\n",
+           label, name, c->rank, c->size);
+}
+
+void comms_info(const MpiComms *communicators)
+{
+    int world_rank = communicators->world.rank;
+
+    /* Optional: make output readable by rank */
+    MPI_Barrier(MPI_COMM_WORLD);
+    for (int r = 0; r < communicators->world.size; r++) {
+        if (r == world_rank) {
+
+            printf("\n=== Communicator info (world rank %d) ===\n", r);
+
+            print_comm_info("WORLD", &communicators->world);
+            print_comm_info("NODE",  &communicators->node_comm);
+            print_comm_info("GROUP", &communicators->group_comm);
+            print_comm_info("CROSS", &communicators->cross_comm);
+
+            for (int i = 0; i < communicators->n_tree_comms; i++) {
+                char label[32];
+                snprintf(label, sizeof(label), "TREE[%d]", i);
+                print_comm_info(label, &communicators->tree_comms[i]);
+            }
+
+            fflush(stdout);
+        }
+        MPI_Barrier(MPI_COMM_WORLD);
     }
 }
 
