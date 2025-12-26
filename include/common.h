@@ -7,6 +7,10 @@
 #include "gpu_ops.h"
 #include <inttypes.h>
 
+#include <string.h>
+#include <unistd.h>
+#include <mpi.h>
+
 #if defined(USE_NVTX)
 #include <nvToolsExt.h>
 

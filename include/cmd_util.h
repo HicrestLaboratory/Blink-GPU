@@ -1,8 +1,7 @@
-#pragma once
+#ifndef TEST_UTILS_CUH
+#define TEST_UTILS_CUH
 
-#include <stdio.h>
-#include <string.h>
-#include <unistd.h>
+#include "common.h"
 
 void read_line_parameters (int argc, char *argv[], int myrank,
                            int *flag_b, int *flag_l, int *flag_x,
@@ -67,3 +66,151 @@ void read_line_parameters (int argc, char *argv[], int myrank,
         }
     }
 }
+
+typedef struct config
+{
+    // Debug parameeters
+    int  verbose;
+
+    // Repetitions and buffer size
+    int loop_count;
+    int buff_cycle;
+    int fix_buff_size;
+
+    // Process displacement
+    int ppn;
+    int npg;
+    int tree_high;
+
+    // Computed
+    int nprocess;
+
+} Config;
+
+void parse_args(int argc, char ** argv, Config * config)
+{
+    config->verbose       = 0;
+
+    config->loop_count    = 0;
+    config->buff_cycle    = 0;
+    config->fix_buff_size = 0;
+
+    config->tree_high = 0;
+    config->npg       = 1;
+    config->ppn       = 1;
+
+    int inc = 2;
+    for (int i=1; i<argc; i+=inc)
+    {
+        inc = 2;
+        const char * argname = (argv[i]);
+
+        if (!strcmp(argname, "--loop-count"))
+        {
+            config->loop_count = atoi(argv[i+1]);
+        }
+        else if (!strcmp(argname, "--fix-buff"))
+        {
+            config->fix_buff_size = atoi(argv[i+1]);
+        }
+        else if (!strcmp(argname, "--buff-cycle"))
+        {
+            config->buff_cycle = atoi(argv[i+1]);
+        }
+        else if (!strcmp(argname, "--verbose"))
+        {
+            config->verbose = atoi(argv[i+1]);
+        }
+        else if (!strcmp(argname, "--tree-high"))
+        {
+            config->tree_high = atoi(argv[i+1]);
+        }
+        else if (!strcmp(argname, "--nodes-per-group"))
+        {
+            config->npg = atoi(argv[i+1]);
+        }
+        else if (!strcmp(argname, "--process-per-node"))
+        {
+            config->ppn = atoi(argv[i+1]);
+        }
+    }
+
+    if (config->loop_count == 0) {
+        fprintf(stdout, "Error: parameeter --loop-count must be set grather than 0\n");
+        exit(__LINE__);
+    }
+    if (config->buff_cycle == 0) {
+        fprintf(stdout, "Error: parameeter --buff-cycle must be set grather than 0\n");
+        exit(__LINE__);
+    }
+
+    config->nprocess = (config->ppn) * (config->npg) * (1<<(config->tree_high));
+
+}
+
+typedef struct my_mpi_comm
+{
+    MPI_Comm comm;
+    int rank, size;
+} MyMpiComm;
+
+void init_mympicomm (MPI_Comm comm, MyMpiComm *mympicomm) {
+    if (comm == MPI_COMM_NULL) {
+        fprintf(stderr, "Error: %s found an MPI_COMM_NULL\n", __func__);
+        exit(__LINE__);
+    }
+
+    mympicomm->comm = comm;
+    MPI_Comm_size(mympicomm->comm, &(mympicomm->size));
+    MPI_Comm_rank(mympicomm->comm, &(mympicomm->rank));
+}
+
+typedef struct mpi_comms
+{
+    MyMpiComm world;
+    MyMpiComm node_comm;
+    MyMpiComm group_comm;
+    MyMpiComm cross_comm;
+
+    int n_tree_comms;
+    MyMpiComm *tree_comms;
+} MpiComms;
+
+void init_comms (Config * config, MpiComms * communicators) {
+
+    init_mympicomm(MPI_COMM_WORLD, &(communicators->world));
+
+    // Check correct process num
+    if (communicators->world.size != config->nprocess) {
+        fprintf(stderr, "Error: mismetch between defined processes (%d) and MPI processes (%d)\n", config->nprocess, communicators->world.size);
+        exit(__LINE__);
+    }
+
+    MPI_Comm tmp_comm;
+    int wrank = communicators->world.rank;
+    int node_id  = wrank / (config->ppn);
+    int group_id = wrank / (config->ppn * config->npg);
+    int cross_id = wrank % (config->ppn * config->npg);
+
+    MPI_Comm_split(MPI_COMM_WORLD, node_id,  wrank, &tmp_comm);
+    init_mympicomm(tmp_comm, &(communicators->node_comm));
+
+    MPI_Comm_split(MPI_COMM_WORLD, group_id, wrank, &tmp_comm);
+    init_mympicomm(tmp_comm, &(communicators->group_comm));
+
+    MPI_Comm_split(MPI_COMM_WORLD, cross_id, wrank, &tmp_comm);
+    init_mympicomm(tmp_comm, &(communicators->cross_comm));
+
+    int process_per_leaf = (config->ppn * config->npg);
+    communicators->n_tree_comms = config->tree_high;
+    communicators->tree_comms = (MyMpiComm*)malloc(sizeof(MyMpiComm)*(communicators->n_tree_comms)); // check > 0
+    for (int i=0; i<communicators->n_tree_comms; i++) {
+        int subtree_size = process_per_leaf * (1<<i);
+        int subtree_id = wrank / subtree_size;
+        MPI_Comm_split(MPI_COMM_WORLD, subtree_id, wrank, &tmp_comm);
+        init_mympicomm(tmp_comm, &(communicators->tree_comms[i]));
+    }
+}
+
+#endif
+
