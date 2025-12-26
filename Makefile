@@ -116,5 +116,8 @@ $(BINFOLDER)/%_Nccl: src/%_Nccl.cu $(NCCL_MODULE_FILE) | $(DIRS)
 	mkdir -p ${BINFOLDER}
 	source $(NCCL_MODULE_FILE) && $(CC) $(CFLAGS) -o $@ $< $(NCCL_LIBS)
 
+$(BINFOLDER)/refactorTest: src/refactorTest.cu $(NCCL_MODULE_FILE) | $(DIRS)
+	$(CC) $(CFLAGS) -o $@ $< $(NCCL_LIBS)
+
 clean:
 	rm -rf $(BINFOLDER)/*

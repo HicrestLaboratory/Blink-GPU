@@ -145,7 +145,6 @@ case "${SYSTEM}:${CONFIGURATION}" in
 
   LEONARDO:DEFAULT)
     echo "Generating exports for ${SYSTEM} system and ${CONFIGURATION} configuration"
-    
     # Home directories
     cuda_home="/leonardo/prod/spack/06/install/0.22/linux-rhel8-icelake/gcc-8.5.0/nvhpc-24.5-torlmnyzcexnrs6pq4cccabv7ehkv3xy/Linux_x86_64/24.5/cuda"
     nccl_home="/leonardo/prod/spack/06/install/0.22/linux-rhel8-icelake/gcc-8.5.0/nvhpc-24.5-torlmnyzcexnrs6pq4cccabv7ehkv3xy/Linux_x86_64/24.5/comm_libs/nccl"
@@ -156,8 +155,22 @@ case "${SYSTEM}:${CONFIGURATION}" in
     cuda_module="nvhpc/24.5"
     nccl_module="nvhpc/24.5"
     mpi_module="nvhpc/24.5"
-    mpicuda_module="nvhpc/24.5"    
+    mpicuda_module="nvhpc/24.5"
     ;;
+
+  PICOSAMSUNGPC:DEFAULT)
+    # Home directories
+    cuda_home="/picomodules/nvhpc/Linux_x86_64/25.11/cuda"
+    nccl_home="/picomodules/nvhpc/Linux_x86_64/25.11/comm_libs/nccl"
+    mpi_home="/usr/local/apps/openmpi/4.1.5"
+    mpicuda_home="/usr/local/apps/openmpi/4.1.5"
+
+    # Module name
+    cuda_module="nvhpc/25.11"
+    nccl_module="nvhpc/25.11"
+    mpi_module="openmpi/4.1.5"
+    mpicuda_module="openmpi/4.1.5"
+  ;;
 
   *)
     echo "Error: Unknown system '$SYSTEM'"
