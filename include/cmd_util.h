@@ -236,8 +236,16 @@ static void print_comm_info(const char *label, const MyMpiComm *c)
         snprintf(name, MPI_MAX_OBJECT_NAME, "<unnamed>");
     }
 
-    printf("[%-12s] name=%-20s rank=%4d size=%4d\n",
-           label, name, c->rank, c->size);
+    int  hostname_len = 0;
+    char host_name[MPI_MAX_PROCESSOR_NAME];
+    MPI_Get_processor_name(host_name, &hostname_len);
+
+    if (hostname_len == 0) {
+        snprintf(host_name, MPI_MAX_PROCESSOR_NAME, "<unnamed>");
+    }
+
+    printf("[%-12s] hostname=%-20s commname=%-20s rank=%4d size=%4d\n",
+           label, host_name, name, c->rank, c->size);
 }
 
 void comms_info(const MpiComms *communicators) {
@@ -465,6 +473,156 @@ struct comm_graph {
         }
     }
 };
+
+
+/*
+ int  assignDeviceToProcess()
+{
+#ifdef MPI
+      char     host_name[MPI_MAX_PROCESSOR_NAME];
+      char (*host_names)[MPI_MAX_PROCESSOR_NAME];
+      MPI_Comm nodeComm;
+
+#else
+      char     host_name[20];
+#endif
+      int myrank;
+      int gpu_per_node;
+      int n, namelen, color, rank, nprocs;
+      size_t bytes;
+
+#ifdef MPI
+      MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+      MPI_Comm_size(MPI_COMM_WORLD, &nprocs);
+      MPI_Get_processor_name(host_name,&namelen);
+
+      bytes = nprocs * sizeof(char[MPI_MAX_PROCESSOR_NAME]);
+      host_names = (char (*)[MPI_MAX_PROCESSOR_NAME]) malloc(bytes);
+
+      strcpy(host_names[rank], host_name);
+
+      for (n=0; n<nprocs; n++)
+      {
+       MPI_Bcast(&(host_names[n]),MPI_MAX_PROCESSOR_NAME, MPI_CHAR,n, MPI_COMM_WORLD);
+      }
+
+
+      qsort(host_names, nprocs, sizeof(char[MPI_MAX_PROCESSOR_NAME]), stringCmp);
+
+      color = 0;
+
+      for (n=0; n<nprocs; n++)
+      {
+        if(n>0&&strcmp(host_names[n-1], host_names[n])) color++;
+        if(strcmp(host_name, host_names[n]) == 0) break;
+      }
+
+      MPI_Comm_split(MPI_COMM_WORLD, color, 0, &nodeComm);
+
+      MPI_Comm_rank(nodeComm, &myrank);
+      MPI_Comm_size(nodeComm, &gpu_per_node);
+      fprintf(stdout, "DEBUG file %s:%d; rank %d host_names: %s --> myrank: %d, gpu_per_node: %d\n", __FILE__, __LINE__, rank, host_names, myrank, gpu_per_node);
+
+#else
+     myrank = 0;
+     return 0;
+#endif
+
+//      printf ("Assigning device %d  to process on node %s rank %d\n",*myrank,  host_name, rank );
+      // Assign device to MPI process, initialize BLAS and probe device properties
+      //cudaSetDevice(*myrank);
+      return myrank;
+}
+ */
+
+bool check_node (MpiComms * communicators) {
+    char     host_name[MPI_MAX_PROCESSOR_NAME];
+
+    int namelen = 0, reducedlen, reductionflag;
+    MPI_Comm nodeComm = communicators->node_comm.comm;
+    MPI_Get_processor_name(host_name, &namelen);
+
+    // First check: all ranks in the same node are on the same host
+    MPI_Allreduce(&namelen, &reducedlen, 1, MPI_INT, MPI_MIN, nodeComm);
+    reductionflag = (reducedlen == namelen) ? 1 : 0 ;
+    if (reductionflag == 0) {
+        fprintf(stderr, "[%d] hostname mismetch (%d!=%d)\n", communicators->world.rank, reducedlen, namelen);
+        fflush(stderr);
+    }
+    MPI_Allreduce(MPI_IN_PLACE, &reductionflag, 1, MPI_INT, MPI_MIN, communicators->world.comm);
+    if (reductionflag == 0) return(false);
+
+    char (*host_names)[MPI_MAX_PROCESSOR_NAME];
+
+    host_names = (char (*)[MPI_MAX_PROCESSOR_NAME])malloc(communicators->node_comm.size * sizeof(*host_names));
+
+    MPI_Allgather(host_name, MPI_MAX_PROCESSOR_NAME, MPI_CHAR,
+                host_names, MPI_MAX_PROCESSOR_NAME, MPI_CHAR,
+                nodeComm);
+
+    /* Ensure null-termination */
+    host_name[namelen] = '\0';
+
+    for (int i = 0; i < communicators->node_comm.size; i++) {
+        if (strcmp(host_names[0], host_names[i]) != 0) {
+            fprintf(stderr,
+                    "[world %d | node %d] hostname mismatch: '%s' vs '%s'\n",
+                    communicators->world.rank,
+                    communicators->node_comm.rank,
+                    host_names[0], host_names[i]);
+            reductionflag = 0;
+            break;
+        }
+    }
+
+
+    /* Reduce result across world */
+    MPI_Allreduce(MPI_IN_PLACE, &reductionflag, 1, MPI_INT, MPI_MIN,
+                  communicators->world.comm);
+
+    if (!reductionflag) return(false);
+
+    free(host_names);
+
+    /* Second check: ranks on different nodes have different hostnames */
+    int cross_size = communicators->cross_comm.size;
+    int cross_rank = communicators->cross_comm.rank;
+
+    host_names = (char (*)[MPI_MAX_PROCESSOR_NAME])
+        malloc(cross_size * sizeof(*host_names));
+
+    /* Gather one hostname per node */
+    MPI_Allgather(host_name, MPI_MAX_PROCESSOR_NAME, MPI_CHAR,
+                host_names, MPI_MAX_PROCESSOR_NAME, MPI_CHAR,
+                communicators->cross_comm.comm);
+
+    /* Compare all hostnames: must be unique */
+    for (int i = 0; i < cross_size; i++) {
+        for (int j = i + 1; j < cross_size; j++) {
+            if (strcmp(host_names[i], host_names[j]) == 0) {
+                fprintf(stderr,
+                        "[world %d | cross %d] node hostname collision: '%s'\n",
+                        communicators->world.rank,
+                        cross_rank,
+                        host_names[i]);
+                reductionflag = 0;
+                break;
+            }
+        }
+        if (!reductionflag) break;
+    }
+
+    /* Ensure all ranks agree */
+    MPI_Allreduce(MPI_IN_PLACE, &reductionflag, 1, MPI_INT, MPI_MIN,
+                communicators->world.comm);
+
+    free(host_names);
+
+    if (!reductionflag) return(false);
+
+
+    return(true);
+}
 
 #endif
 

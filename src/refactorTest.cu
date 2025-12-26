@@ -22,6 +22,7 @@ int main(int argc, char ** argv) {
 
     comm_graph graph;
     graph.init(communicators);
+    /*
     for (int i=0; i<size; i++) {
         if (i == rank) {
             fprintf(stdout, "--------------- Process %d ---------------\n", rank);
@@ -31,6 +32,7 @@ int main(int argc, char ** argv) {
         MPI_Barrier(MPI_COMM_WORLD);
         sleep(1);
     }
+    */
 
     for (int i = 0; i < N_COMM_KIND; i++) {
         CommKind kind = static_cast<CommKind>(i);
@@ -42,6 +44,9 @@ int main(int argc, char ** argv) {
         }
         fflush(stdout);
     }
+
+    bool test = check_node(communicators);
+    if (rank == 0) fprintf(stdout, "Node check %s\n", (test) ? "true" : "false");
 
     MPI_Finalize();
 }
