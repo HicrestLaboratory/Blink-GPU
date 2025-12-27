@@ -19,3 +19,7 @@ sbatch/lumi/*sh
 # tmp
 include/communicators.h
 core
+
+module_dir/*
+setup_dir/*
+configure/*
