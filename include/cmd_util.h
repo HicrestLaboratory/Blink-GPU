@@ -71,6 +71,17 @@ void read_line_parameters (int argc, char *argv[], int myrank,
     }
 }
 
+
+#define N_COMM_KIND 6
+enum CommKind {
+    WORLD,
+    NODE,
+    CROSS_NODE,
+    TREE,
+    CROSS_TREE,
+    ROOT
+};
+
 typedef struct config
 {
     // Debug parameeters
@@ -89,6 +100,9 @@ typedef struct config
     // Computed
     int nprocess;
 
+    // Communicator
+    CommKind selectedComm;
+
 } Config;
 
 void parse_args(int argc, char ** argv, Config * config)
@@ -102,6 +116,8 @@ void parse_args(int argc, char ** argv, Config * config)
     config->tree_high = 0;
     config->npl       = 1;
     config->ppn       = 1;
+
+    config->selectedComm = WORLD;
 
     int inc = 2;
     for (int i=1; i<argc; i+=inc)
@@ -137,6 +153,10 @@ void parse_args(int argc, char ** argv, Config * config)
         {
             config->ppn = atoi(argv[i+1]);
         }
+        else if (!strcmp(argname, "--selected-comm"))
+        {
+            config->selectedComm = static_cast<CommKind>(atoi(argv[i+1]));
+        }
     }
 
     if (config->loop_count == 0) {
@@ -150,6 +170,35 @@ void parse_args(int argc, char ** argv, Config * config)
 
     config->nprocess = (config->ppn) * (config->npl) * (1<<(config->tree_high-1));
 
+}
+
+void print_config(const Config *cfg, FILE *fp = stdout) {
+    if (!fp || !cfg) {
+        return;
+    }
+
+    fprintf(fp, "Config {\n");
+
+    /* Debug parameters */
+    fprintf(fp, "  verbose        : %d\n", cfg->verbose);
+
+    /* Repetitions and buffer size */
+    fprintf(fp, "  loop_count     : %d\n", cfg->loop_count);
+    fprintf(fp, "  buff_cycle     : %d\n", cfg->buff_cycle);
+    fprintf(fp, "  fix_buff_size  : %d\n", cfg->fix_buff_size);
+
+    /* Process displacement */
+    fprintf(fp, "  ppn            : %d\n", cfg->ppn);
+    fprintf(fp, "  npl            : %d\n", cfg->npl);
+    fprintf(fp, "  tree_high      : %d\n", cfg->tree_high);
+
+    /* Computed */
+    fprintf(fp, "  nprocess       : %d\n", cfg->nprocess);
+
+    /* Communicator */
+    fprintf(fp, "  selectedComm   : %d\n", (int)cfg->selectedComm);
+
+    fprintf(fp, "}\n");
 }
 
 typedef struct my_mpi_comm
@@ -328,16 +377,6 @@ void comms_info(const MpiComms *communicators, FILE *fp=stdout) {
         MPI_Barrier(MPI_COMM_WORLD);
     }
 }
-
-#define N_COMM_KIND 6
-enum CommKind {
-    WORLD,
-    NODE,
-    CROSS_NODE,
-    TREE,
-    CROSS_TREE,
-    ROOT
-};
 
 struct comm_graph {
     const MpiComms *comms;

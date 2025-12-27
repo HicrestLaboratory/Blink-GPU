@@ -10,6 +10,9 @@ int main(int argc, char ** argv) {
     Config * config = (Config *)(malloc(sizeof(Config)));
     parse_args(argc, argv, config);
 
+    if (rank == 0) print_config(config);
+    MPI_Barrier(MPI_COMM_WORLD);
+
     MpiComms *communicators = (MpiComms*)malloc(sizeof(MpiComms));
     init_comms(config, communicators);
 
