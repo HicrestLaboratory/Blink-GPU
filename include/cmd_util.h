@@ -2,6 +2,7 @@
 #define TEST_UTILS_CUH
 
 #include "common.h"
+#include <functional>
 
 void read_line_parameters (int argc, char *argv[], int myrank,
                            int *flag_b, int *flag_l, int *flag_x,
@@ -239,8 +240,7 @@ static void print_comm_info(const char *label, const MyMpiComm *c)
            label, name, c->rank, c->size);
 }
 
-void comms_info(const MpiComms *communicators)
-{
+void comms_info(const MpiComms *communicators) {
     int world_rank = communicators->world.rank;
 
     /* Optional: make output readable by rank */
@@ -271,6 +271,200 @@ void comms_info(const MpiComms *communicators)
         MPI_Barrier(MPI_COMM_WORLD);
     }
 }
+
+#define N_COMM_KIND 5
+enum CommKind {
+    WORLD,
+    NODE,
+    CROSS_NODE,
+    TREE,
+    CROSS
+};
+
+struct comm_graph {
+    const MpiComms *comms;
+
+    int height;
+    int node_size;
+    int tree_size;
+    int leaf_count;
+    int nodes_pre_leaf;
+
+    MyMpiComm inccomm;
+    int *inclist, incsize;
+    std::function<bool(int,int,int)> incfunc;
+
+    void init(const MpiComms *communicators) {
+        comms = communicators;
+
+        height         = communicators->n_tree_comms;
+        node_size      = communicators->node_comm.size;
+        tree_size      = communicators->tree_comms[0].size;
+        leaf_count     = communicators->cross_comms[0].size;
+        nodes_pre_leaf = tree_size / node_size;
+
+        incsize = 0;
+        inclist = nullptr;
+        incfunc = [this](int n, int l, int p) {
+            return mywrank(n, l, p);
+        };
+    }
+
+    bool ininclist(int nodeid, int leafid, int processid) {
+        int compare_rank = graphcoo2wrank(nodeid, leafid, processid);
+        bool result = false;
+        for (int i=0; i<incsize; i++) {
+            if (inclist[i] == compare_rank) {
+                result = true;
+                break;
+            }
+        }
+        return(result);
+    }
+
+    void geninclist(CommKind kind, int level=0) {
+        if (kind == WORLD) {
+            inccomm = comms->world;
+        } else if (kind == NODE) {
+            inccomm = comms->node_comm;
+        } else if (kind == CROSS_NODE) {
+            inccomm = comms->cross_comm;
+        } else if (kind == TREE){
+            inccomm = comms->tree_comms[level];
+        } else if (kind == CROSS){
+            inccomm = comms->cross_comms[level];
+        }
+
+        incsize = inccomm.size;
+        inclist = (int*)malloc(sizeof(int)*inccomm.size);
+        MPI_Allgather(&(comms->world.rank), 1, MPI_INT, inclist, 1, MPI_INT, inccomm.comm);
+
+        incfunc = [this](int n, int l, int p) {
+            return ininclist(n, l, p);
+        };
+
+        int name_len = 0;
+        char name[MPI_MAX_OBJECT_NAME];
+        MPI_Comm_get_name(inccomm.comm, name, &name_len);
+        if (comms->world.rank == 0) fprintf(stdout, "Inclusion list updated with %s communicator\n", name);
+        MPI_Barrier(comms->world.comm);
+    }
+
+    void comms_binary_tree(FILE *fp, int box_w = 7)
+    {
+        if (height <= 0) {
+            fprintf(fp, "(empty tree)\n");
+            return;
+        }
+
+        int max_nodes = 1 << (height - 1);
+        int level_width = max_nodes * (box_w + 2);
+
+        for (int level = 0; level < height; level++) {
+
+            int nodes = 1 << level;
+            int spacing = level_width / nodes;
+
+            /* top of boxes */
+            for (int i = 0; i < nodes; i++) {
+                int pad = spacing - box_w;
+                for (int s = 0; s < pad / 2; s++) fprintf(fp, " ");
+                fprintf(fp, "*");
+                for (int s = 0; s < box_w - 2; s++) fprintf(fp, "-");
+                fprintf(fp, "*");
+                for (int s = 0; s < pad - pad / 2; s++) fprintf(fp, " ");
+            }
+            fprintf(fp, "\n");
+
+            /* middle of boxes (fillable area) */
+            for (int i = 0; i < nodes; i++) {
+                int pad = spacing - box_w;
+                for (int s = 0; s < pad / 2; s++) fprintf(fp, " ");
+                fprintf(fp, "|");
+                for (int s = 0; s < box_w - 2; s++) fprintf(fp, " ");
+                fprintf(fp, "|");
+                for (int s = 0; s < pad - pad / 2; s++) fprintf(fp, " ");
+            }
+            fprintf(fp, "\n");
+
+            /* bottom of boxes */
+            for (int i = 0; i < nodes; i++) {
+                int pad = spacing - box_w;
+                for (int s = 0; s < pad / 2; s++) fprintf(fp, " ");
+                fprintf(fp, "*");
+                for (int s = 0; s < box_w - 2; s++) fprintf(fp, "-");
+                fprintf(fp, "*");
+                for (int s = 0; s < pad - pad / 2; s++) fprintf(fp, " ");
+            }
+            fprintf(fp, "\n");
+
+            /* connectors to next level */
+            if (level < height - 1) {
+                for (int i = 0; i < nodes; i++) {
+                    int pad = spacing - box_w;
+                    for (int s = 0; s < pad / 2 + box_w / 2 - 1; s++)
+                        fprintf(fp, " ");
+                    fprintf(fp, "/ \\");
+                    for (int s = 0; s < pad - pad / 2 - box_w / 2; s++)
+                        fprintf(fp, " ");
+                }
+                fprintf(fp, "\n");
+            }
+        }
+        return;
+    }
+
+    int graphcoo2wrank(int nodeid, int leafid, int processid) {
+        return(leafid * tree_size + nodeid * node_size + processid);
+    }
+
+    bool mywrank(int nodeid, int leafid, int processid) {
+        int compare_rank = graphcoo2wrank(nodeid, leafid, processid);
+        return(compare_rank == comms->world.rank);
+    }
+
+    void print (FILE *fp) {
+
+        if (inclist != nullptr) {
+            int name_len = 0;
+            char name[MPI_MAX_OBJECT_NAME];
+            MPI_Comm_get_name(inccomm.comm, name, &name_len);
+            for (int i=0; i<5*node_size*leaf_count; i++) fprintf(fp, "="); fprintf(fp, "\n");
+            fprintf(stdout, "[%d] Current inclusion list was updated to %s communicator\n", comms->world.rank, name);
+            for (int i=0; i<5*node_size*leaf_count; i++) fprintf(fp, "="); fprintf(fp, "\n");
+        } else {
+            for (int i=0; i<5*node_size*leaf_count; i++) fprintf(fp, "="); fprintf(fp, "\n");
+            fprintf(stdout, "[%d] No inclusion list selected, incfunc = mywrank\n", comms->world.rank);
+            for (int i=0; i<5*node_size*leaf_count; i++) fprintf(fp, "="); fprintf(fp, "\n");
+        }
+
+        comms_binary_tree(fp, 3*node_size+4);
+
+        for (int k=0; k<nodes_pre_leaf; k++) {
+            for(int j=0; j<leaf_count; j++) {
+                fprintf(fp, "  *"); for (int i=0; i<node_size; i++) fprintf(fp, "---"); fprintf(fp, "*  ");
+            }
+            fprintf(fp, "\n");
+            for(int j=0; j<leaf_count; j++) {
+                fprintf(fp, "  |"); for (int i=0; i<node_size; i++) fprintf(fp, " _ "); fprintf(fp, "|  ");
+            }
+            fprintf(fp, "\n");
+            for(int j=0; j<leaf_count; j++) {
+                fprintf(fp, "  |");
+                for (int i=0; i<node_size; i++) {
+                    char toprint = (incfunc(k,j,i)) ? 'X' : ' ';
+                    fprintf(fp, "|%c|", toprint);
+                }
+                fprintf(fp, "|  ");
+            }
+            fprintf(fp, "\n");
+            for(int j=0; j<leaf_count; j++) {
+                fprintf(fp, "  *"); for (int i=0; i<node_size; i++) fprintf(fp, "---"); fprintf(fp, "*  ");
+            }
+            fprintf(fp, "\n");
+        }
+    }
+};
 
 #endif
 
