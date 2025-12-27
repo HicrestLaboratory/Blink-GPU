@@ -36,17 +36,24 @@ int main(int argc, char ** argv) {
 
     for (int i = 0; i < N_COMM_KIND; i++) {
         CommKind kind = static_cast<CommKind>(i);
-        graph.geninclist(kind);
+        for (int level=0; level<communicators->n_tree_comms; level++) {
+            graph.geninclist(kind, level);
 
-        if (rank == 0) {
-            fprintf(stdout, "--------------- CommKind %d ---------------\n", kind);
-            graph.print(stdout);
+            if (rank == 0) {
+                fprintf(stdout, "--------------- CommKind %d level %d ---------------\n", kind, level);
+                graph.print(stdout);
+            }
+            fflush(stdout);
+
+            if (kind != TREE && kind != CROSS_TREE && kind != ROOT) break;
         }
-        fflush(stdout);
     }
 
     bool test = check_node(communicators);
     if (rank == 0) fprintf(stdout, "Node check %s\n", (test) ? "true" : "false");
+
+    test = check_addr(communicators);
+    if (rank == 0) fprintf(stdout, "Addr check %s\n", (test) ? "true" : "false");
 
     MPI_Finalize();
 }
