@@ -177,8 +177,7 @@ int main(int argc, char *argv[])
 
     MPI_Allreduce(my_error, error, buff_cycle, MPI_INT, MPI_MAX, MPI_COMM_WORLD);
     MPI_Allreduce(rec.inner_elapsed_time, rec.elapsed_time, buff_cycle*loop_count, MPI_DOUBLE, MPI_MAX, MPI_COMM_WORLD);
-    for(int j=fix_buff_size; j<max_j; j++) {
-        // (j!=0) ? (N <<= 1) : (N = 1);
+    for(int j=0; j<rec.niter; j++){
         if (j!=0) rec.increase_N();
 
         SZTYPE num_B, int_num_GB;
@@ -195,9 +194,9 @@ int main(int argc, char *argv[])
         }
 
         double avg_time_per_transfer = 0.0;
-        for (int i=0; i<loop_count; i++) {
-            avg_time_per_transfer += rec.elapsed_time[(j-fix_buff_size)*loop_count+i];
-            if(rank == 0) printf("\tTransfer size (B): %10" PRIu64 ", Transfer Time (s): %15.9f, Bandwidth (GiB/s): %15.9f, Iteration %d\n", num_B, rec.elapsed_time[(j-fix_buff_size)*loop_count+i], num_GB/rec.elapsed_time[(j-fix_buff_size)*loop_count+i], i);
+        for (int i=0; i<rec.nrepetitions; i++) {
+            avg_time_per_transfer += rec.inner_elapsed_time[(j*rec.nrepetitions)+i];
+            if(rank == 0) printf("\tTransfer size (B): %10" PRIu64 ", Transfer Time (s): %15.9f, Bandwidth (GiB/s): %15.9f, Iteration %d\n", num_B, rec.inner_elapsed_time[(j*rec.nrepetitions)+i], num_GB/rec.inner_elapsed_time[(j*rec.nrepetitions)+i], i);
         }
         avg_time_per_transfer /= ((double)loop_count);
 
