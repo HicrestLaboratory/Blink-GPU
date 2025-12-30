@@ -38,6 +38,12 @@ const int num_colors = sizeof(colors)/sizeof(uint32_t);
 #define POP_RANGE
 #endif
 
+
+#define BUFF_CYCLE 28
+#define LOOP_COUNT 50
+
+#define WARM_UP 5
+
 void alloc_host_buffers(int rank,
                         dtype **sendBuffer, SZTYPE sendBufferLen,
                         dtype **recvBuffer, SZTYPE recvBufferLen) {

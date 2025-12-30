@@ -91,6 +91,7 @@ typedef struct config
     int loop_count;
     int buff_cycle;
     int fix_buff_size;
+    int max_buff_size;
 
     // Process displacement
     int ppn;
@@ -109,8 +110,8 @@ void parse_args(int argc, char ** argv, Config * config)
 {
     config->verbose       = 0;
 
-    config->loop_count    = 0;
-    config->buff_cycle    = 0;
+    config->loop_count    = LOOP_COUNT;
+    config->buff_cycle    = BUFF_CYCLE;
     config->fix_buff_size = 0;
 
     config->tree_high = 0;
@@ -118,6 +119,10 @@ void parse_args(int argc, char ** argv, Config * config)
     config->ppn       = 1;
 
     config->selectedComm = WORLD;
+
+    int flag_loop  = 0;
+    int flag_buff  = 0;
+    int flag_xbuff = 0;
 
     int inc = 2;
     for (int i=1; i<argc; i+=inc)
@@ -128,14 +133,17 @@ void parse_args(int argc, char ** argv, Config * config)
         if (!strcmp(argname, "--loop-count"))
         {
             config->loop_count = atoi(argv[i+1]);
+            flag_loop = 1;
         }
         else if (!strcmp(argname, "--fix-buff"))
         {
             config->fix_buff_size = atoi(argv[i+1]);
+            flag_xbuff = 1;
         }
         else if (!strcmp(argname, "--buff-cycle"))
         {
             config->buff_cycle = atoi(argv[i+1]);
+            flag_buff = 1;
         }
         else if (!strcmp(argname, "--verbose"))
         {
@@ -159,13 +167,17 @@ void parse_args(int argc, char ** argv, Config * config)
         }
     }
 
-    if (config->loop_count == 0) {
-        fprintf(stdout, "Error: parameeter --loop-count must be set grather than 0\n");
+    if (flag_buff && flag_xbuff) {
+        fprintf(stdout, "Error: just one parameeter between --buff-cycle and --fix-buff must be set\n");
         exit(__LINE__);
     }
-    if (config->buff_cycle == 0) {
-        fprintf(stdout, "Error: parameeter --buff-cycle must be set grather than 0\n");
-        exit(__LINE__);
+
+
+    config->max_buff_size = (flag_xbuff == 0) ? (config->buff_cycle) : (config->fix_buff_size + 1) ;
+    if (flag_xbuff) {
+        fprintf(stdout, "fix_buff_size is set as %d, loop_count is %d\n", config->fix_buff_size, config->loop_count);
+    } else {
+        fprintf(stdout, "buff_cycle is set as %d, loop_count is %d\n", config->buff_cycle, config->loop_count);
     }
 
     config->nprocess = (config->ppn) * (config->npl) * (1<<(config->tree_high-1));
