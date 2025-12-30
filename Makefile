@@ -61,6 +61,8 @@ pp:  $(PP_TARGETS_LIST)
 a2a: $(A2A_TARGETS_LIST)
 ar:  $(AR_TARGETS_LIST)
 
+refactored: $(BINFOLDER)/a2a_refactored_Baseline $(BINFOLDER)/refactorTest
+
 # ------------------ Libs & Flags ------------------
 MPI=-L$(BLINKGPU_MPI_HOME)/lib -I$(BLINKGPU_MPI_HOME)/include -lmpi
 MPICUDA=-L$(BLINKGPU_MPICUDA_HOME)/lib -I$(BLINKGPU_MPICUDA_HOME)/include -lmpi
