@@ -88,19 +88,16 @@ int main(int argc, char *argv[])
 
      /* -------------------------------------------------------------------------------------------
         Loop from 8 B to 1 GB
-    --------------------------------------------------------------------------------------------*/
+    -------------------------------------------------------------------------------------------- */
 
     RecordsStruct rec;
-    rec.init_with_config(config);
+    rec.init(config);
 
-    double start_time, stop_time;
     int *error = (int*)malloc(sizeof(int)*buff_cycle);
     int *my_error = (int*)malloc(sizeof(int)*buff_cycle);
     cktype *cpu_checks = (cktype*)malloc(sizeof(cktype)*buff_cycle);
     cktype *gpu_checks = (cktype*)malloc(sizeof(cktype)*buff_cycle);
-    double *elapsed_time = (double*)malloc(sizeof(double)*buff_cycle*loop_count);
-    double *inner_elapsed_time = (double*)malloc(sizeof(double)*buff_cycle*loop_count);
-    for(int j=fix_buff_size; j<max_j; j++){
+    for(int j=0; j<rec.niter; j++){
 
         if (j!=0) rec.increase_N();
         rec.update_large_count(rank);
@@ -133,10 +130,11 @@ int main(int argc, char *argv[])
 
         */
 
+        rec.print_iter_info(rank);
         if (rank == 0) {printf("%i#", j); fflush(stdout);}
-        for(int i=1-(WARM_UP); i<=loop_count; i++){
+        for(int i=1-(WARM_UP); i<=rec.nrepetitions; i++){
             MPI_Barrier(MPI_COMM_WORLD);
-            start_time = MPI_Wtime();
+            rec.record_time_start(i);
 
             cudaErrorCheck( cudaMemcpy(A, d_A, size*(rec.N)*sizeof(dtype), cudaMemcpyDeviceToHost) );
             if(rec.large_count){
@@ -146,13 +144,13 @@ int main(int argc, char *argv[])
             }
             cudaErrorCheck( cudaMemcpy(d_B, B, size*(rec.N)*sizeof(dtype), cudaMemcpyHostToDevice) );
 
-            stop_time = MPI_Wtime();
-            if (i>0) inner_elapsed_time[(j-fix_buff_size)*loop_count+i-1] = stop_time - start_time;
-
+            rec.record_time_stop(j, i);
             if (rank == 0) {printf("%%"); fflush(stdout);}
         }
-        if (rank == 0) {printf("#\n"); fflush(stdout);}
+        if (rank == 0) printf("#\n"); fflush(stdout);
+        MPI_Barrier(MPI_COMM_WORLD);
 
+        // TODO reintegrate
         gpu_device_reduce(d_B, size*(rec.N), &gpu_check);
         MPI_Alltoall(my_cpu_check, 1, MPI_cktype, recv_cpu_check, 1, MPI_cktype, MPI_COMM_WORLD);
 
@@ -175,10 +173,10 @@ int main(int argc, char *argv[])
 #endif
     }
 
-    rec.init_with_config(config);
+    rec.init_iter_var(config);
 
     MPI_Allreduce(my_error, error, buff_cycle, MPI_INT, MPI_MAX, MPI_COMM_WORLD);
-    MPI_Allreduce(inner_elapsed_time, elapsed_time, buff_cycle*loop_count, MPI_DOUBLE, MPI_MAX, MPI_COMM_WORLD);
+    MPI_Allreduce(rec.inner_elapsed_time, rec.elapsed_time, buff_cycle*loop_count, MPI_DOUBLE, MPI_MAX, MPI_COMM_WORLD);
     for(int j=fix_buff_size; j<max_j; j++) {
         // (j!=0) ? (N <<= 1) : (N = 1);
         if (j!=0) rec.increase_N();
@@ -198,8 +196,8 @@ int main(int argc, char *argv[])
 
         double avg_time_per_transfer = 0.0;
         for (int i=0; i<loop_count; i++) {
-            avg_time_per_transfer += elapsed_time[(j-fix_buff_size)*loop_count+i];
-            if(rank == 0) printf("\tTransfer size (B): %10" PRIu64 ", Transfer Time (s): %15.9f, Bandwidth (GiB/s): %15.9f, Iteration %d\n", num_B, elapsed_time[(j-fix_buff_size)*loop_count+i], num_GB/elapsed_time[(j-fix_buff_size)*loop_count+i], i);
+            avg_time_per_transfer += rec.elapsed_time[(j-fix_buff_size)*loop_count+i];
+            if(rank == 0) printf("\tTransfer size (B): %10" PRIu64 ", Transfer Time (s): %15.9f, Bandwidth (GiB/s): %15.9f, Iteration %d\n", num_B, rec.elapsed_time[(j-fix_buff_size)*loop_count+i], num_GB/rec.elapsed_time[(j-fix_buff_size)*loop_count+i], i);
         }
         avg_time_per_transfer /= ((double)loop_count);
 
@@ -228,8 +226,7 @@ int main(int argc, char *argv[])
     free(my_error);
     free(cpu_checks);
     free(gpu_checks);
-    free(elapsed_time);
-    free(inner_elapsed_time);
+    rec.free_timers();
     MPI_Finalize();
     return(0);
 }
