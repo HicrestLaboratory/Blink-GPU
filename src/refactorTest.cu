@@ -1,4 +1,5 @@
 #include "../include/cmd_util.h"
+#include "../include/communicators.h"
 
 int main(int argc, char ** argv) {
 
