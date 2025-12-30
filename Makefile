@@ -35,6 +35,7 @@ COMM_STRATEGY = Baseline CudaAware Nccl # Nvlink Nvlink temporary disable (to ma
 
 BINFOLDER = bin
 DIRS = $(BINFOLDER) out sout
+CFLAGS = -DSKIPCPUAFFINITY -arch=sm_80
 
 # This is expanding ALL_TARGETS = {COMM_PATTERN} x {COMM_STRATEGY}
 #  i.e. ALL_TARGETS = $(BINFOLDER)/pp_Baseline $(BINFOLDER)/pp_CudaAware ... $(BINFOLDER)/pp_Baseline ...
