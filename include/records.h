@@ -10,7 +10,6 @@ struct RecordsStruct {
     SZTYPE N; // This rapresent a loop variable for the current buffer size
     int niter;
     int nrepetitions;
-    size_t large_count;
 
     // ---------- For timers ----------
     double  stop_time;
@@ -39,26 +38,6 @@ struct RecordsStruct {
 
     void increase_N(void) {
         N <<= 1;
-    }
-
-    void update_large_count(int rank) {
-        large_count = 0;
-        if(N >= 8 && N % 8 == 0){ // Check if I can use 64-bit data types
-            large_count = N / 8;
-            if (large_count >= ((u_int64_t) (1UL << 32)) - 1) { // If large_count can't be represented on 32 bits
-                if(rank == 0){
-                    printf("\tTransfer size (B): -1, Transfer Time (s): -1, Bandwidth (GiB/s): -1, Iteration -1\n");
-                }
-                MPI_Abort(MPI_COMM_WORLD, -1);
-            }
-        }else{
-            if (N >= ((u_int64_t) (1UL << 32)) - 1) { // If N can't be represented on 32 bits
-                if(rank == 0){
-                    printf("\tTransfer size (B): -1, Transfer Time (s): -1, Bandwidth (GiB/s): -1, Iteration -1\n");
-                }
-                MPI_Abort(MPI_COMM_WORLD, -1);
-            }
-        }
     }
 
     void print_iter_info(int rank, FILE *fp = stdout) {

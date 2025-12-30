@@ -15,6 +15,7 @@
 #include "../include/cmd_util.h"
 #include "../include/prints.h"
 #include "../include/records.h"
+#include "../include/communication_buffers.h"
 
 #ifdef MPIX_CUDA_AWARE_SUPPORT
 /* Needed for MPIX_Query_cuda_support(), below */
@@ -67,6 +68,8 @@ int main(int argc, char *argv[])
     if(rank == 0) compiletime_runtime_checks(stdout); fflush(stdout);
     MPI_Barrier(MPI_COMM_WORLD);
 
+    MPI_Type_set_name(MPI_dtype,     "MPI_dtype");
+    MPI_Type_set_name(MPI_dtype_big, "MPI_dtype_big");
 
     /* -------------------------------------------------------------------------------------------
         Reading command line inputs
@@ -90,6 +93,8 @@ int main(int argc, char *argv[])
         Loop from 8 B to 1 GB
     -------------------------------------------------------------------------------------------- */
 
+    CommunicationBuffers<dtype> buffs;
+
     RecordsStruct rec;
     rec.init(config);
 
@@ -100,11 +105,8 @@ int main(int argc, char *argv[])
     for(int j=0; j<rec.niter; j++){
 
         if (j!=0) rec.increase_N();
-        rec.update_large_count(rank);
     
-        // Allocate memory for A on CPU
-        dtype *A, *B;
-        alloc_host_buffers(rank, &A, size*(rec.N), &B, size*(rec.N));
+        buffs.init(ALL2ALL, rec.N, MPI_COMM_WORLD);
 
         cktype *my_cpu_check = (cktype*)malloc(sizeof(cktype)*size);
         cktype *recv_cpu_check = (cktype*)malloc(sizeof(cktype)*size), gpu_check = 0;
@@ -113,15 +115,12 @@ int main(int argc, char *argv[])
 
         // Initialize all elements of A to 0.0
         for(SZTYPE i=0; i<(rec.N)*size; i++) {
-            A[i] = 1U * (rank+1);
-            B[i] = 0U;
+            ((dtype*)buffs.sBuff.host)[i] = 1U * (rank+1);
+            ((dtype*)buffs.rBuff.host)[i] = 0U;
         }
 
-        dtype *d_A, *d_B;
-        alloc_device_buffers(A, &d_A, size*(rec.N), B, &d_B, size*(rec.N));
-
         for (int i=0; i<size; i++)
-            gpu_device_reduce(d_A + (i*(rec.N))*sizeof(dtype), (rec.N), &my_cpu_check[i]);
+            gpu_device_reduce(((dtype*)buffs.sBuff.device) + (i*(rec.N))*sizeof(dtype), (rec.N), &my_cpu_check[i]);
 
 
         /*
@@ -136,13 +135,11 @@ int main(int argc, char *argv[])
             MPI_Barrier(MPI_COMM_WORLD);
             rec.record_time_start(i);
 
-            cudaErrorCheck( cudaMemcpy(A, d_A, size*(rec.N)*sizeof(dtype), cudaMemcpyDeviceToHost) );
-            if(rec.large_count){
-                MPI_Alltoall(A, rec.large_count, MPI_dtype_big, B, rec.large_count, MPI_dtype_big, MPI_COMM_WORLD);
-            }else{
-                MPI_Alltoall(A, rec.N, MPI_dtype, B, rec.N, MPI_dtype, MPI_COMM_WORLD);
-            }
-            cudaErrorCheck( cudaMemcpy(d_B, B, size*(rec.N)*sizeof(dtype), cudaMemcpyHostToDevice) );
+
+            cudaErrorCheck( cudaMemcpy(buffs.sBuff.host, buffs.sBuff.device, buffs.sBuff.bytes, cudaMemcpyDeviceToHost) );
+            MPI_Alltoall(buffs.sBuff.host, buffs.sMpicount, buffs.sMpiDtype, buffs.rBuff.host, buffs.rMpicount, buffs.rMpiDtype, MPI_COMM_WORLD);
+            cudaErrorCheck( cudaMemcpy(buffs.rBuff.device, buffs.rBuff.host, buffs.rBuff.bytes, cudaMemcpyHostToDevice) );
+
 
             rec.record_time_stop(j, i);
             if (rank == 0) {printf("%%"); fflush(stdout);}
@@ -151,7 +148,7 @@ int main(int argc, char *argv[])
         MPI_Barrier(MPI_COMM_WORLD);
 
         // TODO reintegrate
-        gpu_device_reduce(d_B, size*(rec.N), &gpu_check);
+        gpu_device_reduce((dtype*)buffs.rBuff.device, size*(rec.N), &gpu_check);
         MPI_Alltoall(my_cpu_check, 1, MPI_cktype, recv_cpu_check, 1, MPI_cktype, MPI_COMM_WORLD);
 
         cpu_checks[j] = 0;
@@ -160,17 +157,9 @@ int main(int argc, char *argv[])
             cpu_checks[j] += recv_cpu_check[i];
         my_error[j] = abs(gpu_checks[j] - cpu_checks[j]);
 
-        cudaErrorCheck( cudaFree(d_A) );
-        cudaErrorCheck( cudaFree(d_B) );
+        buffs.clear(rank);
         free(recv_cpu_check);
         free(my_cpu_check);
-#ifdef PINNED
-        cudaFreeHost(A);
-        cudaFreeHost(B);
-#else
-        free(A);
-        free(B);
-#endif
     }
 
     rec.init_iter_var(config);
