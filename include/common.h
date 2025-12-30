@@ -120,3 +120,25 @@ void compute_global_checks(int mpi_size, cktype *all_checks,
         if (tmp < all_checks[i]) tmp = all_checks[i];
     *check_on_send = tmp;
 }
+
+void compiletime_runtime_checks(FILE *fp = stdout) {
+    fprintf(fp, "Compile time check:\n");
+#if defined(MPIX_CUDA_AWARE_SUPPORT) && MPIX_CUDA_AWARE_SUPPORT
+    fprintf(fp, "This MPI library has CUDA-aware support.\n", MPIX_CUDA_AWARE_SUPPORT);
+#elif defined(MPIX_CUDA_AWARE_SUPPORT) && !MPIX_CUDA_AWARE_SUPPORT
+    fprintf(fp, "This MPI library does not have CUDA-aware support.\n");
+#else
+    fprintf(fp, "This MPI library cannot determine if there is CUDA-aware support.\n");
+#endif /* MPIX_CUDA_AWARE_SUPPORT */
+
+    fprintf(fp, "Run time check:\n");
+#if defined(MPIX_CUDA_AWARE_SUPPORT)
+    if (1 == MPIX_Query_cuda_support()) {
+        fprintf(fp, "This MPI library has CUDA-aware support.\n");
+    } else {
+        fprintf(fp, "This MPI library does not have CUDA-aware support.\n");
+    }
+#else /* !defined(MPIX_CUDA_AWARE_SUPPORT) */
+    fprintf(fp, "This MPI library cannot determine if there is CUDA-aware support.\n");
+#endif /* MPIX_CUDA_AWARE_SUPPORT */
+}
