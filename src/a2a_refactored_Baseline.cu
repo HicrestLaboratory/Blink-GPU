@@ -143,27 +143,16 @@ int main(int argc, char *argv[])
     for(int j=0; j<rec.niter; j++){
         if (j!=0) rec.increase_N();
 
-        SZTYPE num_B, int_num_GB;
-        double num_GB;
-
-        num_B = sizeof(dtype)*(rec.N)*(size-1);
-        // TODO: maybe we can avoid if and just divide always by B_in_GB
-        if (j < 31) {
-            SZTYPE B_in_GB = 1 << 30;
-            num_GB = (double)num_B / (double)B_in_GB;
-        } else {
-            SZTYPE M = 1 << (j - 30);            
-            num_GB = sizeof(dtype)*M*(size-1);
-        }
+        rec.compute_numB(ALL2ALL, size);
 
         double avg_time_per_transfer = 0.0;
         for (int i=0; i<rec.nrepetitions; i++) {
             avg_time_per_transfer += rec.inner_elapsed_time[(j*rec.nrepetitions)+i];
-            if(rank == 0) printf("\tTransfer size (B): %10" PRIu64 ", Transfer Time (s): %15.9f, Bandwidth (GiB/s): %15.9f, Iteration %d\n", num_B, rec.inner_elapsed_time[(j*rec.nrepetitions)+i], num_GB/rec.inner_elapsed_time[(j*rec.nrepetitions)+i], i);
+            if(rank == 0) printf("\tTransfer size (B): %10" PRIu64 ", Transfer Time (s): %15.9f, Bandwidth (GiB/s): %15.9f, Iteration %d\n", rec.num_B, rec.inner_elapsed_time[(j*rec.nrepetitions)+i], rec.num_GB/rec.inner_elapsed_time[(j*rec.nrepetitions)+i], i);
         }
         avg_time_per_transfer /= ((double)loop_count);
 
-        if(rank == 0) printf("[Average] Transfer size (B): %10" PRIu64 ", Transfer Time (s): %15.9f, Bandwidth (GiB/s): %15.9f, Error: %d\n", num_B, avg_time_per_transfer, num_GB/avg_time_per_transfer, (rec.check_results[j]) ? 0 : 1 );
+        if(rank == 0) printf("[Average] Transfer size (B): %10" PRIu64 ", Transfer Time (s): %15.9f, Bandwidth (GiB/s): %15.9f, Error: %d\n", rec.num_B, avg_time_per_transfer, rec.num_GB/avg_time_per_transfer, (rec.check_results[j]) ? 0 : 1 );
         fflush(stdout);
     }
 

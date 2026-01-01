@@ -23,6 +23,10 @@ struct RecordsStruct {
     cktype *recvSideChecks;
     CommunicatioType  type;
 
+    // ---------- For statistics ----------
+    SZTYPE num_B;
+    double num_GB;
+
     // ---------- For buffers ----------
     void init_iter_var(Config *config) {
         if (config->fix_buff_size != 0) {
@@ -103,6 +107,47 @@ struct RecordsStruct {
     void free_correctness(void) {
         free(sendSideChecks);
         free(recvSideChecks);
+    }
+
+    // ---------- For statistics ----------
+    void compute_numB (CommunicatioType type, int size) {
+        switch (type) {
+            case ALL2ALL:
+                num_B = sizeof(dtype)*(N)*(size-1);
+                break;
+
+            case ALLREDUCE:
+                num_B = sizeof(dtype)*N*((size-1)/(float)size)*2;
+                break;
+
+            case ALLGATHER:
+                num_B = UINT64_MAX; // NOTE: Place-holder
+                break;
+
+            case SCATTER:
+                num_B = sizeof(dtype)*N*(size-1); // NOTE: To Check
+                break;
+
+            case GATHER:
+                num_B = UINT64_MAX; // NOTE: Place-holder
+                break;
+
+            case SENDRECV:
+                num_B = sizeof(dtype)*N;
+                break;
+
+            case BCAST:
+                num_B = sizeof(dtype)*N*(size-1); // NOTE: To Check
+                break;
+
+            default:
+                num_B = UINT64_MAX;
+                break;
+        }
+
+        SZTYPE B_in_GB = 1 << 30;
+        num_GB = (double)num_B / (double)B_in_GB;
+        // fprintf(stdout, "num_B: %lu, num_GB: %lu\n", num_B, num_GB);
     }
 
     // ---------- Overall ----------
