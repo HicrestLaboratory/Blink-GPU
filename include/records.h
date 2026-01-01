@@ -17,6 +17,12 @@ struct RecordsStruct {
     double *elapsed_time;
     double *inner_elapsed_time;
 
+    // ---------- For correctness ----------
+    bool    *check_results;
+    cktype *sendSideChecks;
+    cktype *recvSideChecks;
+    CommunicatioType  type;
+
     // ---------- For buffers ----------
     void init_iter_var(Config *config) {
         if (config->fix_buff_size != 0) {
@@ -50,7 +56,7 @@ struct RecordsStruct {
 
 
     // ---------- For timers ----------
-    void init_timers(Config *config) {
+    void init_timers(void) {
         elapsed_time       = (double*)malloc(sizeof(double)*niter*nrepetitions);
         inner_elapsed_time = (double*)malloc(sizeof(double)*niter*nrepetitions);
     }
@@ -64,16 +70,46 @@ struct RecordsStruct {
         if (current_repetition>0) inner_elapsed_time[(current_iter*nrepetitions)+(current_repetition-1)] = stop_time - start_time;
     }
 
+    void time_maxreduce (MPI_Comm comm) {
+        MPI_Allreduce(inner_elapsed_time, elapsed_time, niter*nrepetitions, MPI_DOUBLE, MPI_MAX, comm);
+    }
+
     void free_timers(void) {
         free(elapsed_time);
         free(inner_elapsed_time);
     }
 
+    // ---------- For correctness ----------
+    void init_correctness(CommunicatioType t) {
+        type = t;
+        sendSideChecks = (cktype*)malloc(sizeof(cktype)*niter);
+        recvSideChecks = (cktype*)malloc(sizeof(cktype)*niter);
+        check_results  = (bool*)  malloc(sizeof(cktype)*niter);
+    }
+
+    bool correctness_check(MPI_Comm comm) {
+        MPI_Allreduce(MPI_IN_PLACE, sendSideChecks, niter, MPI_cktype, MPI_SUM, comm);
+        if ((type != ALLGATHER) && (type != ALLREDUCE) && (type != BCAST))
+            MPI_Allreduce(MPI_IN_PLACE, recvSideChecks, niter, MPI_cktype, MPI_SUM, comm);
+
+        bool overall_check = true;
+        for (int i=0; i<niter; i++) {
+            check_results[i] = (sendSideChecks[i] == recvSideChecks[i]);
+            overall_check   &= check_results[i];
+        }
+        return(overall_check);
+    }
+
+    void free_correctness(void) {
+        free(sendSideChecks);
+        free(recvSideChecks);
+    }
 
     // ---------- Overall ----------
-    void init(Config *config) {
+    void init(Config *config, CommunicatioType t) {
         init_iter_var(config);
-        init_timers(config);
+        init_correctness(t);
+        init_timers();
     }
 
 };

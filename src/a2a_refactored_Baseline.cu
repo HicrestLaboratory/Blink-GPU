@@ -96,32 +96,16 @@ int main(int argc, char *argv[])
     CommunicationBuffers<dtype> buffs;
 
     RecordsStruct rec;
-    rec.init(config);
+    rec.init(config, ALL2ALL);
 
-    int *error = (int*)malloc(sizeof(int)*buff_cycle);
-    int *my_error = (int*)malloc(sizeof(int)*buff_cycle);
-    cktype *cpu_checks = (cktype*)malloc(sizeof(cktype)*buff_cycle);
-    cktype *gpu_checks = (cktype*)malloc(sizeof(cktype)*buff_cycle);
     for(int j=0; j<rec.niter; j++){
 
         if (j!=0) rec.increase_N();
     
-        buffs.init(ALL2ALL, rec.N, MPI_COMM_WORLD);
+        buffs.init(ALL2ALL, rec.N, MPI_COMM_WORLD, RANDOM_INT8);
+        if (j<5) buffs.print('s', rank, stdout);
 
-        cktype *my_cpu_check = (cktype*)malloc(sizeof(cktype)*size);
-        cktype *recv_cpu_check = (cktype*)malloc(sizeof(cktype)*size), gpu_check = 0;
-        for (int i=0; i<size; i++)
-            my_cpu_check[i] = 0U;
-
-        // Initialize all elements of A to 0.0
-        for(SZTYPE i=0; i<(rec.N)*size; i++) {
-            ((dtype*)buffs.sBuff.host)[i] = 1U * (rank+1);
-            ((dtype*)buffs.rBuff.host)[i] = 0U;
-        }
-
-        for (int i=0; i<size; i++)
-            gpu_device_reduce(((dtype*)buffs.sBuff.device) + (i*(rec.N))*sizeof(dtype), (rec.N), &my_cpu_check[i]);
-
+        buffs.sendBuff_reduction(&(rec.sendSideChecks[j]));
 
         /*
 
@@ -147,24 +131,15 @@ int main(int argc, char *argv[])
         if (rank == 0) printf("#\n"); fflush(stdout);
         MPI_Barrier(MPI_COMM_WORLD);
 
-        gpu_device_reduce((dtype*)buffs.rBuff.device, size*(rec.N), &gpu_check);
-        MPI_Alltoall(my_cpu_check, 1, MPI_cktype, recv_cpu_check, 1, MPI_cktype, MPI_COMM_WORLD);
-
-        cpu_checks[j] = 0;
-        gpu_checks[j] = gpu_check;
-        for (int i=0; i<size; i++)
-            cpu_checks[j] += recv_cpu_check[i];
-        my_error[j] = abs(gpu_checks[j] - cpu_checks[j]);
+        buffs.recvBuff_reduction(&(rec.recvSideChecks[j]));
 
         buffs.clear(rank);
-        free(recv_cpu_check);
-        free(my_cpu_check);
     }
 
-    rec.init_iter_var(config);
+    rec.time_maxreduce(MPI_COMM_WORLD);
+    rec.correctness_check(MPI_COMM_WORLD);
 
-    MPI_Allreduce(my_error, error, buff_cycle, MPI_INT, MPI_MAX, MPI_COMM_WORLD);
-    MPI_Allreduce(rec.inner_elapsed_time, rec.elapsed_time, buff_cycle*loop_count, MPI_DOUBLE, MPI_MAX, MPI_COMM_WORLD);
+    rec.init_iter_var(config);
     for(int j=0; j<rec.niter; j++){
         if (j!=0) rec.increase_N();
 
@@ -188,32 +163,40 @@ int main(int argc, char *argv[])
         }
         avg_time_per_transfer /= ((double)loop_count);
 
-        if(rank == 0) printf("[Average] Transfer size (B): %10" PRIu64 ", Transfer Time (s): %15.9f, Bandwidth (GiB/s): %15.9f, Error: %d\n", num_B, avg_time_per_transfer, num_GB/avg_time_per_transfer, error[j] );
+        if(rank == 0) printf("[Average] Transfer size (B): %10" PRIu64 ", Transfer Time (s): %15.9f, Bandwidth (GiB/s): %15.9f, Error: %d\n", num_B, avg_time_per_transfer, num_GB/avg_time_per_transfer, (rec.check_results[j]) ? 0 : 1 );
         fflush(stdout);
     }
 
+    fflush(stdout);
+    MPI_Barrier(MPI_COMM_WORLD);
+
     char *s = (char*)malloc(sizeof(char)*(20*buff_cycle + 100));
-    sprintf(s, "[%d] recv_cpu_check = %u", rank, cpu_checks[0]);
-    for (int i=fix_buff_size; i<max_j; i++) {
-        sprintf(s+strlen(s), " %10d", cpu_checks[i]);
+    sprintf(s, "[%d] %15s = ", rank, "sendSideChecks");
+    for (int i=0; i<rec.niter; i++) {
+        sprintf(s+strlen(s), " %5d", rec.sendSideChecks[i]);
     }
     sprintf(s+strlen(s), " (for Error)\n");
     printf("%s", s);
     fflush(stdout);
 
-    sprintf(s, "[%d] gpu_checks = %u", rank, gpu_checks[0]);
-    for (int i=fix_buff_size; i<max_j; i++) {
-        sprintf(s+strlen(s), " %10d", gpu_checks[i]);
+    sprintf(s, "[%d] %15s = ", rank, "recvSideChecks");
+    for (int i=0; i<rec.niter; i++) {
+        sprintf(s+strlen(s), " %5d", rec.recvSideChecks[i]);
     }
     sprintf(s+strlen(s), " (for Error)\n");
     printf("%s", s);
     fflush(stdout);
 
-    free(error);
-    free(my_error);
-    free(cpu_checks);
-    free(gpu_checks);
+    sprintf(s, "[%d] %15s = ", rank, "check_results");
+    for (int i=0; i<rec.niter; i++) {
+        sprintf(s+strlen(s), " %5d", rec.check_results[i]);
+    }
+    sprintf(s+strlen(s), " (for Error)\n");
+    printf("%s", s);
+    fflush(stdout);
+
     rec.free_timers();
+    rec.free_correctness();
     MPI_Finalize();
     return(0);
 }

@@ -3,6 +3,14 @@
 #include "common.h"
 #include "type.h"
 
+typedef enum {
+    RANDOM_UINT8,
+    RANDOM_INT8,
+    SIGNEDRANK,
+    CONST,
+    RANK
+} InitStrategy;
+
 struct BufferHolder {
     void   *host;
     SZTYPE  bytes;
@@ -26,16 +34,51 @@ struct BufferHolder {
         cudaErrorCheck( cudaMemcpy( device, host, bytes, cudaMemcpyHostToDevice) );
     }
 
-    bool alloc(SZTYPE bufferByteLen) {
+    void init_host_buff (InitStrategy str, int rank) {
+        switch (str) {
+            case RANDOM_UINT8:
+                for(SZTYPE i=0; i<(bytes/sizeof(u_int8_t)); i++)
+                    ((u_int8_t*)host)[i] = rand() % (UINT8_MAX/2);
+                break;
+
+            case RANDOM_INT8:
+                for(SZTYPE i=0; i<(bytes/sizeof(int8_t)); i++)
+                    ((int8_t*)host)[i] = (rand() % 17) - 8;
+                    // ((int8_t*)host)[i] = (rand() % INT8_MAX) - (INT8_MAX/2);
+                break;
+
+            case SIGNEDRANK:
+                for(SZTYPE i=0; i<(bytes/sizeof(int8_t)); i++)
+                    ((int8_t*)host)[i] = ((rank%2)!=0) ? (-1 * (rank+1)) : (rank+1) ;
+                break;
+
+            case RANK:
+                for(SZTYPE i=0; i<(bytes/sizeof(dtype)); i++)
+                    ((dtype*)host)[i] = 1U * (rank+1);
+                break;
+
+            case CONST:
+                for(SZTYPE i=0; i<(bytes/sizeof(dtype)); i++) ((dtype*)host)[i] = 0;
+                break;
+
+            default:
+                for(SZTYPE i=0; i<(bytes/sizeof(dtype)); i++) ((dtype*)host)[i] = 0;
+                break;
+        }
+    }
+
+    bool alloc(SZTYPE bufferByteLen, int rank, InitStrategy str = RANK) {
         if (allocated) {
-            fprintf(stderr, "Error: set_size on already allocated buff\n");
+            fprintf(stderr, "[%d] Error: set_size on already allocated buff\n", rank);
             return(false);
         }
 
+        srand((unsigned int)time(NULL) + rank);
         bytes = bufferByteLen;
 
         bool errflag = alloc_host();
         if (!errflag) return(errflag);
+        init_host_buff (str, rank);
         alloc_device_buffers();
         allocated = true;
         return(true);
@@ -63,16 +106,6 @@ struct BufferHolder {
 };
 
 
-
-typedef enum {
-    ALL2ALL,
-    ALLREDUCE,
-    ALLGATHER,
-    SCATTER,
-    GATHER,
-    BCAST,
-    SENDRECV
-} CommunicatioType;
 
 bool tmp_function(size_t bytes, int *mpicount, MPI_Datatype *mpitype) {
     (*mpicount) = 0;
@@ -102,7 +135,7 @@ struct CommunicationBuffers {
     int sMpicount, rMpicount;
     MPI_Datatype sMpiDtype, rMpiDtype;
 
-    void init(CommunicatioType type, int msgcount, MPI_Comm comm, int root = 0) {
+    void init(CommunicatioType type, int msgcount, MPI_Comm comm, InitStrategy str = RANK, int root = 0) {
 
         int rank, commsize;
         MPI_Comm_rank(comm, &rank);
@@ -153,13 +186,13 @@ struct CommunicationBuffers {
         tmp_function(msgcount, &sMpicount, &sMpiDtype);
         tmp_function(msgcount, &rMpicount, &rMpiDtype);
 
-        bool errorflagsend = sBuff.alloc(sBuffBytes);
+        bool errorflagsend = sBuff.alloc(sBuffBytes, rank, str);
         if (!errorflagsend) {
             fprintf(stderr, "[%d] Error while allocating buffers at line %d (%lu Bytes requested)\n", rank, __LINE__, sBuff.bytes);
             fflush(stderr);
         }
 
-        bool errorflagrecv = rBuff.alloc(rBuffBytes);
+        bool errorflagrecv = rBuff.alloc(rBuffBytes, rank, CONST);
         if (!errorflagrecv) {
             fprintf(stderr, "[%d] Error while allocating buffers at line %d (%lu Bytes requested)\n", rank, __LINE__, rBuff.bytes);
             fflush(stderr);
@@ -172,6 +205,39 @@ struct CommunicationBuffers {
         if (rank == 0) printf("Buffers of size %" PRIu64 " B and %" PRIu64 " B succesfuly allocated by all ranks\n", sBuff.bytes, rBuff.bytes);
         fflush(stdout);
         MPI_Barrier(MPI_COMM_WORLD);
+    }
+
+    void print(char bchar, int rank, FILE *fp = stdout) {
+        if ((bchar != 's') && (bchar != 'r')) {
+            fprintf(stderr, "[%d] Error: unsupported bchar %c\n", rank, bchar);
+            return;
+        }
+
+        size_t  len = (bchar=='s') ? sBuffBytes : rBuffBytes ; len /= sizeof(T);
+        int8_t *buf = (bchar=='s') ? (int8_t*)sBuff.host : (int8_t*)rBuff.host ;
+
+        char *s = (char*)malloc( (len * 6 + 64)*sizeof(char) );
+        sprintf(s, "[%d] %cBuff (%zu): ", rank, bchar, len);
+        for (size_t i=0; i<len; i++)
+            sprintf(s+strlen(s), "%d ", buf[i]);
+        sprintf(s+strlen(s), "\n");
+
+        fprintf(fp, "%s", s);
+        free(s);
+    }
+
+    void sendBuff_reduction(cktype *sReduction) {
+        if (sBuffBytes != 0)
+            gpu_device_reduce(((dtype*)sBuff.device), sBuffBytes / sizeof(T), sReduction);
+        else
+            sReduction = 0;
+    }
+
+    void recvBuff_reduction(cktype *rReduction) {
+        if (rBuffBytes != 0)
+            gpu_device_reduce(((dtype*)rBuff.device), rBuffBytes / sizeof(T), rReduction);
+        else
+            rReduction = 0;
     }
 
     void clear(int rank) {

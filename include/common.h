@@ -142,3 +142,13 @@ void compiletime_runtime_checks(FILE *fp = stdout) {
     fprintf(fp, "This MPI library cannot determine if there is CUDA-aware support.\n");
 #endif /* MPIX_CUDA_AWARE_SUPPORT */
 }
+
+typedef enum {
+    ALLREDUCE,
+    ALLGATHER,
+    SENDRECV,
+    ALL2ALL,
+    SCATTER,
+    GATHER,
+    BCAST
+} CommunicatioType;
