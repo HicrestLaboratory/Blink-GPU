@@ -69,7 +69,8 @@ typedef enum {
     ALLREDUCE,
     ALLGATHER,
     SCATTER,
-    INCAST,
+    GATHER,
+    BCAST,
     SENDRECV
 } CommunicatioType;
 
@@ -101,7 +102,7 @@ struct CommunicationBuffers {
     int sMpicount, rMpicount;
     MPI_Datatype sMpiDtype, rMpiDtype;
 
-    void init(CommunicatioType type, int msgcount, MPI_Comm comm) {
+    void init(CommunicatioType type, int msgcount, MPI_Comm comm, int root = 0) {
 
         int rank, commsize;
         MPI_Comm_rank(comm, &rank);
@@ -124,17 +125,22 @@ struct CommunicationBuffers {
                 break;
 
             case SCATTER:
-                sBuffBytes = commsize * msgcount * sizeof(T); // BUG this should be just the root
+                sBuffBytes = (rank == root) ? (commsize * msgcount * sizeof(T)) : 0 ;
                 rBuffBytes = msgcount * sizeof(T);
                 break;
 
-            case INCAST:
+            case GATHER:
                 sBuffBytes = msgcount * sizeof(T);
-                rBuffBytes = commsize * msgcount * sizeof(T); // BUG this should be just the root
+                rBuffBytes = (rank == root) ? (commsize * msgcount * sizeof(T)) : 0 ;
                 break;
 
             case SENDRECV:
                 sBuffBytes = msgcount * sizeof(T);
+                rBuffBytes = msgcount * sizeof(T);
+                break;
+
+            case BCAST:
+                sBuffBytes = (rank == root) ? (msgcount * sizeof(T)) : 0 ;
                 rBuffBytes = msgcount * sizeof(T);
                 break;
 

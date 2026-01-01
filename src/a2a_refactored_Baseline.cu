@@ -147,7 +147,6 @@ int main(int argc, char *argv[])
         if (rank == 0) printf("#\n"); fflush(stdout);
         MPI_Barrier(MPI_COMM_WORLD);
 
-        // TODO reintegrate
         gpu_device_reduce((dtype*)buffs.rBuff.device, size*(rec.N), &gpu_check);
         MPI_Alltoall(my_cpu_check, 1, MPI_cktype, recv_cpu_check, 1, MPI_cktype, MPI_COMM_WORLD);
 
