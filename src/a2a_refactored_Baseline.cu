@@ -138,23 +138,7 @@ int main(int argc, char *argv[])
 
     rec.time_maxreduce(MPI_COMM_WORLD);
     rec.correctness_check(MPI_COMM_WORLD);
-
-    rec.init_iter_var(config);
-    for(int j=0; j<rec.niter; j++){
-        if (j!=0) rec.increase_N();
-
-        rec.compute_numB(ALL2ALL, size);
-
-        double avg_time_per_transfer = 0.0;
-        for (int i=0; i<rec.nrepetitions; i++) {
-            avg_time_per_transfer += rec.inner_elapsed_time[(j*rec.nrepetitions)+i];
-            if(rank == 0) printf("\tTransfer size (B): %10" PRIu64 ", Transfer Time (s): %15.9f, Bandwidth (GiB/s): %15.9f, Iteration %d\n", rec.num_B, rec.inner_elapsed_time[(j*rec.nrepetitions)+i], rec.num_GB/rec.inner_elapsed_time[(j*rec.nrepetitions)+i], i);
-        }
-        avg_time_per_transfer /= ((double)loop_count);
-
-        if(rank == 0) printf("[Average] Transfer size (B): %10" PRIu64 ", Transfer Time (s): %15.9f, Bandwidth (GiB/s): %15.9f, Error: %d\n", rec.num_B, avg_time_per_transfer, rec.num_GB/avg_time_per_transfer, (rec.check_results[j]) ? 0 : 1 );
-        fflush(stdout);
-    }
+    rec.print_statistics(config, rank, size);
 
     fflush(stdout);
     MPI_Barrier(MPI_COMM_WORLD);

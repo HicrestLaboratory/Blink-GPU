@@ -147,7 +147,25 @@ struct RecordsStruct {
 
         SZTYPE B_in_GB = 1 << 30;
         num_GB = (double)num_B / (double)B_in_GB;
-        // fprintf(stdout, "num_B: %lu, num_GB: %lu\n", num_B, num_GB);
+    }
+
+    void print_statistics(Config *config, int rank, int size) {
+        init_iter_var(config);
+        for(int j=0; j<niter; j++){
+            if (j!=0) increase_N();
+
+            compute_numB(ALL2ALL, size);
+
+            double avg_time_per_transfer = 0.0;
+            for (int i=0; i<nrepetitions; i++) {
+                avg_time_per_transfer += inner_elapsed_time[(j*nrepetitions)+i];
+                if(rank == 0) printf("\tTransfer size (B): %10" PRIu64 ", Transfer Time (s): %15.9f, Bandwidth (GiB/s): %15.9f, Iteration %d\n", num_B, inner_elapsed_time[(j*nrepetitions)+i], num_GB/inner_elapsed_time[(j*nrepetitions)+i], i);
+            }
+            avg_time_per_transfer /= ((double)nrepetitions);
+
+            if(rank == 0) printf("[Average] Transfer size (B): %10" PRIu64 ", Transfer Time (s): %15.9f, Bandwidth (GiB/s): %15.9f, Error: %d\n", num_B, avg_time_per_transfer, num_GB/avg_time_per_transfer, (check_results[j]) ? 0 : 1 );
+            fflush(stdout);
+        }
     }
 
     // ---------- Overall ----------
