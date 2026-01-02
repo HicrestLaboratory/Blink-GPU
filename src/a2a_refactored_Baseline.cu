@@ -52,24 +52,24 @@ int main(int argc, char *argv[])
 
     // ----- TMP test communicator use -----
     MpiComms *communicators = (MpiComms*)malloc(sizeof(MpiComms));
-    init_comms(config, communicators);
+    communicators->init(config);
 
     comm_graph graph;
     graph.init(communicators);
     graph.geninclist(CROSS_NODE);
     if (rank == 0) graph.print(stdout);
 
-    bool test = check_node(communicators);
+    bool test = communicators->check_node();
     if (rank == 0) fprintf(stdout, "Node check %s\n", (test) ? "true" : "false");
 
-    // test = check_addr(communicators);
+    // test = communicators->check_addr();
     // if (rank == 0) fprintf(stdout, "Addr check %s\n", (test) ? "true" : "false");
 
-    int num_devices_2 = 0;
-    cudaErrorCheck( cudaGetDeviceCount(&num_devices_2) );
-    MPI_Allreduce(MPI_IN_PLACE, &num_devices_2, 1, MPI_INT, MPI_MIN, communicators->cross_comm.comm);
+    int num_devices = 0;
+    cudaErrorCheck( cudaGetDeviceCount(&num_devices) );
+    MPI_Allreduce(MPI_IN_PLACE, &num_devices, 1, MPI_INT, MPI_MIN, communicators->cross_comm.comm);
 
-    if (num_devices_2 != communicators->node_comm.size) {
+    if (num_devices != communicators->node_comm.size) {
         fprintf(stderr, "Error: ngpus per node must be the same on all the nodes and must be the same of the nodeComm size.\n");
         MPI_Abort(MPI_COMM_WORLD, __LINE__);
     }
@@ -81,6 +81,12 @@ int main(int argc, char *argv[])
     if (0==rank) printf("List device affinity done.\n\n");
     MPI_Barrier(MPI_COMM_WORLD);
 #endif
+
+    fflush(stdout);
+    MPI_Barrier(MPI_COMM_WORLD);
+
+    graph.geninclist(WORLD);
+    if (rank == 0) graph.print(stdout);
 
     fflush(stdout);
     MPI_Barrier(MPI_COMM_WORLD);
@@ -98,8 +104,8 @@ int main(int argc, char *argv[])
 
         if (j!=0) rec.increase_N();
     
-        buffs.init(ALL2ALL, rec.N, MPI_COMM_WORLD, RANDOM_INT8);
-        if (j<5) buffs.print('s', rank, stdout);
+        buffs.init(ALL2ALL, rec.N, graph.inccomm.comm, RANDOM_INT8);
+        // if (j<5) buffs.print('s', rank, stdout);
 
         buffs.sendBuff_reduction(&(rec.sendSideChecks[j]));
 
@@ -112,12 +118,12 @@ int main(int argc, char *argv[])
         rec.print_iter_info(rank);
         if (rank == 0) {printf("%i#", j); fflush(stdout);}
         for(int i=1-(WARM_UP); i<=rec.nrepetitions; i++){
-            MPI_Barrier(MPI_COMM_WORLD);
+            MPI_Barrier(graph.inccomm.comm);
             rec.record_time_start(i);
 
 
             cudaErrorCheck( cudaMemcpy(buffs.sBuff.host, buffs.sBuff.device, buffs.sBuff.bytes, cudaMemcpyDeviceToHost) );
-            MPI_Alltoall(buffs.sBuff.host, buffs.sMpicount, buffs.sMpiDtype, buffs.rBuff.host, buffs.rMpicount, buffs.rMpiDtype, MPI_COMM_WORLD);
+            MPI_Alltoall(buffs.sBuff.host, buffs.sMpicount, buffs.sMpiDtype, buffs.rBuff.host, buffs.rMpicount, buffs.rMpiDtype, graph.inccomm.comm);
             cudaErrorCheck( cudaMemcpy(buffs.rBuff.device, buffs.rBuff.host, buffs.rBuff.bytes, cudaMemcpyHostToDevice) );
 
 
@@ -125,19 +131,19 @@ int main(int argc, char *argv[])
             if (rank == 0) {printf("%%"); fflush(stdout);}
         }
         if (rank == 0) printf("#\n"); fflush(stdout);
-        MPI_Barrier(MPI_COMM_WORLD);
+        MPI_Barrier(graph.inccomm.comm);
 
         buffs.recvBuff_reduction(&(rec.recvSideChecks[j]));
 
         buffs.clear(rank);
     }
 
-    rec.time_maxreduce(MPI_COMM_WORLD);
-    rec.correctness_check(MPI_COMM_WORLD);
+    rec.time_maxreduce(graph.inccomm.comm);
+    rec.correctness_check(graph.inccomm.comm);
     rec.print_statistics(config, rank, size);
 
     fflush(stdout);
-    MPI_Barrier(MPI_COMM_WORLD);
+    MPI_Barrier(graph.inccomm.comm);
 
     char *s = (char*)malloc(sizeof(char)*(20*(rec.niter) + 100));
     sprintf(s, "[%d] %15s = ", rank, "sendSideChecks");

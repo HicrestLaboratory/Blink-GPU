@@ -15,14 +15,14 @@ int main(int argc, char ** argv) {
     MPI_Barrier(MPI_COMM_WORLD);
 
     MpiComms *communicators = (MpiComms*)malloc(sizeof(MpiComms));
-    init_comms(config, communicators);
+    communicators->init(config);
 
     if (communicators->world.rank == 0) {
         fprintf(stdout, "%d x %d x (tree high %d)\n", config->ppn, config->npl, config->tree_high);
     }
     MPI_Barrier(MPI_COMM_WORLD);
 
-    comms_info(communicators);
+    communicators->info();
 
     comm_graph graph;
     graph.init(communicators);
@@ -53,10 +53,10 @@ int main(int argc, char ** argv) {
         }
     }
 
-    bool test = check_node(communicators);
+    bool test = communicators->check_node();
     if (rank == 0) fprintf(stdout, "Node check %s\n", (test) ? "true" : "false");
 
-    test = check_addr(communicators);
+    test = communicators->check_addr();
     if (rank == 0) fprintf(stdout, "Addr check %s\n", (test) ? "true" : "false");
 
     MPI_Finalize();
