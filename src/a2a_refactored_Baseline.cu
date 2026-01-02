@@ -54,26 +54,10 @@ int main(int argc, char *argv[])
     MpiComms *communicators = (MpiComms*)malloc(sizeof(MpiComms));
     communicators->init(config);
 
-    comm_graph graph;
-    graph.init(communicators);
-    graph.geninclist(CROSS_NODE);
-    if (rank == 0) graph.print(stdout);
-
     bool test = communicators->check_node();
     if (rank == 0) fprintf(stdout, "Node check %s\n", (test) ? "true" : "false");
 
-    // test = communicators->check_addr();
-    // if (rank == 0) fprintf(stdout, "Addr check %s\n", (test) ? "true" : "false");
-
-    int num_devices = 0;
-    cudaErrorCheck( cudaGetDeviceCount(&num_devices) );
-    MPI_Allreduce(MPI_IN_PLACE, &num_devices, 1, MPI_INT, MPI_MIN, communicators->cross_comm.comm);
-
-    if (num_devices != communicators->node_comm.size) {
-        fprintf(stderr, "Error: ngpus per node must be the same on all the nodes and must be the same of the nodeComm size.\n");
-        MPI_Abort(MPI_COMM_WORLD, __LINE__);
-    }
-    cudaSetDevice(communicators->node_comm.rank);
+    communicators->assign_cuda_gpu();
 
 #ifndef SKIPCPUAFFINITY
     if (0==rank) printf("List device affinity:\n");
@@ -85,6 +69,8 @@ int main(int argc, char *argv[])
     fflush(stdout);
     MPI_Barrier(MPI_COMM_WORLD);
 
+    comm_graph graph;
+    graph.init(communicators);
     graph.geninclist(WORLD);
     if (rank == 0) graph.print(stdout);
 
@@ -95,10 +81,9 @@ int main(int argc, char *argv[])
         Loop from 8 B to 1 GB
     -------------------------------------------------------------------------------------------- */
 
-    CommunicationBuffers<dtype> buffs;
-
     RecordsStruct rec;
     rec.init(config, ALL2ALL);
+    CommunicationBuffers<dtype> buffs;
 
     for(int j=0; j<rec.niter; j++){
 

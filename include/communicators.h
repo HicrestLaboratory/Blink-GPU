@@ -473,6 +473,18 @@ struct MpiComms
 
         return(check_flag);
     }
+
+    void assign_cuda_gpu(void) {
+        int num_devices = 0;
+        cudaErrorCheck( cudaGetDeviceCount(&num_devices) );
+        MPI_Allreduce(MPI_IN_PLACE, &num_devices, 1, MPI_INT, MPI_MIN, cross_comm.comm);
+
+        if (num_devices != node_comm.size) {
+            fprintf(stderr, "Error: ngpus per node must be the same on all the nodes and must be the same of the nodeComm size.\n");
+            MPI_Abort(MPI_COMM_WORLD, __LINE__);
+        }
+        cudaSetDevice(node_comm.rank);
+    }
 };
 
 struct comm_graph {
