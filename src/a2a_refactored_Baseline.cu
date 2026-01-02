@@ -35,22 +35,21 @@ int main(int argc, char *argv[])
     MPI_Comm_size(MPI_COMM_WORLD, &size);
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
 
+    MPI_Type_set_name(MPI_dtype,     "MPI_dtype");
+    MPI_Type_set_name(MPI_dtype_big, "MPI_dtype_big");
+
     // Compile-time and run-time checks
     if(rank == 0) compiletime_runtime_checks(stdout); fflush(stdout);
     MPI_Barrier(MPI_COMM_WORLD);
 
-    MPI_Type_set_name(MPI_dtype,     "MPI_dtype");
-    MPI_Type_set_name(MPI_dtype_big, "MPI_dtype_big");
-
     /* -------------------------------------------------------------------------------------------
-        Reading command line inputs
+        Reading command line inputs and communicators init
     --------------------------------------------------------------------------------------------*/
 
-    // Parse command-line options
     Config * config = (Config *)(malloc(sizeof(Config)));
     parse_args(argc, argv, config);
 
-    // ----- TMP test communicator use -----
+    // ----- Define communicators -----
     MpiComms *communicators = (MpiComms*)malloc(sizeof(MpiComms));
     communicators->init(config);
 
@@ -69,10 +68,11 @@ int main(int argc, char *argv[])
     fflush(stdout);
     MPI_Barrier(MPI_COMM_WORLD);
 
-    comm_graph graph;
-    graph.init(communicators);
-    graph.geninclist(WORLD);
-    if (rank == 0) graph.print(stdout);
+    // ----- Set BlinkCommWrapper -----
+    BlinkCommWrapper commWrap;
+    commWrap.init(communicators);
+    commWrap.geninclist(WORLD);
+    if (rank == 0) commWrap.print(stdout);
 
     fflush(stdout);
     MPI_Barrier(MPI_COMM_WORLD);
@@ -82,14 +82,14 @@ int main(int argc, char *argv[])
     -------------------------------------------------------------------------------------------- */
 
     RecordsStruct rec;
-    rec.init(config, ALL2ALL);
     CommunicationBuffers<dtype> buffs;
+    rec.init(config, commWrap.inccomm.comm, ALL2ALL);
 
     for(int j=0; j<rec.niter; j++){
 
         if (j!=0) rec.increase_N();
     
-        buffs.init(ALL2ALL, rec.N, graph.inccomm.comm, RANDOM_INT8);
+        buffs.init(rec.type, rec.N, rec.comm, RANDOM_INT8);
         // if (j<5) buffs.print('s', rank, stdout);
 
         buffs.sendBuff_reduction(&(rec.sendSideChecks[j]));
@@ -103,12 +103,12 @@ int main(int argc, char *argv[])
         rec.print_iter_info(rank);
         if (rank == 0) {printf("%i#", j); fflush(stdout);}
         for(int i=1-(WARM_UP); i<=rec.nrepetitions; i++){
-            MPI_Barrier(graph.inccomm.comm);
+            MPI_Barrier(rec.comm);
             rec.record_time_start(i);
 
 
             cudaErrorCheck( cudaMemcpy(buffs.sBuff.host, buffs.sBuff.device, buffs.sBuff.bytes, cudaMemcpyDeviceToHost) );
-            MPI_Alltoall(buffs.sBuff.host, buffs.sMpicount, buffs.sMpiDtype, buffs.rBuff.host, buffs.rMpicount, buffs.rMpiDtype, graph.inccomm.comm);
+            MPI_Alltoall(buffs.sBuff.host, buffs.sMpicount, buffs.sMpiDtype, buffs.rBuff.host, buffs.rMpicount, buffs.rMpiDtype, rec.comm);
             cudaErrorCheck( cudaMemcpy(buffs.rBuff.device, buffs.rBuff.host, buffs.rBuff.bytes, cudaMemcpyHostToDevice) );
 
 
@@ -116,19 +116,19 @@ int main(int argc, char *argv[])
             if (rank == 0) {printf("%%"); fflush(stdout);}
         }
         if (rank == 0) printf("#\n"); fflush(stdout);
-        MPI_Barrier(graph.inccomm.comm);
+        MPI_Barrier(rec.comm);
 
         buffs.recvBuff_reduction(&(rec.recvSideChecks[j]));
 
         buffs.clear(rank);
     }
 
-    rec.time_maxreduce(graph.inccomm.comm);
-    rec.correctness_check(graph.inccomm.comm);
-    rec.print_statistics(config, rank, size);
+    rec.time_maxreduce();
+    rec.correctness_check();
+    rec.print_statistics(config);
 
     fflush(stdout);
-    MPI_Barrier(graph.inccomm.comm);
+    MPI_Barrier(rec.comm);
 
     char *s = (char*)malloc(sizeof(char)*(20*(rec.niter) + 100));
     sprintf(s, "[%d] %15s = ", rank, "sendSideChecks");

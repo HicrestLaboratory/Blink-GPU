@@ -24,7 +24,7 @@ int main(int argc, char ** argv) {
 
     communicators->info();
 
-    comm_graph graph;
+    BlinkCommWrapper graph;
     graph.init(communicators);
     /*
     for (int i=0; i<size; i++) {

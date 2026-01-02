@@ -487,7 +487,7 @@ struct MpiComms
     }
 };
 
-struct comm_graph {
+struct BlinkCommWrapper {
     const MpiComms *comms;
 
     int height;

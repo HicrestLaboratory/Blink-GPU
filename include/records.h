@@ -27,6 +27,10 @@ struct RecordsStruct {
     SZTYPE num_B;
     double num_GB;
 
+    // ---------- General ----------
+    MPI_Comm comm;
+    int comm_size, comm_rank;
+
     // ---------- For buffers ----------
     void init_iter_var(Config *config) {
         if (config->fix_buff_size != 0) {
@@ -74,7 +78,7 @@ struct RecordsStruct {
         if (current_repetition>0) inner_elapsed_time[(current_iter*nrepetitions)+(current_repetition-1)] = stop_time - start_time;
     }
 
-    void time_maxreduce (MPI_Comm comm) {
+    void time_maxreduce(void) {
         MPI_Allreduce(inner_elapsed_time, elapsed_time, niter*nrepetitions, MPI_DOUBLE, MPI_MAX, comm);
     }
 
@@ -91,7 +95,7 @@ struct RecordsStruct {
         check_results  = (bool*)  malloc(sizeof(cktype)*niter);
     }
 
-    bool correctness_check(MPI_Comm comm) {
+    bool correctness_check(void) {
         MPI_Allreduce(MPI_IN_PLACE, sendSideChecks, niter, MPI_cktype, MPI_SUM, comm);
         if ((type != ALLGATHER) && (type != ALLREDUCE) && (type != BCAST))
             MPI_Allreduce(MPI_IN_PLACE, recvSideChecks, niter, MPI_cktype, MPI_SUM, comm);
@@ -110,14 +114,14 @@ struct RecordsStruct {
     }
 
     // ---------- For statistics ----------
-    void compute_numB (CommunicatioType type, int size) {
+    void compute_numB(void) {
         switch (type) {
             case ALL2ALL:
-                num_B = sizeof(dtype)*(N)*(size-1);
+                num_B = sizeof(dtype)*(N)*(comm_size-1);
                 break;
 
             case ALLREDUCE:
-                num_B = sizeof(dtype)*N*((size-1)/(float)size)*2;
+                num_B = sizeof(dtype)*N*((comm_size-1)/(float)comm_size)*2;
                 break;
 
             case ALLGATHER:
@@ -125,7 +129,7 @@ struct RecordsStruct {
                 break;
 
             case SCATTER:
-                num_B = sizeof(dtype)*N*(size-1); // NOTE: To Check
+                num_B = sizeof(dtype)*N*(comm_size-1); // NOTE: To Check
                 break;
 
             case GATHER:
@@ -137,7 +141,7 @@ struct RecordsStruct {
                 break;
 
             case BCAST:
-                num_B = sizeof(dtype)*N*(size-1); // NOTE: To Check
+                num_B = sizeof(dtype)*N*(comm_size-1); // NOTE: To Check
                 break;
 
             default:
@@ -149,28 +153,34 @@ struct RecordsStruct {
         num_GB = (double)num_B / (double)B_in_GB;
     }
 
-    void print_statistics(Config *config, int rank, int size) {
+    void print_statistics(Config *config) {
         init_iter_var(config);
         for(int j=0; j<niter; j++){
             if (j!=0) increase_N();
 
-            compute_numB(ALL2ALL, size);
-
+            compute_numB();
             double avg_time_per_transfer = 0.0;
             for (int i=0; i<nrepetitions; i++) {
                 avg_time_per_transfer += inner_elapsed_time[(j*nrepetitions)+i];
-                if(rank == 0) printf("\tTransfer size (B): %10" PRIu64 ", Transfer Time (s): %15.9f, Bandwidth (GiB/s): %15.9f, Iteration %d\n", num_B, inner_elapsed_time[(j*nrepetitions)+i], num_GB/inner_elapsed_time[(j*nrepetitions)+i], i);
+                if(comm_rank == 0) printf("\tTransfer size (B): %10" PRIu64 ", Transfer Time (s): %15.9f, Bandwidth (GiB/s): %15.9f, Iteration %d\n", num_B, inner_elapsed_time[(j*nrepetitions)+i], num_GB/inner_elapsed_time[(j*nrepetitions)+i], i);
             }
             avg_time_per_transfer /= ((double)nrepetitions);
 
-            if(rank == 0) printf("[Average] Transfer size (B): %10" PRIu64 ", Transfer Time (s): %15.9f, Bandwidth (GiB/s): %15.9f, Error: %d\n", num_B, avg_time_per_transfer, num_GB/avg_time_per_transfer, (check_results[j]) ? 0 : 1 );
+            if(comm_rank == 0) printf("[Average] Transfer size (B): %10" PRIu64 ", Transfer Time (s): %15.9f, Bandwidth (GiB/s): %15.9f, Error: %d\n", num_B, avg_time_per_transfer, num_GB/avg_time_per_transfer, (check_results[j]) ? 0 : 1 );
             fflush(stdout);
         }
     }
 
     // ---------- Overall ----------
-    void init(Config *config, CommunicatioType t) {
+    void init_comm(MPI_Comm in_comm) {
+        comm = in_comm;
+        MPI_Comm_size(in_comm, &comm_size);
+        MPI_Comm_rank(in_comm, &comm_rank);
+    }
+
+    void init(Config *config, MPI_Comm in_comm, CommunicatioType t) {
         init_iter_var(config);
+        init_comm(in_comm);
         init_correctness(t);
         init_timers();
     }
