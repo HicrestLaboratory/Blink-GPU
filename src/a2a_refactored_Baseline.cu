@@ -15,6 +15,7 @@
 #include "../include/cmd_util.h"
 #include "../include/prints.h"
 #include "../include/records.h"
+#include "../include/communicators.h"
 #include "../include/communication_buffers.h"
 
 #ifdef MPIX_CUDA_AWARE_SUPPORT
@@ -28,41 +29,11 @@ int main(int argc, char *argv[])
     /* -------------------------------------------------------------------------------------------
         MPI Initialization 
     --------------------------------------------------------------------------------------------*/
+
+    int rank, size;
     MPI_Init(&argc, &argv);
-
-    int size, nnodes;
     MPI_Comm_size(MPI_COMM_WORLD, &size);
-
-    int rank, mynode;
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-
-    int namelen;
-    char host_name[MPI_MAX_PROCESSOR_NAME];
-    MPI_Get_processor_name(host_name, &namelen);
-    MPI_Barrier(MPI_COMM_WORLD);
-
-    printf("Size = %d, myrank = %d, host_name = %s\n", size, rank, host_name);
-    fflush(stdout);
-    MPI_Barrier(MPI_COMM_WORLD);
-
-    // Map MPI ranks to GPUs
-    int num_devices = 0;
-    cudaErrorCheck( cudaGetDeviceCount(&num_devices) );
-
-    MPI_Comm nodeComm;
-
-    int dev = assignDeviceToProcess(&nodeComm, &nnodes, &mynode);
-    // print device affiniy
-#ifndef SKIPCPUAFFINITY
-    if (0==rank) printf("List device affinity:\n");
-    check_cpu_and_gpu_affinity(dev);
-    if (0==rank) printf("List device affinity done.\n\n");
-    MPI_Barrier(MPI_COMM_WORLD);
-#endif
-
-    int mynodeid = -1, mynodesize = -1;
-    MPI_Comm_rank(nodeComm, &mynodeid);
-    MPI_Comm_size(nodeComm, &mynodesize);
 
     // Compile-time and run-time checks
     if(rank == 0) compiletime_runtime_checks(stdout); fflush(stdout);
@@ -78,6 +49,41 @@ int main(int argc, char *argv[])
     // Parse command-line options
     Config * config = (Config *)(malloc(sizeof(Config)));
     parse_args(argc, argv, config);
+
+    // ----- TMP test communicator use -----
+    MpiComms *communicators = (MpiComms*)malloc(sizeof(MpiComms));
+    init_comms(config, communicators);
+
+    comm_graph graph;
+    graph.init(communicators);
+    graph.geninclist(CROSS_NODE);
+    if (rank == 0) graph.print(stdout);
+
+    bool test = check_node(communicators);
+    if (rank == 0) fprintf(stdout, "Node check %s\n", (test) ? "true" : "false");
+
+    // test = check_addr(communicators);
+    // if (rank == 0) fprintf(stdout, "Addr check %s\n", (test) ? "true" : "false");
+
+    int num_devices_2 = 0;
+    cudaErrorCheck( cudaGetDeviceCount(&num_devices_2) );
+    MPI_Allreduce(MPI_IN_PLACE, &num_devices_2, 1, MPI_INT, MPI_MIN, communicators->cross_comm.comm);
+
+    if (num_devices_2 != communicators->node_comm.size) {
+        fprintf(stderr, "Error: ngpus per node must be the same on all the nodes and must be the same of the nodeComm size.\n");
+        MPI_Abort(MPI_COMM_WORLD, __LINE__);
+    }
+    cudaSetDevice(communicators->node_comm.rank);
+
+#ifndef SKIPCPUAFFINITY
+    if (0==rank) printf("List device affinity:\n");
+    check_cpu_and_gpu_affinity(communicators->node_comm.rank);
+    if (0==rank) printf("List device affinity done.\n\n");
+    MPI_Barrier(MPI_COMM_WORLD);
+#endif
+
+    fflush(stdout);
+    MPI_Barrier(MPI_COMM_WORLD);
 
      /* -------------------------------------------------------------------------------------------
         Loop from 8 B to 1 GB
