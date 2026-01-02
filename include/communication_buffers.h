@@ -2,13 +2,15 @@
 
 #include "common.h"
 #include "type.h"
+#include "myrand.h"
 
 typedef enum {
     RANDOM_UINT8,
     RANDOM_INT8,
     SIGNEDRANK,
     CONST,
-    RANK
+    RANK,
+    NONE
 } InitStrategy;
 
 struct BufferHolder {
@@ -35,6 +37,9 @@ struct BufferHolder {
     }
 
     void init_host_buff (InitStrategy str, int rank) {
+        rng_state += rank;
+
+        double start = MPI_Wtime();
         switch (str) {
             case RANDOM_UINT8:
                 for(SZTYPE i=0; i<(bytes/sizeof(u_int8_t)); i++)
@@ -42,9 +47,9 @@ struct BufferHolder {
                 break;
 
             case RANDOM_INT8:
-                for(SZTYPE i=0; i<(bytes/sizeof(int8_t)); i++)
-                    ((int8_t*)host)[i] = (rand() % 17) - 8;
-                    // ((int8_t*)host)[i] = (rand() % INT8_MAX) - (INT8_MAX/2);
+                // for(SZTYPE i=0; i<(bytes/sizeof(int8_t)); i++)
+                //     ((int8_t*)host)[i] = (rand() % 17) - 8;
+                rand_int8_array((int8_t*)host, bytes/sizeof(int8_t));
                 break;
 
             case SIGNEDRANK:
@@ -61,10 +66,15 @@ struct BufferHolder {
                 for(SZTYPE i=0; i<(bytes/sizeof(dtype)); i++) ((dtype*)host)[i] = 0;
                 break;
 
+            case NONE:
+                break;
+
             default:
-                for(SZTYPE i=0; i<(bytes/sizeof(dtype)); i++) ((dtype*)host)[i] = 0;
                 break;
         }
+        double stop = MPI_Wtime();
+
+        fprintf(stdout, "Array initiated in %lf s\n", stop - start);
     }
 
     bool alloc(SZTYPE bufferByteLen, int rank, InitStrategy str = RANK) {
@@ -192,7 +202,7 @@ struct CommunicationBuffers {
             fflush(stderr);
         }
 
-        bool errorflagrecv = rBuff.alloc(rBuffBytes, rank, CONST);
+        bool errorflagrecv = rBuff.alloc(rBuffBytes, rank, NONE);
         if (!errorflagrecv) {
             fprintf(stderr, "[%d] Error while allocating buffers at line %d (%lu Bytes requested)\n", rank, __LINE__, rBuff.bytes);
             fflush(stderr);

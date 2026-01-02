@@ -90,7 +90,7 @@ int main(int argc, char *argv[])
         if (j!=0) rec.increase_N();
     
         buffs.init(rec.type, rec.N, rec.comm, RANDOM_INT8);
-        // if (j<5) buffs.print('s', rank, stdout);
+        if (j<3) buffs.print('s', rank, stdout);
 
         buffs.sendBuff_reduction(&(rec.sendSideChecks[j]));
 
