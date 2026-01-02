@@ -75,19 +75,9 @@ int main(int argc, char *argv[])
         Reading command line inputs
     --------------------------------------------------------------------------------------------*/
 
-    int max_j;
-    int loop_count;
-    int buff_cycle;
-    int fix_buff_size;
-
     // Parse command-line options
     Config * config = (Config *)(malloc(sizeof(Config)));
     parse_args(argc, argv, config);
-
-    loop_count    = config->loop_count;
-    buff_cycle    = config->buff_cycle;
-    max_j         = config->max_buff_size;
-    fix_buff_size = config->fix_buff_size;
 
      /* -------------------------------------------------------------------------------------------
         Loop from 8 B to 1 GB
@@ -143,7 +133,7 @@ int main(int argc, char *argv[])
     fflush(stdout);
     MPI_Barrier(MPI_COMM_WORLD);
 
-    char *s = (char*)malloc(sizeof(char)*(20*buff_cycle + 100));
+    char *s = (char*)malloc(sizeof(char)*(20*(rec.niter) + 100));
     sprintf(s, "[%d] %15s = ", rank, "sendSideChecks");
     for (int i=0; i<rec.niter; i++) {
         sprintf(s+strlen(s), " %5d", rec.sendSideChecks[i]);
