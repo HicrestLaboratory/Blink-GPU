@@ -7,7 +7,7 @@
 struct RecordsStruct {
 
     // ---------- For buffers ----------
-    SZTYPE N; // This rapresent a loop variable for the current buffer size
+    SZTYPE msgsize; // This rapresent a loop variable for the current buffer size
     int niter;
     int nrepetitions;
 
@@ -37,26 +37,26 @@ struct RecordsStruct {
             niter = 1;
 
             if (config->fix_buff_size<=30) {
-                N = 1 << (config->fix_buff_size - 1);
+                msgsize = 1 << (config->fix_buff_size - 1);
             } else {
-                N = 1 << 30;
-                N <<= (config->fix_buff_size - 31);
+                msgsize = 1 << 30;
+                msgsize <<= (config->fix_buff_size - 31);
             }
         } else {
-            N = 1;
+            msgsize = 1;
             niter = config->buff_cycle;
         }
 
         nrepetitions = config->loop_count;
     }
 
-    void increase_N(void) {
-        N <<= 1;
+    void increase_msgsize(void) {
+        msgsize <<= 1;
     }
 
     void print_iter_info(int rank, FILE *fp = stdout) {
         if(rank == 0){
-            fprintf(fp, "Record structure info: niter = %d, nrepetitions = %d, current_N = %lu\n", niter, nrepetitions, N);
+            fprintf(fp, "Record structure info: niter = %d, nrepetitions = %d, current_N = %lu\n", niter, nrepetitions, msgsize);
         }
         fflush(fp);
         MPI_Barrier(MPI_COMM_WORLD);
@@ -117,11 +117,11 @@ struct RecordsStruct {
     void compute_numB(void) {
         switch (type) {
             case ALL2ALL:
-                num_B = sizeof(dtype)*(N)*(comm_size-1);
+                num_B = sizeof(dtype)*msgsize*(comm_size-1);
                 break;
 
             case ALLREDUCE:
-                num_B = sizeof(dtype)*N*((comm_size-1)/(float)comm_size)*2;
+                num_B = sizeof(dtype)*msgsize*((comm_size-1)/(float)comm_size)*2;
                 break;
 
             case ALLGATHER:
@@ -129,7 +129,7 @@ struct RecordsStruct {
                 break;
 
             case SCATTER:
-                num_B = sizeof(dtype)*N*(comm_size-1); // NOTE: To Check
+                num_B = sizeof(dtype)*msgsize*(comm_size-1); // NOTE: To Check
                 break;
 
             case GATHER:
@@ -137,11 +137,11 @@ struct RecordsStruct {
                 break;
 
             case SENDRECV:
-                num_B = sizeof(dtype)*N;
+                num_B = sizeof(dtype)*msgsize;
                 break;
 
             case BCAST:
-                num_B = sizeof(dtype)*N*(comm_size-1); // NOTE: To Check
+                num_B = sizeof(dtype)*msgsize*(comm_size-1); // NOTE: To Check
                 break;
 
             default:
@@ -156,7 +156,7 @@ struct RecordsStruct {
     void print_statistics(Config *config) {
         init_iter_var(config);
         for(int j=0; j<niter; j++){
-            if (j!=0) increase_N();
+            if (j!=0) increase_msgsize();
 
             compute_numB();
             double avg_time_per_transfer = 0.0;
@@ -169,6 +169,12 @@ struct RecordsStruct {
             if(comm_rank == 0) printf("[Average] Transfer size (B): %10" PRIu64 ", Transfer Time (s): %15.9f, Bandwidth (GiB/s): %15.9f, Error: %d\n", num_B, avg_time_per_transfer, num_GB/avg_time_per_transfer, (check_results[j]) ? 0 : 1 );
             fflush(stdout);
         }
+    }
+
+    void get_statistics(Config *config) {
+        time_maxreduce();
+        correctness_check();
+        print_statistics(config);
     }
 
     // ---------- Overall ----------
@@ -185,4 +191,8 @@ struct RecordsStruct {
         init_timers();
     }
 
+    void clear(void){
+        free_timers();
+        free_correctness();
+    }
 };

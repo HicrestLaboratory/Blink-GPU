@@ -49,30 +49,20 @@ int main(int argc, char *argv[])
     Config * config = (Config *)(malloc(sizeof(Config)));
     parse_args(argc, argv, config);
 
-    // ----- Define communicators -----
-    MpiComms *communicators = (MpiComms*)malloc(sizeof(MpiComms));
-    communicators->init(config);
-
-    bool test = communicators->check_node();
-    if (rank == 0) fprintf(stdout, "Node check %s\n", (test) ? "true" : "false");
-
-    communicators->assign_cuda_gpu();
-
-#ifndef SKIPCPUAFFINITY
-    if (0==rank) printf("List device affinity:\n");
-    check_cpu_and_gpu_affinity(communicators->node_comm.rank);
-    if (0==rank) printf("List device affinity done.\n\n");
-    MPI_Barrier(MPI_COMM_WORLD);
-#endif
+    // ----- Set BlinkCommWrapper & define communicators -----
+    BlinkCommWrapper commWrap;
+    commWrap.init(config, true, WORLD);
+    if (rank == 0) commWrap.print(stdout);
 
     fflush(stdout);
     MPI_Barrier(MPI_COMM_WORLD);
 
-    // ----- Set BlinkCommWrapper -----
-    BlinkCommWrapper commWrap;
-    commWrap.init(communicators);
-    commWrap.geninclist(WORLD);
-    if (rank == 0) commWrap.print(stdout);
+#ifndef SKIPCPUAFFINITY
+    if (0==rank) printf("List device affinity:\n");
+    check_cpu_and_gpu_affinity(commWrap.comms->node_comm.rank);
+    if (0==rank) printf("List device affinity done.\n\n");
+    MPI_Barrier(MPI_COMM_WORLD);
+#endif
 
     fflush(stdout);
     MPI_Barrier(MPI_COMM_WORLD);
@@ -86,10 +76,9 @@ int main(int argc, char *argv[])
     rec.init(config, commWrap.inccomm.comm, ALL2ALL);
 
     for(int j=0; j<rec.niter; j++){
-
-        if (j!=0) rec.increase_N();
+        if (j!=0) rec.increase_msgsize();
     
-        buffs.init(rec.type, rec.N, rec.comm, RANDOM_INT8);
+        buffs.init(rec.type, rec.msgsize, rec.comm, RANDOM_INT8);
         if (j<3) buffs.print('s', rank, stdout);
 
         buffs.sendBuff_reduction(&(rec.sendSideChecks[j]));
@@ -123,9 +112,7 @@ int main(int argc, char *argv[])
         buffs.clear(rank);
     }
 
-    rec.time_maxreduce();
-    rec.correctness_check();
-    rec.print_statistics(config);
+    rec.get_statistics(config);
 
     fflush(stdout);
     MPI_Barrier(rec.comm);
@@ -155,8 +142,7 @@ int main(int argc, char *argv[])
     printf("%s", s);
     fflush(stdout);
 
-    rec.free_timers();
-    rec.free_correctness();
+    rec.clear();
     MPI_Finalize();
     return(0);
 }

@@ -488,7 +488,7 @@ struct MpiComms
 };
 
 struct BlinkCommWrapper {
-    const MpiComms *comms;
+    MpiComms *comms;
 
     int height;
     int node_size;
@@ -500,7 +500,7 @@ struct BlinkCommWrapper {
     int *inclist, incsize;
     std::function<bool(int,int,int)> incfunc;
 
-    void init(const MpiComms *communicators) {
+    void init(MpiComms *communicators) {
         comms = communicators;
 
         height         = communicators->n_tree_comms;
@@ -556,6 +556,30 @@ struct BlinkCommWrapper {
         MPI_Comm_get_name(inccomm.comm, name, &name_len);
         if (comms->world.rank == 0) fprintf(stdout, "Inclusion list updated with %s communicator\n", name);
         MPI_Barrier(comms->world.comm);
+    }
+
+    void init(Config *config, bool gpu_flag, CommKind kind=WORLD, int level=0) {
+        comms = (MpiComms*)malloc(sizeof(MpiComms));
+        comms->init(config);
+
+        bool test = comms->check_node();
+        if (comms->world.rank == 0) fprintf(stdout, "Node check %s\n", (test) ? "true" : "false");
+
+        if (gpu_flag) comms->assign_cuda_gpu();
+
+        height         = comms->n_tree_comms;
+        node_size      = comms->node_comm.size;
+        tree_size      = comms->tree_comms[0].size;
+        leaf_count     = comms->cross_comms[0].size;
+        nodes_pre_leaf = tree_size / node_size;
+
+        incsize = 0;
+        inclist = nullptr;
+        incfunc = [this](int n, int l, int p) {
+            return mywrank(n, l, p);
+        };
+
+        geninclist(kind, level);
     }
 
     void comms_binary_tree(FILE *fp, int box_w = 7)
