@@ -7,16 +7,17 @@
 #include <inttypes.h>
 
 #define MPI
+#define NCCL
 
-#include "../include/error.h"
-#include "../include/type.h"
-#include "../include/gpu_ops.h"
-#include "../include/device_assignment.h"
-#include "../include/cmd_util.h"
-#include "../include/prints.h"
-#include "../include/records.h"
-#include "../include/communicators.h"
-#include "../include/communication_buffers.h"
+#include "error.h"
+#include "type.h"
+#include "gpu_ops.h"
+#include "device_assignment.h"
+#include "cmd_util.h"
+#include "prints.h"
+#include "records.h"
+#include "communicators.h"
+#include "communication_buffers.h"
 
 #ifdef MPIX_CUDA_AWARE_SUPPORT
 /* Needed for MPIX_Query_cuda_support(), below */
@@ -53,6 +54,7 @@ int main(int argc, char *argv[])
     BlinkCommWrapper commWrap;
     commWrap.init(config, true, WORLD);
     if (rank == 0) commWrap.print(stdout);
+    commWrap.add_nccl();
 
     fflush(stdout);
     MPI_Barrier(MPI_COMM_WORLD);
@@ -73,7 +75,7 @@ int main(int argc, char *argv[])
 
     RecordsStruct rec;
     CommunicationBuffers<dtype> buffs;
-    rec.init(config, commWrap.inccomm.comm, ALL2ALL);
+    rec.init(config, commWrap.inccomm, ALLREDUCE);
 
     for(int j=0; j<rec.niter; j++){
         if (j!=0) rec.increase_msgsize();
@@ -96,9 +98,8 @@ int main(int argc, char *argv[])
             rec.record_time_start(i);
 
 
-            cudaErrorCheck( cudaMemcpy(buffs.sBuff.host, buffs.sBuff.device, buffs.sBuff.bytes, cudaMemcpyDeviceToHost) );
-            MPI_Alltoall(buffs.sBuff.host, buffs.sMpicount, buffs.sMpiDtype, buffs.rBuff.host, buffs.rMpicount, buffs.rMpiDtype, rec.comm);
-            cudaErrorCheck( cudaMemcpy(buffs.rBuff.device, buffs.rBuff.host, buffs.rBuff.bytes, cudaMemcpyHostToDevice) );
+            // NOTE: reduction operation must be in line with the correctness check (sum)
+            ncclAllReduce(buffs.sBuff.device, buffs.rBuff.device, buffs.sMpicount, buffs.sNcclType, ncclSum, rec.ncclcomm, NULL);
 
 
             rec.record_time_stop(j, i);

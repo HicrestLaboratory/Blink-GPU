@@ -7,63 +7,6 @@
 #include <iostream>
 #include "cmd_util.h"
 
-struct MyMpiComm
-{
-    MPI_Comm comm;
-    int rank, size;
-
-    void init(MPI_Comm in_comm) {
-        if (in_comm == MPI_COMM_NULL) {
-            fprintf(stderr, "Error: %s found an MPI_COMM_NULL\n", __func__);
-            exit(__LINE__);
-        }
-
-        comm = in_comm;
-        MPI_Comm_size(in_comm, &size);
-        MPI_Comm_rank(in_comm, &rank);
-    }
-
-#ifdef NCCL
-    ncclComm_t ncclcomm;
-
-    void add_nccl(void) {
-        // Step 1: unique ID created by rank 0
-        ncclUniqueId id;
-        if (rank == 0) ncclGetUniqueId(&id);
-
-        // Step 2: send ID to all others using MPI
-        MPI_Bcast(&id, sizeof(id), MPI_BYTE, 0, comm);
-
-        // Step 3: create NCCL communicator
-        ncclCommInitRank(&ncclcomm, size, id, rank);
-    }
-#endif
-
-};
-
-static void print_comm_info(const char *label, const MyMpiComm *c, FILE *fp)
-{
-    char name[MPI_MAX_OBJECT_NAME];
-    int name_len = 0;
-
-    MPI_Comm_get_name(c->comm, name, &name_len);
-
-    if (name_len == 0) {
-        snprintf(name, MPI_MAX_OBJECT_NAME, "<unnamed>");
-    }
-
-    int  hostname_len = 0;
-    char host_name[MPI_MAX_PROCESSOR_NAME];
-    MPI_Get_processor_name(host_name, &hostname_len);
-
-    if (hostname_len == 0) {
-        snprintf(host_name, MPI_MAX_PROCESSOR_NAME, "<unnamed>");
-    }
-
-    fprintf(fp, "[%-12s] hostname=%-20s commname=%-20s rank=%4d size=%4d\n",
-           label, host_name, name, c->rank, c->size);
-}
-
 typedef struct process_env {
 
     char* home = nullptr;

@@ -31,6 +31,10 @@ struct RecordsStruct {
     MPI_Comm comm;
     int comm_size, comm_rank;
 
+#ifdef NCCL
+    ncclComm_t ncclcomm;
+#endif
+
     // ---------- For buffers ----------
     void init_iter_var(Config *config) {
         if (config->fix_buff_size != 0) {
@@ -178,13 +182,17 @@ struct RecordsStruct {
     }
 
     // ---------- Overall ----------
-    void init_comm(MPI_Comm in_comm) {
-        comm = in_comm;
-        MPI_Comm_size(in_comm, &comm_size);
-        MPI_Comm_rank(in_comm, &comm_rank);
+    void init_comm(MyMpiComm in_comm) {
+        comm      = in_comm.comm;
+        comm_size = in_comm.size;
+        comm_rank = in_comm.rank;
+
+#ifdef NCCL
+        ncclcomm = in_comm.ncclcomm;
+#endif
     }
 
-    void init(Config *config, MPI_Comm in_comm, CommunicatioType t) {
+    void init(Config *config, MyMpiComm in_comm, CommunicatioType t) {
         init_iter_var(config);
         init_comm(in_comm);
         init_correctness(t);

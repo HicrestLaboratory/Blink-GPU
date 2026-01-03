@@ -8,15 +8,15 @@
 
 #define MPI
 
-#include "../include/error.h"
-#include "../include/type.h"
-#include "../include/gpu_ops.h"
-#include "../include/device_assignment.h"
-#include "../include/cmd_util.h"
-#include "../include/prints.h"
-#include "../include/records.h"
-#include "../include/communicators.h"
-#include "../include/communication_buffers.h"
+#include "error.h"
+#include "type.h"
+#include "gpu_ops.h"
+#include "device_assignment.h"
+#include "cmd_util.h"
+#include "prints.h"
+#include "records.h"
+#include "communicators.h"
+#include "communication_buffers.h"
 
 #ifdef MPIX_CUDA_AWARE_SUPPORT
 /* Needed for MPIX_Query_cuda_support(), below */
@@ -73,7 +73,7 @@ int main(int argc, char *argv[])
 
     RecordsStruct rec;
     CommunicationBuffers<dtype> buffs;
-    rec.init(config, commWrap.inccomm.comm, ALLREDUCE);
+    rec.init(config, commWrap.inccomm, ALLREDUCE);
 
     for(int j=0; j<rec.niter; j++){
         if (j!=0) rec.increase_msgsize();

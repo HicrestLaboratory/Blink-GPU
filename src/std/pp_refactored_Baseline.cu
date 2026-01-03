@@ -8,15 +8,15 @@
 
 #define MPI
 
-#include "../include/error.h"
-#include "../include/type.h"
-#include "../include/gpu_ops.h"
-#include "../include/device_assignment.h"
-#include "../include/cmd_util.h"
-#include "../include/prints.h"
-#include "../include/records.h"
-#include "../include/communicators.h"
-#include "../include/communication_buffers.h"
+#include "error.h"
+#include "type.h"
+#include "gpu_ops.h"
+#include "device_assignment.h"
+#include "cmd_util.h"
+#include "prints.h"
+#include "records.h"
+#include "communicators.h"
+#include "communication_buffers.h"
 
 #ifdef MPIX_CUDA_AWARE_SUPPORT
 /* Needed for MPIX_Query_cuda_support(), below */
@@ -73,7 +73,7 @@ int main(int argc, char *argv[])
 
     RecordsStruct rec;
     CommunicationBuffers<dtype> buffs;
-    rec.init(config, commWrap.inccomm.comm, ALL2ALL);
+    rec.init(config, commWrap.inccomm, SENDRECV);
 
     for(int j=0; j<rec.niter; j++){
         if (j!=0) rec.increase_msgsize();
@@ -96,7 +96,19 @@ int main(int argc, char *argv[])
             rec.record_time_start(i);
 
 
-            MPI_Alltoall(buffs.sBuff.device, buffs.sMpicount, buffs.sMpiDtype, buffs.rBuff.device, buffs.rMpicount, buffs.rMpiDtype, rec.comm);
+            int rank2 = size - 1;
+            if(rank == 0){
+                cudaErrorCheck( cudaMemcpy(buffs.sBuff.host, buffs.sBuff.device, buffs.sBuff.bytes, cudaMemcpyDeviceToHost) );
+                MPI_Send(buffs.sBuff.host, buffs.sMpicount, buffs.sMpiDtype, rank2, rank, rec.comm);
+                MPI_Recv(buffs.rBuff.host, buffs.rMpicount, buffs.rMpiDtype, rank2, MPI_ANY_TAG, rec.comm, MPI_STATUS_IGNORE);
+                cudaErrorCheck( cudaMemcpy(buffs.rBuff.device, buffs.rBuff.host, buffs.rBuff.bytes, cudaMemcpyHostToDevice) );
+            }
+            else if(rank == rank2){
+                MPI_Recv(buffs.rBuff.host, buffs.rMpicount, buffs.rMpiDtype, 0, MPI_ANY_TAG, rec.comm, MPI_STATUS_IGNORE);
+                cudaErrorCheck( cudaMemcpy(buffs.rBuff.device, buffs.rBuff.host, buffs.rBuff.bytes, cudaMemcpyHostToDevice) );
+                cudaErrorCheck( cudaMemcpy(buffs.sBuff.host, buffs.sBuff.device, buffs.sBuff.bytes, cudaMemcpyDeviceToHost) );
+                MPI_Send(buffs.sBuff.host, buffs.sMpicount, buffs.sMpiDtype, 0, rank, rec.comm);
+            }
 
 
             rec.record_time_stop(j, i);

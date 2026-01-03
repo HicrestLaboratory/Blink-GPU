@@ -1,3 +1,5 @@
+SHELL := /bin/bash
+
 REQUIRED_VARS := \
   BLINKGPU_SYSTEM \
   BLINKGPU_CONFIGURATION \
@@ -30,12 +32,12 @@ $(foreach v,$(REQUIRED_VARS),\
     $(error Environment variable $(v) is not set or empty)))
 
 # ------------------ Targets ------------------
-COMM_PATTERN  = pp a2a ar hlo mpp
+COMM_PATTERN  = old/pp old/a2a old/ar old/hlo old/mpp std/a2a_refactored std/ar_refactored std/pp_refactored std/mpp_refactored
 COMM_STRATEGY = Baseline CudaAware Nccl # Nvlink Nvlink temporary disable (to manage and also to change name)
 
 BINFOLDER = bin
 DIRS = $(BINFOLDER) out sout
-CFLAGS = -DSKIPCPUAFFINITY -arch=sm_80
+CFLAGS = -DSKIPCPUAFFINITY -arch=sm_80 -Iinclude
 
 # This is expanding ALL_TARGETS = {COMM_PATTERN} x {COMM_STRATEGY}
 #  i.e. ALL_TARGETS = $(BINFOLDER)/pp_Baseline $(BINFOLDER)/pp_CudaAware ... $(BINFOLDER)/pp_Baseline ...
@@ -43,31 +45,53 @@ define ALL_TARGETS
 $(foreach p,$(1),$(foreach s,$(2),$(BINFOLDER)/$(p)_$(s)))
 endef
 
+$(info ----------------------------------------------------------------)
 ALL_TARGETS_LIST := $(call ALL_TARGETS,$(COMM_PATTERN),$(COMM_STRATEGY))
 $(info ALL_TARGETS = $(ALL_TARGETS_LIST))
 
-PP_TARGETS_LIST := $(call ALL_TARGETS,pp,$(COMM_STRATEGY))
-A2A_TARGETS_LIST := $(call ALL_TARGETS,a2a,$(COMM_STRATEGY))
-AR_TARGETS_LIST := $(call ALL_TARGETS,ar,$(COMM_STRATEGY))
+all: $(ALL_TARGETS_LIST)
+
+$(info ----------------------------------------------------------------)
+OLDPP_TARGETS_LIST := $(call ALL_TARGETS,old/pp,$(COMM_STRATEGY))
+OLDA2A_TARGETS_LIST := $(call ALL_TARGETS,old/a2a,$(COMM_STRATEGY))
+OLDAR_TARGETS_LIST := $(call ALL_TARGETS,old/ar,$(COMM_STRATEGY))
+$(info OLDPP_TARGETS_LIST = $(OLDPP_TARGETS_LIST))
+$(info OLDA2A_TARGETS_LIST = $(OLDA2A_TARGETS_LIST))
+$(info OLDAR_TARGETS_LIST = $(OLDAR_TARGETS_LIST))
+
+oldpp olda2a oldar:
+	@true
+
+oldpp:  $(OLDPP_TARGETS_LIST)
+olda2a: $(OLDA2A_TARGETS_LIST)
+oldar:  $(OLDAR_TARGETS_LIST)
+
+$(info ----------------------------------------------------------------)
+PP_TARGETS_LIST := $(call ALL_TARGETS,std/pp_refactored,$(COMM_STRATEGY))
+MPP_TARGETS_LIST := $(call ALL_TARGETS,std/mpp_refactored,$(COMM_STRATEGY))
+A2A_TARGETS_LIST := $(call ALL_TARGETS,std/a2a_refactored,$(COMM_STRATEGY))
+AR_TARGETS_LIST := $(call ALL_TARGETS,std/ar_refactored,$(COMM_STRATEGY))
 $(info PP_TARGETS_LIST = $(PP_TARGETS_LIST))
+$(info MPP_TARGETS_LIST = $(MPP_TARGETS_LIST))
 $(info A2A_TARGETS_LIST = $(A2A_TARGETS_LIST))
 $(info AR_TARGETS_LIST = $(AR_TARGETS_LIST))
 
-pp a2a ar:
+pp mpp a2a ar:
 	@true
 
-all: $(ALL_TARGETS_LIST)
 pp:  $(PP_TARGETS_LIST)
+mpp: $(MPP_TARGETS_LIST)
 a2a: $(A2A_TARGETS_LIST)
 ar:  $(AR_TARGETS_LIST)
 
-refactored: $(BINFOLDER)/a2a_refactored_Baseline $(BINFOLDER)/a2a_refactored_CudaAware $(BINFOLDER)/a2a_refactored_Nccl $(BINFOLDER)/ar_refactored_Baseline $(BINFOLDER)/pp_refactored_Baseline $(BINFOLDER)/mpp_refactored_Baseline $(BINFOLDER)/refactorTest
+refactored: $(BINFOLDER)/std/pp_refactored_Baseline $(BINFOLDER)/tests/refactorTest
+$(info ----------------------------------------------------------------)
 
 # ------------------ Libs & Flags ------------------
 MPI=-L$(BLINKGPU_MPI_HOME)/lib -I$(BLINKGPU_MPI_HOME)/include -lmpi
 MPICUDA=-L$(BLINKGPU_MPICUDA_HOME)/lib -I$(BLINKGPU_MPICUDA_HOME)/include -lmpi
 CUDA=-L$(BLINKGPU_CUDA_HOME)/lib64 -L$(BLINKGPU_CUDA_HOME)/compact -I$(BLINKGPU_CUDA_HOME)/include -lcudart -lcuda
-NCCL=-DNCCL -L$(BLINKGPU_NCCL_HOME)/lib -I$(BLINKGPU_NCCL_HOME)/include -lnccl
+NCCL=-L$(BLINKGPU_NCCL_HOME)/lib -I$(BLINKGPU_NCCL_HOME)/include -lnccl
 
 BASELINE_LIBS = $(MPI) $(CUDA)
 CUDAAWARE_LIBS = $(MPICUDA) $(CUDA)
@@ -101,25 +125,24 @@ $(NCCL_MODULE_FILE):
 
 # ------------------  Rules  ------------------
 CC=$(BLINKGPU_CUDA_HOME)/bin/nvcc
-# COMPILE = $(CC) $(CFLAGS) $(INCL) $(LIBS) $(LIBFLAGS) \
-#           -lstdc++ -lm -Wno-deprecated-gpu-targets $(DBGFLAGS)
 
 $(BINFOLDER)/%_Baseline: src/%_Baseline.cu $(BASELINE_MODULE_FILE) | $(DIRS)
 	@echo "Building $@"
-	mkdir -p ${BINFOLDER}
+	mkdir -p $(dir $@)
 	source $(BASELINE_MODULE_FILE) && $(CC) $(CFLAGS) -o $@ $< $(BASELINE_LIBS)
 
 $(BINFOLDER)/%_CudaAware: src/%_CudaAware.cu $(CUDAAWARE_MODULE_FILE) | $(DIRS)
 	@echo "Building $@"
-	mkdir -p ${BINFOLDER}
+	mkdir -p $(dir $@)
 	source $(CUDAAWARE_MODULE_FILE) && $(CC) $(CFLAGS) -o $@ $< $(CUDAAWARE_LIBS)
 
 $(BINFOLDER)/%_Nccl: src/%_Nccl.cu $(NCCL_MODULE_FILE) | $(DIRS)
 	@echo "Building $@"
-	mkdir -p ${BINFOLDER}
+	mkdir -p $(dir $@)
 	source $(NCCL_MODULE_FILE) && $(CC) $(CFLAGS) -o $@ $< $(NCCL_LIBS)
 
-$(BINFOLDER)/refactorTest: src/refactorTest.cu $(NCCL_MODULE_FILE) | $(DIRS)
+$(BINFOLDER)/tests/refactorTest: src/tests/refactorTest.cu $(NCCL_MODULE_FILE) | $(DIRS)
+	mkdir -p $(dir $@)
 	$(CC) $(CFLAGS) -o $@ $< $(NCCL_LIBS)
 
 clean:

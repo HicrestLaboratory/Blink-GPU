@@ -146,7 +146,7 @@ struct CommunicationBuffers {
     int sMpicount, rMpicount;
     MPI_Datatype sMpiDtype, rMpiDtype;
 
-    ncclDataType_t ncclType;
+    ncclDataType_t sNcclType, rNcclType;
 
     void init(CommunicatioType type, int msgcount, MPI_Comm comm, InitStrategy str = RANK, int root = 0) {
 
@@ -196,8 +196,8 @@ struct CommunicationBuffers {
                 break;
         }
 
-        tmp_function(msgcount, &sMpicount, &sMpiDtype, &ncclType);
-        tmp_function(msgcount, &rMpicount, &rMpiDtype, &ncclType);
+        tmp_function(msgcount, &sMpicount, &sMpiDtype, &sNcclType);
+        tmp_function(msgcount, &rMpicount, &rMpiDtype, &rNcclType);
 
         bool errorflagsend = sBuff.alloc(sBuffBytes, rank, str);
         if (!errorflagsend) {

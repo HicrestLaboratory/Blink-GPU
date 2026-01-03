@@ -7,16 +7,17 @@
 #include <inttypes.h>
 
 #define MPI
+#define NCCL
 
-#include "../include/error.h"
-#include "../include/type.h"
-#include "../include/gpu_ops.h"
-#include "../include/device_assignment.h"
-#include "../include/cmd_util.h"
-#include "../include/prints.h"
-#include "../include/records.h"
-#include "../include/communicators.h"
-#include "../include/communication_buffers.h"
+#include "error.h"
+#include "type.h"
+#include "gpu_ops.h"
+#include "device_assignment.h"
+#include "cmd_util.h"
+#include "prints.h"
+#include "records.h"
+#include "communicators.h"
+#include "communication_buffers.h"
 
 #ifdef MPIX_CUDA_AWARE_SUPPORT
 /* Needed for MPIX_Query_cuda_support(), below */
@@ -74,7 +75,7 @@ int main(int argc, char *argv[])
 
     RecordsStruct rec;
     CommunicationBuffers<dtype> buffs;
-    rec.init(config, commWrap.inccomm.comm, ALL2ALL);
+    rec.init(config, commWrap.inccomm, ALL2ALL);
 
     for(int j=0; j<rec.niter; j++){
         if (j!=0) rec.increase_msgsize();
@@ -98,12 +99,12 @@ int main(int argc, char *argv[])
 
 
             #if HAVE_NCCL_ALLTOALL
-                ncclAlltoAll(buffs.sBuff.device, buffs.rBuff.device, buffs.sMpicount, buffs.ncclType, commWrap.inccomm.ncclcomm, 0);
+                ncclAlltoAll(buffs.sBuff.device, buffs.rBuff.device, buffs.sMpicount, buffs.sNcclType, rec.ncclcomm, 0);
             #else
                 ncclGroupStart();
                 for (int r=0; r<rec.comm_size; r++) {
-                    ncclSend(((dtype*)buffs.sBuff.device) + (r*buffs.sMpicount)*sizeof(dtype), buffs.sMpicount, buffs.ncclType, r, commWrap.inccomm.ncclcomm, 0);
-                    ncclRecv(((dtype*)buffs.rBuff.device) + (r*buffs.sMpicount)*sizeof(dtype), buffs.sMpicount, buffs.ncclType, r, commWrap.inccomm.ncclcomm, 0);
+                    ncclSend(((dtype*)buffs.sBuff.device) + (r*buffs.sMpicount)*sizeof(dtype), buffs.sMpicount, buffs.sNcclType, r, rec.ncclcomm, 0);
+                    ncclRecv(((dtype*)buffs.rBuff.device) + (r*buffs.sMpicount)*sizeof(dtype), buffs.rMpicount, buffs.rNcclType, r, rec.ncclcomm, 0);
                 }
                 ncclGroupEnd();
             #endif
