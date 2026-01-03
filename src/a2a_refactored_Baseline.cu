@@ -79,7 +79,7 @@ int main(int argc, char *argv[])
         if (j!=0) rec.increase_msgsize();
     
         buffs.init(rec.type, rec.msgsize, rec.comm, RANDOM_INT8);
-        if (j<3) buffs.print('s', rank, stdout);
+        if ((config->verbose > 2) && (j<3)) buffs.print('s', rank, stdout);
 
         buffs.sendBuff_reduction(&(rec.sendSideChecks[j]));
 
@@ -118,29 +118,33 @@ int main(int argc, char *argv[])
     MPI_Barrier(rec.comm);
 
     char *s = (char*)malloc(sizeof(char)*(20*(rec.niter) + 100));
-    sprintf(s, "[%d] %15s = ", rank, "sendSideChecks");
-    for (int i=0; i<rec.niter; i++) {
-        sprintf(s+strlen(s), " %5d", rec.sendSideChecks[i]);
-    }
-    sprintf(s+strlen(s), " (for Error)\n");
-    printf("%s", s);
-    fflush(stdout);
+    if (config->verbose > 1) {
+        sprintf(s, "[%d] %15s = ", rank, "sendSideChecks");
+        for (int i=0; i<rec.niter; i++) {
+            sprintf(s+strlen(s), " %5d", rec.sendSideChecks[i]);
+        }
+        sprintf(s+strlen(s), " (for Error)\n");
+        printf("%s", s);
+        fflush(stdout);
 
-    sprintf(s, "[%d] %15s = ", rank, "recvSideChecks");
-    for (int i=0; i<rec.niter; i++) {
-        sprintf(s+strlen(s), " %5d", rec.recvSideChecks[i]);
+        sprintf(s, "[%d] %15s = ", rank, "recvSideChecks");
+        for (int i=0; i<rec.niter; i++) {
+            sprintf(s+strlen(s), " %5d", rec.recvSideChecks[i]);
+        }
+        sprintf(s+strlen(s), " (for Error)\n");
+        printf("%s", s);
+        fflush(stdout);
     }
-    sprintf(s+strlen(s), " (for Error)\n");
-    printf("%s", s);
-    fflush(stdout);
 
-    sprintf(s, "[%d] %15s = ", rank, "check_results");
-    for (int i=0; i<rec.niter; i++) {
-        sprintf(s+strlen(s), " %5d", rec.check_results[i]);
+    if (config->verbose > 0) {
+        sprintf(s, "[%d] %15s = ", rank, "check_results");
+        for (int i=0; i<rec.niter; i++) {
+            sprintf(s+strlen(s), " %5d", rec.check_results[i]);
+        }
+        sprintf(s+strlen(s), " (for Error)\n");
+        printf("%s", s);
+        fflush(stdout);
     }
-    sprintf(s+strlen(s), " (for Error)\n");
-    printf("%s", s);
-    fflush(stdout);
 
     rec.clear();
     MPI_Finalize();

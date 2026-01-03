@@ -39,7 +39,7 @@ struct BufferHolder {
     void init_host_buff (InitStrategy str, int rank) {
         rng_state += rank;
 
-        double start = MPI_Wtime();
+        // double start = MPI_Wtime();
         switch (str) {
             case RANDOM_UINT8:
                 for(SZTYPE i=0; i<(bytes/sizeof(u_int8_t)); i++)
@@ -72,9 +72,8 @@ struct BufferHolder {
             default:
                 break;
         }
-        double stop = MPI_Wtime();
-
-        fprintf(stdout, "Array initiated in %lf s\n", stop - start);
+        // double stop = MPI_Wtime();
+        // fprintf(stdout, "Array initiated in %lf s\n", stop - start);
     }
 
     bool alloc(SZTYPE bufferByteLen, int rank, InitStrategy str = RANK) {
