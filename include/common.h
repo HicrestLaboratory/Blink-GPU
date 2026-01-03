@@ -10,6 +10,13 @@
 #include <string.h>
 #include <unistd.h>
 #include <mpi.h>
+#include <nccl.h>
+
+#if NCCL_VERSION_CODE >= NCCL_VERSION(2,19,0)
+#define HAVE_NCCL_ALLTOALL 1
+#else
+#define HAVE_NCCL_ALLTOALL 0
+#endif
 
 #if defined(USE_NVTX)
 #include <nvToolsExt.h>

@@ -61,13 +61,13 @@ pp:  $(PP_TARGETS_LIST)
 a2a: $(A2A_TARGETS_LIST)
 ar:  $(AR_TARGETS_LIST)
 
-refactored: $(BINFOLDER)/a2a_refactored_Baseline $(BINFOLDER)/refactorTest
+refactored: $(BINFOLDER)/a2a_refactored_Baseline $(BINFOLDER)/a2a_refactored_CudaAware $(BINFOLDER)/a2a_refactored_Nccl $(BINFOLDER)/ar_refactored_Baseline $(BINFOLDER)/pp_refactored_Baseline $(BINFOLDER)/mpp_refactored_Baseline $(BINFOLDER)/refactorTest
 
 # ------------------ Libs & Flags ------------------
 MPI=-L$(BLINKGPU_MPI_HOME)/lib -I$(BLINKGPU_MPI_HOME)/include -lmpi
 MPICUDA=-L$(BLINKGPU_MPICUDA_HOME)/lib -I$(BLINKGPU_MPICUDA_HOME)/include -lmpi
 CUDA=-L$(BLINKGPU_CUDA_HOME)/lib64 -L$(BLINKGPU_CUDA_HOME)/compact -I$(BLINKGPU_CUDA_HOME)/include -lcudart -lcuda
-NCCL=-L$(BLINKGPU_NCCL_HOME)/lib -I$(BLINKGPU_NCCL_HOME)/include -lnccl
+NCCL=-DNCCL -L$(BLINKGPU_NCCL_HOME)/lib -I$(BLINKGPU_NCCL_HOME)/include -lnccl
 
 BASELINE_LIBS = $(MPI) $(CUDA)
 CUDAAWARE_LIBS = $(MPICUDA) $(CUDA)

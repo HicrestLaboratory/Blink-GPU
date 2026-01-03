@@ -15,8 +15,8 @@
 #define MPI_dtype MPI_INT8_T
 #define MPI_dtype_big MPI_INT64_T
 
-#define ncclDtype ncclChar // ncclUint8
-#define ncclDtype_big ncclUint64
+#define ncclDtype ncclInt8
+#define ncclDtype_big ncclInt64
 
 #define cktype int32_t
 #define MPI_cktype MPI_INT32_T

@@ -12,7 +12,7 @@ struct MyMpiComm
     MPI_Comm comm;
     int rank, size;
 
-    void init (MPI_Comm in_comm) {
+    void init(MPI_Comm in_comm) {
         if (in_comm == MPI_COMM_NULL) {
             fprintf(stderr, "Error: %s found an MPI_COMM_NULL\n", __func__);
             exit(__LINE__);
@@ -22,6 +22,23 @@ struct MyMpiComm
         MPI_Comm_size(in_comm, &size);
         MPI_Comm_rank(in_comm, &rank);
     }
+
+#ifdef NCCL
+    ncclComm_t ncclcomm;
+
+    void add_nccl(void) {
+        // Step 1: unique ID created by rank 0
+        ncclUniqueId id;
+        if (rank == 0) ncclGetUniqueId(&id);
+
+        // Step 2: send ID to all others using MPI
+        MPI_Bcast(&id, sizeof(id), MPI_BYTE, 0, comm);
+
+        // Step 3: create NCCL communicator
+        ncclCommInitRank(&ncclcomm, size, id, rank);
+    }
+#endif
+
 };
 
 static void print_comm_info(const char *label, const MyMpiComm *c, FILE *fp)
@@ -582,6 +599,12 @@ struct BlinkCommWrapper {
         geninclist(kind, level);
     }
 
+#ifdef NCCL
+    void add_nccl(void) {
+        inccomm.add_nccl();
+    }
+#endif
+
     void comms_binary_tree(FILE *fp, int box_w = 7)
     {
         if (height <= 0) {
@@ -697,3 +720,23 @@ struct BlinkCommWrapper {
         }
     }
 };
+
+int naive_process_peering (MPI_Comm comm, int ncouples) {
+
+    int rank, size;
+    MPI_Comm_size(comm, &size);
+    MPI_Comm_rank(comm, &rank);
+
+    int mypeer;
+    if (rank < ncouples) {
+        mypeer = size - ncouples + rank;
+    }
+    else if (rank >= size - ncouples) {
+        mypeer = rank - (size - ncouples);
+    }
+    else {
+        mypeer = -1;
+    }
+
+    return(mypeer);
+}

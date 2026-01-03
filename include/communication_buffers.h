@@ -116,17 +116,19 @@ struct BufferHolder {
 
 
 
-bool tmp_function(size_t bytes, int *mpicount, MPI_Datatype *mpitype) {
+bool tmp_function(size_t bytes, int *mpicount, MPI_Datatype *mpitype, ncclDataType_t *nccltype) {
     (*mpicount) = 0;
     if(bytes >= 8 && bytes % 8 == 0){ // Check if I can use 64-bit data types
 
         (*mpicount) = bytes / 8;
         (*mpitype)  = MPI_dtype_big;
+        (*nccltype) = ncclDtype_big;
         if ((*mpicount) >= ((u_int64_t) (1UL << 32)) - 1) // If large_count can't be represented on 32 bits
             return(false);
     }else{
         (*mpicount) = bytes;
         (*mpitype)  = MPI_dtype;
+        (*nccltype) = ncclDtype;
         if (bytes >= ((u_int64_t) (1UL << 32)) - 1) // If N can't be represented on 32 bits
             return(false);
     }
@@ -143,6 +145,8 @@ struct CommunicationBuffers {
 
     int sMpicount, rMpicount;
     MPI_Datatype sMpiDtype, rMpiDtype;
+
+    ncclDataType_t ncclType;
 
     void init(CommunicatioType type, int msgcount, MPI_Comm comm, InitStrategy str = RANK, int root = 0) {
 
@@ -192,8 +196,8 @@ struct CommunicationBuffers {
                 break;
         }
 
-        tmp_function(msgcount, &sMpicount, &sMpiDtype);
-        tmp_function(msgcount, &rMpicount, &rMpiDtype);
+        tmp_function(msgcount, &sMpicount, &sMpiDtype, &ncclType);
+        tmp_function(msgcount, &rMpicount, &rMpiDtype, &ncclType);
 
         bool errorflagsend = sBuff.alloc(sBuffBytes, rank, str);
         if (!errorflagsend) {
