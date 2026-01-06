@@ -167,8 +167,10 @@ struct MyMpiComm
 
     void init(MPI_Comm in_comm) {
         if (in_comm == MPI_COMM_NULL) {
-            fprintf(stderr, "Error: %s found an MPI_COMM_NULL\n", __func__);
-            exit(__LINE__);
+            comm = MPI_COMM_NULL;
+            size = -1;
+            rank = -1;
+            return;
         }
 
         comm = in_comm;
