@@ -51,9 +51,6 @@ int main(int argc, char *argv[])
     parse_args(argc, argv, config);
 
     // ----- Set BlinkCommWrapper & define communicators -----
-    // BlinkCommWrapper commWrap;
-    // commWrap.init(config, true, WORLD);
-    // if (rank == 0) commWrap.print(stdout);
 
     ProcessEnv penv;
     AddrStruct addr;
@@ -65,6 +62,7 @@ int main(int argc, char *argv[])
 
     MpiComms2 newcomms;
     newcomms.init(newworld_buffers);
+    newcomms.assign_cuda_gpu();
     newcomms.pregraph();
     newworld_buffers.clear();
     if(newcomms.world.rank==0) newcomms.graph.netPrint();
@@ -74,7 +72,6 @@ int main(int argc, char *argv[])
 
 #ifndef SKIPCPUAFFINITY
     if (0==rank) printf("List device affinity:\n");
-    // check_cpu_and_gpu_affinity(commWrap.comms->node_comm.rank);
     check_cpu_and_gpu_affinity(newcomms.subcomms[newcomms.nfields-1].rank);
     if (0==rank) printf("List device affinity done.\n\n");
     MPI_Barrier(newcomms.world.comm);
@@ -89,7 +86,6 @@ int main(int argc, char *argv[])
 
     RecordsStruct rec;
     CommunicationBuffers<dtype> buffs;
-    // rec.init(config, commWrap.inccomm, ALL2ALL);
     rec.init(config, newcomms.world, ALL2ALL);
 
     for(int j=0; j<rec.niter; j++){

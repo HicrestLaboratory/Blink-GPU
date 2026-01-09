@@ -148,11 +148,12 @@ struct CommunicationBuffers {
 
     ncclDataType_t sNcclType, rNcclType;
 
-    void init(CommunicatioType type, int msgcount, MPI_Comm comm, InitStrategy str = RANK, int root = 0) {
+    void init(CommunicatioType type, size_t msgcount, MPI_Comm comm, InitStrategy str = RANK, int root = 0) {
 
-        int rank, commsize;
+        int rank, commsize_int;
         MPI_Comm_rank(comm, &rank);
-        MPI_Comm_size(comm, &commsize);
+        MPI_Comm_size(comm, &commsize_int);
+        size_t commsize = static_cast<size_t>(commsize_int);
 
         switch (type) {
             case ALL2ALL:

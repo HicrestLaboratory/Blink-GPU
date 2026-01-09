@@ -373,6 +373,8 @@ struct MpiComms2 {
 
     NetworkGraph graph;
 
+    MyMpiComm nodecomm;
+
     void init(const ComputeNewWorld& input) {
         nfields = input.nfields;
         world.init(input.new_world);
@@ -386,6 +388,20 @@ struct MpiComms2 {
             crosscomms[i].init(input.crosscomms[i]);
             subcrosscomms[i].init(input.subcrosscomms[i]);
         }
+
+        nodecomm = subcomms[nfields-1];
+    }
+
+    void assign_cuda_gpu(void) {
+        int num_devices = 0;
+        cudaErrorCheck( cudaGetDeviceCount(&num_devices) );
+        MPI_Allreduce(MPI_IN_PLACE, &num_devices, 1, MPI_INT, MPI_MIN, world.comm);
+
+        if (num_devices != nodecomm.size) {
+            fprintf(stderr, "Error: ngpus per node must be the same on all the nodes and must be the same of the nodeComm size.\n");
+            MPI_Abort(MPI_COMM_WORLD, __LINE__);
+        }
+        cudaSetDevice(nodecomm.rank);
     }
 
     void pregraph (void) {
