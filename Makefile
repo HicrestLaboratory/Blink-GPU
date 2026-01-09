@@ -84,7 +84,8 @@ mpp: $(MPP_TARGETS_LIST)
 a2a: $(A2A_TARGETS_LIST)
 ar:  $(AR_TARGETS_LIST)
 
-refactored: $(BINFOLDER)/std/pp_refactored_Baseline $(BINFOLDER)/tests/refactorTest
+refactored: $(BINFOLDER)/std/pp_refactored_Baseline
+tests: $(BINFOLDER)/tests/refactorTest $(BINFOLDER)/tests/newCommsTest
 $(info ----------------------------------------------------------------)
 
 # ------------------ Libs & Flags ------------------
@@ -142,6 +143,10 @@ $(BINFOLDER)/%_Nccl: src/%_Nccl.cu $(NCCL_MODULE_FILE) | $(DIRS)
 	source $(NCCL_MODULE_FILE) && $(CC) $(CFLAGS) -o $@ $< $(NCCL_LIBS)
 
 $(BINFOLDER)/tests/refactorTest: src/tests/refactorTest.cu $(NCCL_MODULE_FILE) | $(DIRS)
+	mkdir -p $(dir $@)
+	$(CC) $(CFLAGS) -o $@ $< $(NCCL_LIBS)
+
+$(BINFOLDER)/tests/newCommsTest: src/tests/newCommsTest.cu $(NCCL_MODULE_FILE) | $(DIRS)
 	mkdir -p $(dir $@)
 	$(CC) $(CFLAGS) -o $@ $< $(NCCL_LIBS)
 

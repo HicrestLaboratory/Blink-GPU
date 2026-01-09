@@ -21,28 +21,6 @@ typedef struct process_env {
 
 } ProcessEnv;
 
-int addr_distance(const char *a, const char *b) {
-    int i = 0;
-    int last_dot = -1;
-    int dots = 0;
-
-    while (a[i] && b[i] && a[i] == b[i]) {
-        if (a[i] == '.') {
-            dots++;
-            last_dot = i;
-        }
-        i++;
-    }
-
-    // If mismatch occurred after a dot, dots is correct.
-    // If mismatch occurred inside a field, ignore the partial field.
-    // dots already counts only completed fields.
-
-    /* if both reached NUL, strings are identical -> add +1 */
-    if (a[i] == '\0' && b[i] == '\0') dots++;
-    return dots;
-}
-
 struct MpiComms
 {
     MyMpiComm world;

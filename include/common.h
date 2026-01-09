@@ -218,3 +218,90 @@ static void print_comm_info(const char *label, const MyMpiComm *c, FILE *fp)
     fprintf(fp, "[%-12s] hostname=%-20s commname=%-20s rank=%4d size=%4d\n",
            label, host_name, name, c->rank, c->size);
 }
+
+int addr_distance(const char *a, const char *b) {
+    int i = 0;
+    int last_dot = -1;
+    int dots = 0;
+
+    while (a[i] && b[i] && a[i] == b[i]) {
+        if (a[i] == '.') {
+            dots++;
+            last_dot = i;
+        }
+        i++;
+    }
+
+    // If mismatch occurred after a dot, dots is correct.
+    // If mismatch occurred inside a field, ignore the partial field.
+    // dots already counts only completed fields.
+
+    /* if both reached NUL, strings are identical -> add +1 */
+    if (a[i] == '\0' && b[i] == '\0') dots++;
+    return dots;
+}
+
+struct AddrStruct {
+    const char *addr_str;
+    int         addr_str_len;
+
+    char *node_name;
+    int   node_name_len;
+
+    int    nswitchs;
+    char **switch_names;
+    int   *switch_name_lens;
+
+    int max_lable_len;
+
+    void init(const char *addr_string)
+    {
+        addr_str     = addr_string;
+        addr_str_len = strlen(addr_string);
+
+        int dots = 0;
+        for (int i = 0; addr_string[i]; i++) {
+            if (addr_string[i] == '.') dots++;
+        }
+
+        /* tokens = dots + 1 */
+        nswitchs = dots;   /* last token is node_name */
+
+        switch_names     = (char **)malloc(sizeof(char *) * nswitchs);
+        switch_name_lens = (int   *)malloc(sizeof(int)    * nswitchs);
+
+        const char *start = addr_string;
+        const char *dot   = NULL;
+
+        /* Extract switch names */
+        for (int j = 0; j < nswitchs; j++) {
+            dot = strchr(start, '.');
+
+            switch_name_lens[j] = dot - start;
+            switch_names[j] = (char *)malloc(switch_name_lens[j] + 1);
+
+            memcpy(switch_names[j], start, switch_name_lens[j]);
+            switch_names[j][switch_name_lens[j]] = '\0';
+
+            start = dot + 1;
+        }
+
+        /* Remaining token → node_name */
+        node_name_len = strlen(start);
+        node_name = (char *)malloc(node_name_len + 1);
+        memcpy(node_name, start, node_name_len);
+        node_name[node_name_len] = '\0';
+
+        // Compute local max name len
+        max_lable_len = strlen(node_name);
+        for (int i=0; i<nswitchs; i++) if(strlen(switch_names[i])>max_lable_len) max_lable_len = strlen(switch_names[i]);
+    }
+
+    void print(FILE *fp) {
+        fprintf(fp, "\n=== ADDR info  ===\n");
+        fprintf(fp, "ADDR string: %s\n\n", addr_str);
+
+        for(int i=0; i<nswitchs; i++) fprintf(fp, "Switch L%d: %s\n", nswitchs - i, switch_names[i]);
+        fprintf(fp, "Node: %s\n", node_name);
+    }
+};
