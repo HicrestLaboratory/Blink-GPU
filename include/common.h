@@ -305,3 +305,17 @@ struct AddrStruct {
         fprintf(fp, "Node: %s\n", node_name);
     }
 };
+
+typedef struct process_env {
+
+    char* home = nullptr;
+    char* slurm_addr = nullptr;
+    char* slurm_node = nullptr;
+
+    void init_processenv(void) {
+        home = std::getenv("HOME");
+        slurm_node = std::getenv("SLURM_NODEID");
+        slurm_addr = std::getenv("SLURM_TOPOLOGY_ADDR");
+    }
+
+} ProcessEnv;

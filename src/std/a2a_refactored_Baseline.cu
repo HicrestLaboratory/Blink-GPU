@@ -16,6 +16,7 @@
 #include "prints.h"
 #include "records.h"
 #include "communicators.h"
+#include "communicators2.h"
 #include "communication_buffers.h"
 
 #ifdef MPIX_CUDA_AWARE_SUPPORT
@@ -50,22 +51,37 @@ int main(int argc, char *argv[])
     parse_args(argc, argv, config);
 
     // ----- Set BlinkCommWrapper & define communicators -----
-    BlinkCommWrapper commWrap;
-    commWrap.init(config, true, WORLD);
-    if (rank == 0) commWrap.print(stdout);
+    // BlinkCommWrapper commWrap;
+    // commWrap.init(config, true, WORLD);
+    // if (rank == 0) commWrap.print(stdout);
+
+    ProcessEnv penv;
+    AddrStruct addr;
+    penv.init_processenv();
+    addr.init(penv.slurm_addr);
+    ComputeNewWorld newworld_buffers;
+    newworld_buffers.init(addr, MPI_COMM_WORLD);
+    newworld_buffers.gen_all();
+
+    MpiComms2 newcomms;
+    newcomms.init(newworld_buffers);
+    newcomms.pregraph();
+    newworld_buffers.clear();
+    if(newcomms.world.rank==0) newcomms.graph.netPrint();
 
     fflush(stdout);
-    MPI_Barrier(MPI_COMM_WORLD);
+    MPI_Barrier(newcomms.world.comm);
 
 #ifndef SKIPCPUAFFINITY
     if (0==rank) printf("List device affinity:\n");
-    check_cpu_and_gpu_affinity(commWrap.comms->node_comm.rank);
+    // check_cpu_and_gpu_affinity(commWrap.comms->node_comm.rank);
+    check_cpu_and_gpu_affinity(newcomms.subcomms[newcomms.nfields-1].rank);
     if (0==rank) printf("List device affinity done.\n\n");
-    MPI_Barrier(MPI_COMM_WORLD);
+    MPI_Barrier(newcomms.world.comm);
 #endif
 
     fflush(stdout);
-    MPI_Barrier(MPI_COMM_WORLD);
+    MPI_Barrier(newcomms.world.comm);
 
      /* -------------------------------------------------------------------------------------------
         Loop from 8 B to 1 GB
@@ -73,7 +89,8 @@ int main(int argc, char *argv[])
 
     RecordsStruct rec;
     CommunicationBuffers<dtype> buffs;
-    rec.init(config, commWrap.inccomm, ALL2ALL);
+    // rec.init(config, commWrap.inccomm, ALL2ALL);
+    rec.init(config, newcomms.world, ALL2ALL);
 
     for(int j=0; j<rec.niter; j++){
         if (j!=0) rec.increase_msgsize();

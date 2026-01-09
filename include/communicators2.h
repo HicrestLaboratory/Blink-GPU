@@ -1,5 +1,6 @@
-#include "common.h"
+#pragma once
 
+#include "common.h"
 #include <vector>
 
 char **allgather_strings(int strlen_local, const char *str, MPI_Comm mycomm)
