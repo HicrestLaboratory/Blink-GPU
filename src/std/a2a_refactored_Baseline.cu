@@ -50,21 +50,13 @@ int main(int argc, char *argv[])
     Config * config = (Config *)(malloc(sizeof(Config)));
     parse_args(argc, argv, config);
 
-    // ----- Set BlinkCommWrapper & define communicators -----
+    // ----- Set ProcessEnc & MPI comms -----
 
     ProcessEnv penv;
-    AddrStruct addr;
     penv.init_processenv();
-    addr.init(penv.slurm_addr);
-    ComputeNewWorld newworld_buffers;
-    newworld_buffers.init(addr, MPI_COMM_WORLD);
-    newworld_buffers.gen_all();
 
     MpiComms2 newcomms;
-    newcomms.init(newworld_buffers);
-    newcomms.assign_cuda_gpu();
-    newcomms.pregraph();
-    newworld_buffers.clear();
+    newcomms.init(penv);
     if(newcomms.world.rank==0) newcomms.graph.netPrint();
 
     fflush(stdout);

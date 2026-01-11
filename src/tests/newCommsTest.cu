@@ -217,7 +217,7 @@ int main(int argc, char ** argv) {
 
     MpiComms2 newcomms;
     newcomms.init(newworld_buffers);
-    newcomms.pregraph();
+    newcomms.build_graph();
     newworld_buffers.clear();
 
     if(new_rank==0) newcomms.graph.shortPrint();

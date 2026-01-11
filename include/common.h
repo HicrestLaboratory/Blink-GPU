@@ -304,6 +304,35 @@ struct AddrStruct {
         for(int i=0; i<nswitchs; i++) fprintf(fp, "Switch L%d: %s\n", nswitchs - i, switch_names[i]);
         fprintf(fp, "Node: %s\n", node_name);
     }
+
+    void clear() {
+        /* Free switch names */
+        if (switch_names) {
+            for (int i = 0; i < nswitchs; i++) {
+                free(switch_names[i]);
+                switch_names[i] = NULL;
+            }
+            free(switch_names);
+            switch_names = NULL;
+        }
+
+        /* Free switch name lengths */
+        if (switch_name_lens) {
+            free(switch_name_lens);
+            switch_name_lens = NULL;
+        }
+
+        /* Free node name */
+        if (node_name) {
+            free(node_name);
+            node_name = NULL;
+        }
+
+        /* Reset metadata */
+        nswitchs        = 0;
+        node_name_len  = 0;
+        max_lable_len  = 0;
+    }
 };
 
 typedef struct process_env {

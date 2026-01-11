@@ -392,6 +392,19 @@ struct MpiComms2 {
         nodecomm = subcomms[nfields-1];
     }
 
+    void init(ProcessEnv& penv) {
+        AddrStruct addr;
+        addr.init(penv.slurm_addr);
+        ComputeNewWorld newworld_buffers;
+        newworld_buffers.init(addr, MPI_COMM_WORLD);
+        newworld_buffers.gen_all();
+
+        init(newworld_buffers);
+        assign_cuda_gpu();
+        build_graph();
+        newworld_buffers.clear();
+    }
+
     void assign_cuda_gpu(void) {
         int num_devices = 0;
         cudaErrorCheck( cudaGetDeviceCount(&num_devices) );
@@ -404,7 +417,7 @@ struct MpiComms2 {
         cudaSetDevice(nodecomm.rank);
     }
 
-    void pregraph (void) {
+    void build_graph (void) {
         int max_nps, nps = (subcrosscomms[nfields-1].comm != MPI_COMM_NULL) ? subcrosscomms[nfields-1].size : 0;
         MPI_Bcast(&nps, 1, MPI_INT, 0, subcomms[nfields-1].comm);
         MPI_Allreduce(&nps, &max_nps, 1, MPI_INT, MPI_MAX, world.comm);
