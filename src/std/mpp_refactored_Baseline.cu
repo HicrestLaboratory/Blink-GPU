@@ -15,7 +15,7 @@
 #include "cmd_util.h"
 #include "prints.h"
 #include "records.h"
-#include "communicators.h"
+#include "netcommunicators.h"
 #include "communication_buffers.h"
 
 #ifdef MPIX_CUDA_AWARE_SUPPORT
@@ -49,23 +49,27 @@ int main(int argc, char *argv[])
     Config * config = (Config *)(malloc(sizeof(Config)));
     parse_args(argc, argv, config);
 
-    // ----- Set BlinkCommWrapper & define communicators -----
-    BlinkCommWrapper commWrap;
-    commWrap.init(config, true, WORLD);
-    if (rank == 0) commWrap.print(stdout);
+    // ----- Set ProcessEnc & MPI comms -----
+
+    ProcessEnv penv;
+    penv.init_processenv();
+
+    MpiNetworkComms netcomms;
+    netcomms.init(penv);
+    if(netcomms.world.rank==0) netcomms.graph.netPrint();
 
     fflush(stdout);
-    MPI_Barrier(MPI_COMM_WORLD);
+    MPI_Barrier(netcomms.world.comm);
 
 #ifndef SKIPCPUAFFINITY
     if (0==rank) printf("List device affinity:\n");
-    check_cpu_and_gpu_affinity(commWrap.comms->node_comm.rank);
+    check_cpu_and_gpu_affinity(netcomms.subcomms[netcomms.nfields-1].rank);
     if (0==rank) printf("List device affinity done.\n\n");
-    MPI_Barrier(MPI_COMM_WORLD);
+    MPI_Barrier(netcomms.world.comm);
 #endif
 
     fflush(stdout);
-    MPI_Barrier(MPI_COMM_WORLD);
+    MPI_Barrier(netcomms.world.comm);
 
      /* -------------------------------------------------------------------------------------------
         Loop from 8 B to 1 GB
@@ -73,7 +77,7 @@ int main(int argc, char *argv[])
 
     RecordsStruct rec;
     CommunicationBuffers<dtype> buffs;
-    rec.init(config, commWrap.inccomm, SENDRECV);
+    rec.init(config, netcomms.world, SENDRECV);
 
     for(int j=0; j<rec.niter; j++){
         if (j!=0) rec.increase_msgsize();
@@ -91,7 +95,7 @@ int main(int argc, char *argv[])
 
         const int TAG = 0;
         MPI_Request request;
-        int ncouples = commWrap.comms->node_comm.size;
+        int ncouples = netcomms.nodecomm.size;
         int mypeer = naive_process_peering (rec.comm, ncouples);
 
         rec.print_iter_info(rank);

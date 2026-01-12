@@ -215,7 +215,7 @@ int main(int argc, char ** argv) {
     fflush(stdout);
     MPI_Barrier(MPI_COMM_WORLD);
 
-    MpiComms2 newcomms;
+    MpiNetworkComms newcomms;
     newcomms.init(newworld_buffers);
     newcomms.build_graph();
     newworld_buffers.clear();

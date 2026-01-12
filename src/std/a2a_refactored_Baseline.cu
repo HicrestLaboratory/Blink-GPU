@@ -15,8 +15,7 @@
 #include "cmd_util.h"
 #include "prints.h"
 #include "records.h"
-#include "communicators.h"
-#include "communicators2.h"
+#include "netcommunicators.h"
 #include "communication_buffers.h"
 
 #ifdef MPIX_CUDA_AWARE_SUPPORT
@@ -55,22 +54,22 @@ int main(int argc, char *argv[])
     ProcessEnv penv;
     penv.init_processenv();
 
-    MpiComms2 newcomms;
-    newcomms.init(penv);
-    if(newcomms.world.rank==0) newcomms.graph.netPrint();
+    MpiNetworkComms netcomms;
+    netcomms.init(penv);
+    if(netcomms.world.rank==0) netcomms.graph.netPrint();
 
     fflush(stdout);
-    MPI_Barrier(newcomms.world.comm);
+    MPI_Barrier(netcomms.world.comm);
 
 #ifndef SKIPCPUAFFINITY
     if (0==rank) printf("List device affinity:\n");
-    check_cpu_and_gpu_affinity(newcomms.subcomms[newcomms.nfields-1].rank);
+    check_cpu_and_gpu_affinity(netcomms.subcomms[netcomms.nfields-1].rank);
     if (0==rank) printf("List device affinity done.\n\n");
-    MPI_Barrier(newcomms.world.comm);
+    MPI_Barrier(netcomms.world.comm);
 #endif
 
     fflush(stdout);
-    MPI_Barrier(newcomms.world.comm);
+    MPI_Barrier(netcomms.world.comm);
 
      /* -------------------------------------------------------------------------------------------
         Loop from 8 B to 1 GB
@@ -78,7 +77,7 @@ int main(int argc, char *argv[])
 
     RecordsStruct rec;
     CommunicationBuffers<dtype> buffs;
-    rec.init(config, newcomms.world, ALL2ALL);
+    rec.init(config, netcomms.world, ALL2ALL);
 
     for(int j=0; j<rec.niter; j++){
         if (j!=0) rec.increase_msgsize();

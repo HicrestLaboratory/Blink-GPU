@@ -348,3 +348,23 @@ typedef struct process_env {
     }
 
 } ProcessEnv;
+
+int naive_process_peering (MPI_Comm comm, int ncouples) {
+
+    int rank, size;
+    MPI_Comm_size(comm, &size);
+    MPI_Comm_rank(comm, &rank);
+
+    int mypeer;
+    if (rank < ncouples) {
+        mypeer = size - ncouples + rank;
+    }
+    else if (rank >= size - ncouples) {
+        mypeer = rank - (size - ncouples);
+    }
+    else {
+        mypeer = -1;
+    }
+
+    return(mypeer);
+}

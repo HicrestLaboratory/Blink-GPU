@@ -362,7 +362,7 @@ struct NetworkGraph {
     }
 };
 
-struct MpiComms2 {
+struct MpiNetworkComms {
     MyMpiComm world;
     AddrStruct addr;
 
@@ -416,6 +416,12 @@ struct MpiComms2 {
         }
         cudaSetDevice(nodecomm.rank);
     }
+
+#ifdef NCCL
+    void add_nccl(void) {
+        world.add_nccl();
+    }
+#endif
 
     void build_graph (void) {
         int max_nps, nps = (subcrosscomms[nfields-1].comm != MPI_COMM_NULL) ? subcrosscomms[nfields-1].size : 0;
