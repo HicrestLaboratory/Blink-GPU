@@ -1,0 +1,3 @@
+[submodule "energy/energy-profiler"]
+	path = energy/energy-profiler
+	url = https://github.com/lorenzo-carpentieri/energy-profiler.git
